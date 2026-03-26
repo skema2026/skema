@@ -1,14 +1,9 @@
-# Environment variables
+# ── 환경변수 ──────────────────────────────────────────────
 .env
 .env.local
 .env.*.local
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Python
+# ── Python ────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
@@ -17,12 +12,17 @@ __pycache__/
 venv/
 *.egg-info/
 
-# Frontend (Vite)
+# ── SQLite DB ─────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Frontend (Vite — 구버전) ──────────────────────────────
 frontend/node_modules/
 frontend/dist/
 frontend/.cache/
 
-# Frontend (Next.js)
+# ── Frontend (Next.js) ────────────────────────────────────
 frontend-next/node_modules/
 frontend-next/.next/
 frontend-next/out/
@@ -30,12 +30,18 @@ frontend-next/.env*
 frontend-next/*.tsbuildinfo
 frontend-next/next-env.d.ts
 
-# macOS
+# ── OS ────────────────────────────────────────────────────
 .DS_Store
+Thumbs.db
+desktop.ini
 
-# IDE
+# ── IDE ───────────────────────────────────────────────────
 .vscode/
 .idea/
+*.swp
 
-# Local skills
+# ── Claude Code ───────────────────────────────────────────
+.claude/
+
+# ── 기타 ──────────────────────────────────────────────────
 backend/deep-research-skills/
