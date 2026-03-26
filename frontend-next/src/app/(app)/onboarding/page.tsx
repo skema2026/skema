@@ -175,7 +175,7 @@ export default function OnboardingPage() {
           {!isDone && (
             <button
               onClick={handleSkip}
-              className="text-xs text-gray-400 hover:text-gray-600 underline"
+              className="text-xs font-semibold text-gray-500 hover:text-gray-800 border border-gray-300 hover:border-gray-400 rounded-lg px-3 py-1.5 transition-all"
             >
               건너뛰기
             </button>
@@ -244,27 +244,36 @@ export default function OnboardingPage() {
 
         {/* Input */}
         {!isDone && (
-          <div className="flex gap-2">
-            <input
-              className="flex-1 px-4 py-3 text-sm border-2 rounded-xl outline-none focus:border-indigo-400 transition-colors"
-              placeholder={currentStep?.hint || '입력하세요...'}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              disabled={isProcessing}
-            />
+          <>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 px-4 py-3 text-sm border-2 rounded-xl outline-none focus:border-indigo-400 transition-colors"
+                placeholder={currentStep?.hint || '입력하세요...'}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                disabled={isProcessing}
+              />
+              <button
+                onClick={() => handleSend()}
+                disabled={!input.trim() || isProcessing}
+                className="px-5 py-3 rounded-xl text-sm font-bold text-white transition-all"
+                style={{
+                  background: (!input.trim() || isProcessing) ? '#d1d5db' : 'var(--skema-primary)',
+                  cursor: (!input.trim() || isProcessing) ? 'not-allowed' : 'pointer',
+                }}
+              >
+                전송
+              </button>
+            </div>
             <button
-              onClick={() => handleSend()}
-              disabled={!input.trim() || isProcessing}
-              className="px-5 py-3 rounded-xl text-sm font-bold text-white transition-all"
-              style={{
-                background: (!input.trim() || isProcessing) ? '#d1d5db' : 'var(--skema-primary)',
-                cursor: (!input.trim() || isProcessing) ? 'not-allowed' : 'pointer',
-              }}
+              onClick={handleSkip}
+              disabled={isProcessing}
+              className="mt-3 w-full py-2.5 rounded-xl text-sm font-medium text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700 hover:bg-gray-50 transition-all"
             >
-              전송
+              온보딩 건너뛰기 (나중에 설정에서 변경 가능)
             </button>
-          </div>
+          </>
         )}
       </div>
     </div>
