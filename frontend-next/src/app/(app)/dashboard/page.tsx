@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,10 @@ export default function DashboardPage() {
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [notification, setNotification] = useState<Schedule | null>(null);
+  const [isRegenerateOpen, setIsRegenerateOpen] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenerateForm, setRegenerateForm] = useState({ subject: '', days: '7', hours: '2' });
+  const queryClient = useQueryClient();
 
   // Notification system
   const checkNotifications = useCallback(() => {
@@ -78,6 +83,24 @@ export default function DashboardPage() {
   const total = schedules.length;
   const done = schedules.filter((s) => s.is_completed).length;
   const pct = total > 0 ? Math.round((done / total) * 100) : null;
+
+  const handleRegenerate = async () => {
+    const { subject, days, hours } = regenerateForm;
+    if (!subject.trim()) { toast.error('과목명을 입력하세요'); return; }
+    setIsRegenerating(true);
+    try {
+      const message = `기존 학습 일정을 모두 삭제하고 ${subject} 학습 일정을 ${days}일간 하루 ${hours}시간씩 새로 만들어줘`;
+      await api.post('/ai/chat', { message, messages: [] });
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      toast.success('학습 시간표가 재생성되었습니다');
+      setIsRegenerateOpen(false);
+      setRegenerateForm({ subject: '', days: '7', hours: '2' });
+    } catch {
+      toast.error('재생성 중 오류가 발생했습니다');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -233,6 +256,15 @@ export default function DashboardPage() {
                 <TabsTrigger value="exams">시험 일정</TabsTrigger>
               </TabsList>
               <TabsContent value="timetable">
+                <div className="flex justify-end mb-3">
+                  <button
+                    onClick={() => setIsRegenerateOpen(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
+                  >
+                    <MaterialIcon icon="refresh" size={15} color="var(--skema-on-surface-variant)" />
+                    학습 시간표 재생성
+                  </button>
+                </div>
                 {isLoading ? (
                   <div className="flex items-center justify-center h-64">
                     <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--skema-secondary-container)', borderTopColor: 'transparent' }} />
@@ -240,7 +272,6 @@ export default function DashboardPage() {
                 ) : (
                   <Timetable schedules={schedules} />
                 )}
-
               </TabsContent>
               <TabsContent value="exams">
                 <ExamList />
@@ -261,6 +292,59 @@ export default function DashboardPage() {
 
         {/* Settings Modal */}
         <SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+        {/* Regenerate Modal */}
+        <Dialog open={isRegenerateOpen} onOpenChange={(o) => !o && setIsRegenerateOpen(false)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>학습 시간표 재생성</DialogTitle>
+            </DialogHeader>
+            <div className="py-2 space-y-4">
+              <p className="text-xs text-gray-500">기존 학습 일정을 삭제하고 새로운 학습 시간표를 생성합니다.</p>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">과목 / 내용</label>
+                <input
+                  className="w-full px-3 py-2 text-sm border rounded-lg"
+                  placeholder="예: 알고리즘, 영어"
+                  value={regenerateForm.subject}
+                  onChange={(e) => setRegenerateForm({ ...regenerateForm, subject: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">기간 (일)</label>
+                  <select
+                    className="w-full px-3 py-2 text-sm border rounded-lg bg-white"
+                    value={regenerateForm.days}
+                    onChange={(e) => setRegenerateForm({ ...regenerateForm, days: e.target.value })}
+                  >
+                    {[3, 5, 7, 14].map((d) => <option key={d} value={d}>{d}일</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">하루 목표 (시간)</label>
+                  <select
+                    className="w-full px-3 py-2 text-sm border rounded-lg bg-white"
+                    value={regenerateForm.hours}
+                    onChange={(e) => setRegenerateForm({ ...regenerateForm, hours: e.target.value })}
+                  >
+                    {[1, 1.5, 2, 3, 4].map((h) => <option key={h} value={h}>{h}시간</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsRegenerateOpen(false)}>취소</Button>
+              <Button
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                style={{ background: 'var(--skema-primary)', color: '#fff' }}
+              >
+                {isRegenerating ? '생성 중...' : '재생성'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Share Modal */}
         <Dialog open={isShareModalOpen} onOpenChange={(open) => !open && closeShareModal()}>
