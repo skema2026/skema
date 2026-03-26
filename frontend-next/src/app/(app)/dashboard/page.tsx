@@ -84,6 +84,22 @@ export default function DashboardPage() {
   const done = schedules.filter((s) => s.is_completed).length;
   const pct = total > 0 ? Math.round((done / total) * 100) : null;
 
+  const handleReschedule = async () => {
+    setIsRegenerating(true);
+    try {
+      const { data } = await api.post<{ response: string }>('/ai/chat', {
+        message: '미완료 일정을 오늘 이후 빈 시간에 자동으로 재배치해줘',
+        messages: [],
+      });
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      toast.success(data.response.includes('재배치했습니다') ? '일정이 재배치되었습니다' : data.response);
+    } catch {
+      toast.error('재배치 중 오류가 발생했습니다');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   const handleRegenerate = async () => {
     const { subject, days, hours } = regenerateForm;
     if (!subject.trim()) { toast.error('과목명을 입력하세요'); return; }
@@ -256,7 +272,15 @@ export default function DashboardPage() {
                 <TabsTrigger value="exams">시험 일정</TabsTrigger>
               </TabsList>
               <TabsContent value="timetable">
-                <div className="flex justify-end mb-3">
+                <div className="flex justify-end gap-2 mb-3">
+                  <button
+                    onClick={handleReschedule}
+                    disabled={isRegenerating}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: isRegenerating ? 'not-allowed' : 'pointer' }}
+                  >
+                    <MaterialIcon icon="update" size={15} color="var(--skema-on-surface-variant)" />
+                    미완료 일정 재배치
+                  </button>
                   <button
                     onClick={() => setIsRegenerateOpen(true)}
                     style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}

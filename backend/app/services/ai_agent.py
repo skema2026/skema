@@ -116,6 +116,16 @@ TOOLS_SPEC = [
             "required": ["subject"],
         },
     },
+    {
+        "name": "reschedule_incomplete",
+        "description": "미완료 상태인 일정을 오늘 이후 빈 시간대에 자동으로 재배치합니다.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "target_days": {"type": "integer", "description": "재배치 탐색 기간(일수), 기본 7"},
+            },
+        },
+    },
 ]
 
 
@@ -324,6 +334,63 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             return (f"📚 '{subject}' 학습 일정 {created}개 생성 완료!\n"
                     f"📅 {today.strftime('%Y-%m-%d')} ~ {end_date}  ⏰ 하루 {daily_hours}시간 목표")
         return "😅 여유 시간이 부족하여 학습 일정을 생성하지 못했습니다."
+
+    elif tool_name == "reschedule_incomplete":
+        target_days = tool_input.get("target_days", 7)
+        profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+        wake = _t2m(profile.sleep_end if profile and profile.sleep_end else "07:00")
+        sleep = _t2m(profile.sleep_start if profile and profile.sleep_start else "23:00")
+
+        # 미완료 날짜 지정 일정 중 오늘 이전 것만 대상
+        incomplete = db.query(Schedule).filter(
+            Schedule.user_id == user_id,
+            Schedule.is_completed == False,
+            Schedule.date.isnot(None),
+            Schedule.date < today.isoformat(),
+        ).all()
+
+        if not incomplete:
+            return "✅ 재배치할 미완료 일정이 없습니다."
+
+        moved = []
+        for s in incomplete:
+            duration = _t2m(s.end_time) - _t2m(s.start_time)
+            # 오늘부터 target_days일 내 빈 슬롯 탐색
+            for offset in range(target_days):
+                tdate = today + timedelta(days=offset)
+                date_str = tdate.strftime("%Y-%m-%d")
+                dow = tdate.weekday()
+                existing = _day_schedules(db, user_id, dow, date_str)
+                busy = sorted((_t2m(x.start_time), _t2m(x.end_time)) for x in existing if x.id != s.id)
+                cursor = max(8 * 60, wake)
+                placed = False
+                for bs, be in busy:
+                    if cursor + duration <= bs:
+                        s.date = date_str
+                        s.day_of_week = dow
+                        s.start_time = _m2t(cursor)
+                        s.end_time = _m2t(cursor + duration)
+                        s.is_completed = False
+                        db.commit()
+                        moved.append(f"  • {s.title} → {date_str} {s.start_time}~{s.end_time}")
+                        placed = True
+                        break
+                    cursor = max(cursor, be)
+                if not placed and cursor + duration <= sleep:
+                    s.date = date_str
+                    s.day_of_week = dow
+                    s.start_time = _m2t(cursor)
+                    s.end_time = _m2t(cursor + duration)
+                    s.is_completed = False
+                    db.commit()
+                    moved.append(f"  • {s.title} → {date_str} {s.start_time}~{s.end_time}")
+                    placed = True
+                if placed:
+                    break
+
+        if not moved:
+            return f"😅 {target_days}일 내에 재배치 가능한 빈 시간을 찾지 못했습니다."
+        return f"🔄 미완료 일정 {len(moved)}개를 재배치했습니다:\n" + "\n".join(moved)
 
     return f"❌ 알 수 없는 도구: {tool_name}"
 
