@@ -1,56 +1,155 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { api } from '@/lib/api';
 import { useUpdateProfile } from '@/hooks/useProfile';
 import { useCreateExam } from '@/hooks/useExams';
+import { useCreateSchedule } from '@/hooks/useSchedules';
 
-const OCCUPATIONS = ['학생', '직장인', '프리랜서', '기타'];
+type Message = { role: 'ai' | 'user'; text: string };
+
+// 단계별 AI 질문
+const STEPS = [
+  {
+    key: 'occupation',
+    question: '안녕하세요! SKEMA에 오신 걸 환영합니다 😊\n\n먼저 직업 또는 신분을 알려주세요.\n(예: 학생, 직장인, 프리랜서 등)',
+    hint: '직업을 입력하세요',
+    quick: ['학생', '직장인', '프리랜서', '기타'],
+  },
+  {
+    key: 'schedule',
+    question: '반복되는 수업이나 고정 일정이 있나요?\n\n있다면 알려주세요. 예를 들어:\n"월수금 9시-11시 알고리즘 수업"\n"화목 14시-16시 영어"\n\n없으면 "없음"이라고 입력해주세요.',
+    hint: '수업/고정 일정을 입력하세요 (없으면 "없음")',
+    quick: ['없음'],
+  },
+  {
+    key: 'exam',
+    question: '가까운 시험 일정이 있나요?\n\n있다면 알려주세요. 예를 들어:\n"4월 15일 알고리즘 중간고사"\n"5월 20일 영어 기말시험"\n\n없으면 "없음"이라고 입력해주세요.',
+    hint: '시험 일정을 입력하세요 (없으면 "없음")',
+    quick: ['없음'],
+  },
+  {
+    key: 'sleep',
+    question: '평소 수면 시간을 알려주세요.\n\n취침 시간과 기상 시간을 입력해주세요. 예를 들어:\n"밤 11시 취침, 아침 7시 기상"\n"새벽 1시 취침, 오전 8시 기상"',
+    hint: '수면 시간을 입력하세요',
+    quick: ['23시 취침, 7시 기상', '24시 취침, 8시 기상', '1시 취침, 8시 기상'],
+  },
+];
 
 export default function OnboardingPage() {
   const router = useRouter();
   const updateProfile = useUpdateProfile();
   const createExam = useCreateExam();
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState({
-    occupation: '',
-    sleep_start: '23:00',
-    sleep_end: '07:00',
-  });
-  const [examForm, setExamForm] = useState({ title: '', exam_date: '' });
+  const createSchedule = useCreateSchedule();
 
-  const handleNext = () => {
-    if (step < 3) setStep(step + 1);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [stepIdx, setStepIdx] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isDone, setIsDone] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // 첫 질문 표시
+  useEffect(() => {
+    setMessages([{ role: 'ai', text: STEPS[0].question }]);
+  }, []);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const parseTime = (text: string): { sleep_start: string; sleep_end: string } => {
+    // 숫자 추출: "23시 취침, 7시 기상" → sleep_start=23:00, sleep_end=07:00
+    const nums = text.match(/\d+/g)?.map(Number) || [];
+    const toHHMM = (h: number) => `${String(h % 24).padStart(2, '0')}:00`;
+    return {
+      sleep_start: nums[0] !== undefined ? toHHMM(nums[0]) : '23:00',
+      sleep_end: nums[1] !== undefined ? toHHMM(nums[1]) : '07:00',
+    };
   };
 
-  const handleSubmit = () => {
-    updateProfile.mutate(
-      { ...form, onboarding_completed: true },
-      {
-        onSuccess: () => {
-          toast.success('설정이 완료되었습니다! 시간표를 시작해보세요');
-          router.push('/dashboard');
-        },
-        onError: () => {
-          toast.error('설정 저장 중 오류가 발생했습니다');
-        },
+  const parseSchedule = (text: string) => {
+    // AI에게 자연어로 등록 요청
+    return text;
+  };
+
+  const finishOnboarding = async (finalAnswers: Record<string, string>) => {
+    setIsProcessing(true);
+    try {
+      const sleepTimes = parseTime(finalAnswers.sleep || '');
+      await updateProfile.mutateAsync({
+        occupation: finalAnswers.occupation || '',
+        sleep_start: sleepTimes.sleep_start,
+        sleep_end: sleepTimes.sleep_end,
+        onboarding_completed: true,
+      });
+
+      // 시험 일정 등록 (AI에게 위임)
+      const examText = finalAnswers.exam;
+      if (examText && examText !== '없음') {
+        try {
+          await api.post('/ai/chat', {
+            message: `다음 시험 일정을 등록해줘: ${examText}`,
+            messages: [],
+          });
+        } catch { /* 실패해도 온보딩은 계속 */ }
       }
-    );
+
+      // 수업 일정 등록 (AI에게 위임)
+      const scheduleText = finalAnswers.schedule;
+      if (scheduleText && scheduleText !== '없음') {
+        try {
+          await api.post('/ai/chat', {
+            message: `다음 수업 일정을 등록해줘: ${scheduleText}`,
+            messages: [],
+          });
+        } catch { /* 실패해도 온보딩은 계속 */ }
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'ai',
+          text: '모든 정보가 저장되었습니다! 이제 SKEMA와 함께 스마트한 시간 관리를 시작해보세요 🎉\n\n잠시 후 대시보드로 이동합니다.',
+        },
+      ]);
+      setIsDone(true);
+      setTimeout(() => router.push('/dashboard'), 2000);
+    } catch {
+      toast.error('설정 저장 중 오류가 발생했습니다');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleFinishWithExam = () => {
-    if (examForm.title && examForm.exam_date) {
-      createExam.mutate(
-        { title: examForm.title, exam_date: examForm.exam_date },
-        { onSettled: () => handleSubmit() }
-      );
+  const handleSend = async (text?: string) => {
+    const userText = (text ?? input).trim();
+    if (!userText || isProcessing || isDone) return;
+
+    setInput('');
+    setMessages((prev) => [...prev, { role: 'user', text: userText }]);
+
+    const newAnswers = { ...answers, [STEPS[stepIdx].key]: userText };
+    setAnswers(newAnswers);
+
+    const nextIdx = stepIdx + 1;
+
+    if (nextIdx < STEPS.length) {
+      setStepIdx(nextIdx);
+      setTimeout(() => {
+        setMessages((prev) => [...prev, { role: 'ai', text: STEPS[nextIdx].question }]);
+      }, 400);
     } else {
-      handleSubmit();
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'ai', text: '감사합니다! 입력하신 정보를 저장하고 있습니다...' },
+        ]);
+        finishOnboarding(newAnswers);
+      }, 400);
     }
   };
 
@@ -64,169 +163,119 @@ export default function OnboardingPage() {
     );
   };
 
+  const currentStep = STEPS[stepIdx];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950 p-4">
-      <Card className="w-full max-w-lg border-0 shadow-xl">
-        <CardHeader className="text-center">
-          <div className="flex justify-center gap-2 mb-4">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 1 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'}`}>1</div>
-            <div className="flex-1 h-1 my-auto bg-gray-200 rounded">
-              <div className={`h-full bg-indigo-600 rounded transition-all ${step >= 2 ? 'w-full' : 'w-0'}`} />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
+      <div className="w-full max-w-lg flex flex-col" style={{ height: '80vh' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold" style={{ background: 'var(--skema-primary)' }}>
+              AI
             </div>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 2 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'}`}>2</div>
-            <div className="flex-1 h-1 my-auto bg-gray-200 rounded">
-              <div className={`h-full bg-indigo-600 rounded transition-all ${step >= 3 ? 'w-full' : 'w-0'}`} />
+            <div>
+              <p className="font-bold text-sm" style={{ color: 'var(--skema-on-surface)' }}>SKEMA 온보딩</p>
+              <p className="text-xs text-gray-400">
+                {isDone ? '완료' : `${stepIdx + 1} / ${STEPS.length} 단계`}
+              </p>
             </div>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 3 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'}`}>3</div>
           </div>
-          {step === 1 && (
-            <>
-              <CardTitle className="text-2xl font-bold">프로필 설정</CardTitle>
-              <CardDescription>기본 정보를 입력해주세요</CardDescription>
-            </>
+          {!isDone && (
+            <button
+              onClick={handleSkip}
+              className="text-xs text-gray-400 hover:text-gray-600 underline"
+            >
+              건너뛰기
+            </button>
           )}
-          {step === 2 && (
-            <>
-              <CardTitle className="text-2xl font-bold">수면 시간 설정</CardTitle>
-              <CardDescription>AI가 일정 추천 시 참고합니다</CardDescription>
-            </>
-          )}
-          {step === 3 && (
-            <>
-              <CardTitle className="text-2xl font-bold">시험 일정 등록</CardTitle>
-              <CardDescription>가까운 시험을 등록해두세요 (선택)</CardDescription>
-            </>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {step === 1 && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>직업 / 신분</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {OCCUPATIONS.map((occ) => (
-                    <button
-                      key={occ}
-                      type="button"
-                      onClick={() => setForm({ ...form, occupation: occ })}
-                      className={`py-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                        form.occupation === occ
-                          ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
-                          : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300'
-                      }`}
-                    >
-                      {occ}
-                    </button>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-full h-1 bg-gray-200 rounded-full mb-4">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${((stepIdx + (isDone ? 1 : 0)) / STEPS.length) * 100}%`, background: 'var(--skema-primary)' }}
+          />
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1 mb-4">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {msg.role === 'ai' && (
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-1 flex-shrink-0 text-white" style={{ background: 'var(--skema-primary)' }}>
+                  AI
+                </div>
+              )}
+              <div
+                className="max-w-[80%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed"
+                style={
+                  msg.role === 'user'
+                    ? { background: 'var(--skema-primary)', color: '#fff', borderTopRightRadius: 4 }
+                    : { background: '#f1f3f5', color: '#1a1a2e', borderTopLeftRadius: 4 }
+                }
+              >
+                {msg.text}
+              </div>
+            </div>
+          ))}
+          {isProcessing && (
+            <div className="flex justify-start">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-1 flex-shrink-0 text-white" style={{ background: 'var(--skema-primary)' }}>AI</div>
+              <div className="rounded-2xl rounded-tl-sm px-4 py-3 bg-gray-100">
+                <div className="flex gap-1">
+                  {[0, 150, 300].map((d) => (
+                    <span key={d} className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: `${d}ms` }} />
                   ))}
                 </div>
               </div>
-              {form.occupation === '기타' && (
-                <div className="space-y-2">
-                  <Label htmlFor="customOccupation">직접 입력</Label>
-                  <Input
-                    id="customOccupation"
-                    placeholder="직업 / 신분을 입력하세요"
-                    value={form.occupation === '기타' ? '' : form.occupation}
-                    onChange={(e) => setForm({ ...form, occupation: e.target.value })}
-                  />
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <Button variant="ghost" className="flex-1" onClick={handleSkip}>
-                  건너뛰기
-                </Button>
-                <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleNext}>
-                  다음
-                </Button>
-              </div>
             </div>
           )}
+          <div ref={bottomRef} />
+        </div>
 
-          {step === 2 && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sleep_start">취침 시간</Label>
-                  <Input
-                    id="sleep_start"
-                    type="time"
-                    value={form.sleep_start}
-                    onChange={(e) => setForm({ ...form, sleep_start: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sleep_end">기상 시간</Label>
-                  <Input
-                    id="sleep_end"
-                    type="time"
-                    value={form.sleep_end}
-                    onChange={(e) => setForm({ ...form, sleep_end: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 text-sm text-indigo-700 dark:text-indigo-300">
-                💡 수면 시간 설정을 통해 AI가 더 적합한 시간에 일정을 추천해드립니다.
-              </div>
-              <div className="flex gap-3 pt-2">
-                <Button variant="ghost" className="flex-1" onClick={handleSkip}>
-                  건너뛰기
-                </Button>
-                <Button variant="outline" onClick={() => setStep(1)}>
-                  이전
-                </Button>
-                <Button
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                  onClick={handleNext}
-                  disabled={updateProfile.isPending}
-                >
-                  다음
-                </Button>
-              </div>
-            </div>
-          )}
+        {/* Quick replies */}
+        {!isDone && !isProcessing && currentStep?.quick && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {currentStep.quick.map((q) => (
+              <button
+                key={q}
+                onClick={() => handleSend(q)}
+                className="px-3 py-1.5 text-xs rounded-full border-2 font-medium transition-all hover:border-indigo-400 hover:text-indigo-600"
+                style={{ borderColor: 'var(--skema-container)', color: 'var(--skema-on-surface-variant)' }}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
 
-          {step === 3 && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="exam_title">시험 이름</Label>
-                <Input
-                  id="exam_title"
-                  placeholder="예: 중간고사, 기말시험"
-                  value={examForm.title}
-                  onChange={(e) => setExamForm({ ...examForm, title: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="exam_date">시험 날짜</Label>
-                <Input
-                  id="exam_date"
-                  type="date"
-                  value={examForm.exam_date}
-                  onChange={(e) => setExamForm({ ...examForm, exam_date: e.target.value })}
-                />
-              </div>
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 text-sm text-indigo-700 dark:text-indigo-300">
-                💡 나중에 대시보드에서 시험 일정을 추가하거나 수정할 수 있습니다.
-              </div>
-              <div className="flex gap-3 pt-2">
-                <Button variant="ghost" className="flex-1" onClick={handleSubmit} disabled={updateProfile.isPending}>
-                  건너뛰기
-                </Button>
-                <Button variant="outline" onClick={() => setStep(2)}>
-                  이전
-                </Button>
-                <Button
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                  onClick={handleFinishWithExam}
-                  disabled={updateProfile.isPending || createExam.isPending}
-                >
-                  {updateProfile.isPending || createExam.isPending ? '저장 중...' : '시작하기'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* Input */}
+        {!isDone && (
+          <div className="flex gap-2">
+            <input
+              className="flex-1 px-4 py-3 text-sm border-2 rounded-xl outline-none focus:border-indigo-400 transition-colors"
+              placeholder={currentStep?.hint || '입력하세요...'}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              disabled={isProcessing}
+            />
+            <button
+              onClick={() => handleSend()}
+              disabled={!input.trim() || isProcessing}
+              className="px-5 py-3 rounded-xl text-sm font-bold text-white transition-all"
+              style={{
+                background: (!input.trim() || isProcessing) ? '#d1d5db' : 'var(--skema-primary)',
+                cursor: (!input.trim() || isProcessing) ? 'not-allowed' : 'pointer',
+              }}
+            >
+              전송
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
