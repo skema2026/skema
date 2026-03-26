@@ -39,7 +39,9 @@ export default function LoginPage() {
           setUser(user);
           queryClient.invalidateQueries({ queryKey: ['me'] });
           toast.success('로그인 되었습니다');
-          router.push('/dashboard');
+          api.get('/profile').then(({ data: profile }) => {
+            router.push(profile.onboarding_completed ? '/dashboard' : '/onboarding');
+          }).catch(() => router.push('/dashboard'));
         }).catch(() => router.push('/dashboard'));
       });
     }
@@ -69,12 +71,15 @@ export default function LoginPage() {
           const { api } = await import('@/lib/api');
           const { data: user } = await api.get('/auth/me');
           setUser(user);
+          const { data: profile } = await api.get('/profile');
+          queryClient.invalidateQueries({ queryKey: ['me'] });
+          toast.success('로그인 되었습니다');
+          router.push(profile.onboarding_completed ? '/dashboard' : '/onboarding');
         } catch {
-          // ignore
+          queryClient.invalidateQueries({ queryKey: ['me'] });
+          toast.success('로그인 되었습니다');
+          router.push('/dashboard');
         }
-        queryClient.invalidateQueries({ queryKey: ['me'] });
-        toast.success('로그인 되었습니다');
-        router.push('/dashboard');
       },
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };

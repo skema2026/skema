@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useUpdateProfile } from '@/hooks/useProfile';
-import { useCreateExam } from '@/hooks/useExams';
-import { useCreateSchedule } from '@/hooks/useSchedules';
 
 type Message = { role: 'ai' | 'user'; text: string };
 
@@ -41,8 +39,6 @@ const STEPS = [
 export default function OnboardingPage() {
   const router = useRouter();
   const updateProfile = useUpdateProfile();
-  const createExam = useCreateExam();
-  const createSchedule = useCreateSchedule();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -69,11 +65,6 @@ export default function OnboardingPage() {
       sleep_start: nums[0] !== undefined ? toHHMM(nums[0]) : '23:00',
       sleep_end: nums[1] !== undefined ? toHHMM(nums[1]) : '07:00',
     };
-  };
-
-  const parseSchedule = (text: string) => {
-    // AI에게 자연어로 등록 요청
-    return text;
   };
 
   const finishOnboarding = async (finalAnswers: Record<string, string>) => {
