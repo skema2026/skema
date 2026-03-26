@@ -15,8 +15,21 @@ interface TimetableProps {
   readOnly?: boolean;
 }
 
+function isSameDay(a: Schedule, b: Schedule): boolean {
+  // 둘 다 특정 날짜 → 날짜가 같아야 충돌
+  if (a.date && b.date) return a.date === b.date;
+  // 둘 다 반복 일정 → 같은 요일이면 충돌
+  if (!a.date && !b.date) return a.day_of_week === b.day_of_week;
+  // 하나만 날짜 지정 → 해당 날짜의 요일과 반복 일정의 요일이 같으면 충돌
+  const dated = a.date ? a : b;
+  const recurring = a.date ? b : a;
+  const dow = new Date(dated.date!).getDay(); // 0=Sun
+  const dowMon = dow === 0 ? 6 : dow - 1;    // 0=Mon 변환
+  return dowMon === recurring.day_of_week;
+}
+
 function hasConflict(a: Schedule, b: Schedule): boolean {
-  if (a.day_of_week !== b.day_of_week) return false;
+  if (!isSameDay(a, b)) return false;
   const aStart = timeToMinutes(a.start_time);
   const aEnd = timeToMinutes(a.end_time);
   const bStart = timeToMinutes(b.start_time);
@@ -211,6 +224,13 @@ export function Timetable({ schedules, readOnly = false }: TimetableProps) {
   return (
     <div className="overflow-x-auto rounded-xl border bg-white dark:bg-gray-900 shadow-sm">
       <div className="min-w-[700px]">
+        {/* 충돌 경고 배너 */}
+        {conflictIds.size > 0 && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border-b border-red-200 text-red-700 text-xs font-medium">
+            <span>⚠️</span>
+            <span>시간이 겹치는 일정이 {conflictIds.size}개 있습니다. 빨간 테두리로 표시된 일정을 확인하세요.</span>
+          </div>
+        )}
         {/* Header row */}
         <div className="flex border-b">
           <div className="w-12 flex-shrink-0" />
