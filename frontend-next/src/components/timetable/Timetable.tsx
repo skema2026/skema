@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Schedule } from '@/types';
 import { DAY_NAMES, timeToMinutes, cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { useDeleteSchedule, useToggleComplete } from '@/hooks/useSchedules';
+import { useDeleteSchedule, useToggleComplete, useUpdateSchedule } from '@/hooks/useSchedules';
 import { useUIStore } from '@/store/uiStore';
 import { toast } from 'sonner';
 
@@ -44,6 +44,8 @@ interface ScheduleBlockProps {
   onEdit: (s: Schedule) => void;
   onDelete: (id: number) => void;
   onToggleComplete: (id: number, completed: boolean) => void;
+  onDragStart: (e: React.DragEvent, s: Schedule) => void;
+  onDragEnd: () => void;
   startHour: number;
   totalMinutes: number;
 }
@@ -59,7 +61,7 @@ function getHeightPercent(start: string, end: string, startHour: number, endHour
   return ((endMin - startMin) / totalMinutes) * 100;
 }
 
-function ScheduleBlock({ schedule, isConflict, readOnly, onEdit, onDelete, onToggleComplete, startHour, totalMinutes }: ScheduleBlockProps) {
+function ScheduleBlock({ schedule, isConflict, readOnly, onEdit, onDelete, onToggleComplete, onDragStart, onDragEnd, startHour, totalMinutes }: ScheduleBlockProps) {
   const [hovered, setHovered] = useState(false);
   const endHour = startHour + totalMinutes / 60;
   const top = getTopPercent(schedule.start_time, startHour, totalMinutes);
@@ -77,8 +79,12 @@ function ScheduleBlock({ schedule, isConflict, readOnly, onEdit, onDelete, onTog
 
   return (
     <div
+      draggable={!readOnly}
+      onDragStart={(e) => { if (!readOnly) onDragStart(e, schedule); }}
+      onDragEnd={onDragEnd}
       className={cn(
-        'absolute left-0.5 right-0.5 rounded-md px-1.5 py-1 text-white text-xs overflow-hidden cursor-pointer group transition-opacity',
+        'absolute left-0.5 right-0.5 rounded-md px-1.5 py-1 text-white text-xs overflow-hidden group transition-opacity',
+        readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
         isConflict && 'ring-2 ring-red-400 ring-offset-1',
         schedule.is_completed && 'opacity-60'
       )}
@@ -159,11 +165,18 @@ function ScheduleBlock({ schedule, isConflict, readOnly, onEdit, onDelete, onTog
   );
 }
 
+const toHHMM = (m: number) =>
+  `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
 export function Timetable({ schedules, readOnly = false }: TimetableProps) {
   const openClassForm = useUIStore((s) => s.openClassForm);
   const deleteSchedule = useDeleteSchedule();
   const toggleComplete = useToggleComplete();
+  const updateSchedule = useUpdateSchedule();
   const containerRef = useRef<HTMLDivElement>(null);
+  const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const dragState = useRef<{ id: number; offsetMin: number; durationMin: number } | null>(null);
+  const [dropPreview, setDropPreview] = useState<{ dayIdx: number; startMin: number; endMin: number } | null>(null);
   const [currentTimeTop, setCurrentTimeTop] = useState<number | null>(null);
 
   // Compute dynamic time range
@@ -195,6 +208,64 @@ export function Timetable({ schedules, readOnly = false }: TimetableProps) {
     const interval = setInterval(updateCurrentTime, 60000);
     return () => clearInterval(interval);
   }, [updateCurrentTime]);
+
+  const getMinutesFromEvent = (e: React.DragEvent, dayIdx: number): number => {
+    const col = columnRefs.current[dayIdx];
+    if (!col) return visibleStart * 60;
+    const rect = col.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    const raw = visibleStart * 60 + pct * TOTAL_MINUTES;
+    return Math.round(raw / 15) * 15; // 15분 단위 스냅
+  };
+
+  const handleDragStart = (e: React.DragEvent, schedule: Schedule) => {
+    const col = columnRefs.current[schedule.day_of_week];
+    let offsetMin = 0;
+    if (col) {
+      const rect = col.getBoundingClientRect();
+      const pct = (e.clientY - rect.top) / rect.height;
+      const mouseMin = visibleStart * 60 + pct * TOTAL_MINUTES;
+      offsetMin = Math.max(0, mouseMin - timeToMinutes(schedule.start_time));
+    }
+    dragState.current = {
+      id: schedule.id,
+      offsetMin,
+      durationMin: timeToMinutes(schedule.end_time) - timeToMinutes(schedule.start_time),
+    };
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, dayIdx: number) => {
+    e.preventDefault();
+    if (!dragState.current) return;
+    const { offsetMin, durationMin } = dragState.current;
+    const mouseMin = getMinutesFromEvent(e, dayIdx);
+    const startMin = Math.max(visibleStart * 60, mouseMin - offsetMin);
+    setDropPreview({ dayIdx, startMin, endMin: startMin + durationMin });
+  };
+
+  const handleDrop = (e: React.DragEvent, dayIdx: number) => {
+    e.preventDefault();
+    if (!dragState.current) return;
+    const { id, offsetMin, durationMin } = dragState.current;
+    const mouseMin = getMinutesFromEvent(e, dayIdx);
+    const startMin = Math.max(visibleStart * 60, mouseMin - offsetMin);
+    const endMin = startMin + durationMin;
+    updateSchedule.mutate(
+      { id, day_of_week: dayIdx, start_time: toHHMM(startMin), end_time: toHHMM(endMin) },
+      {
+        onSuccess: () => toast.success('일정이 이동되었습니다'),
+        onError: () => toast.error('이동 중 오류가 발생했습니다'),
+      }
+    );
+    dragState.current = null;
+    setDropPreview(null);
+  };
+
+  const handleDragEnd = () => {
+    dragState.current = null;
+    setDropPreview(null);
+  };
 
   const handleDelete = (id: number) => {
     if (confirm('일정을 삭제하시겠습니까?')) {
@@ -269,8 +340,12 @@ export function Timetable({ schedules, readOnly = false }: TimetableProps) {
             return (
               <div
                 key={dayIdx}
+                ref={(el) => { columnRefs.current[dayIdx] = el; }}
                 className="flex-1 relative border-l"
                 style={{ height: `${GRID_HEIGHT}px` }}
+                onDragOver={(e) => !readOnly && handleDragOver(e, dayIdx)}
+                onDragLeave={() => setDropPreview(null)}
+                onDrop={(e) => !readOnly && handleDrop(e, dayIdx)}
               >
                 {/* Hour grid lines */}
                 {hours.map((hour) => (
@@ -294,6 +369,20 @@ export function Timetable({ schedules, readOnly = false }: TimetableProps) {
                   </div>
                 )}
 
+                {/* Drop preview */}
+                {dropPreview?.dayIdx === dayIdx && (
+                  <div
+                    className="absolute left-0.5 right-0.5 rounded-md pointer-events-none border-2 border-dashed opacity-50"
+                    style={{
+                      top: `${getTopPercent(toHHMM(dropPreview.startMin), visibleStart, TOTAL_MINUTES)}%`,
+                      height: `${getHeightPercent(toHHMM(dropPreview.startMin), toHHMM(dropPreview.endMin), visibleStart, visibleStart + TOTAL_MINUTES / 60, TOTAL_MINUTES)}%`,
+                      background: 'var(--skema-primary)',
+                      borderColor: 'var(--skema-primary)',
+                      minHeight: '24px',
+                    }}
+                  />
+                )}
+
                 {/* Schedule blocks */}
                 {daySchedules.map((schedule) => (
                   <ScheduleBlock
@@ -304,6 +393,8 @@ export function Timetable({ schedules, readOnly = false }: TimetableProps) {
                     onEdit={openClassForm}
                     onDelete={handleDelete}
                     onToggleComplete={(id, completed) => toggleComplete.mutate({ id, is_completed: completed })}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
                     startHour={visibleStart}
                     totalMinutes={TOTAL_MINUTES}
                   />
