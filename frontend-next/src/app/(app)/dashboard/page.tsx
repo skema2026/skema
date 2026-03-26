@@ -28,6 +28,7 @@ import { AIChat } from '@/components/ai-chat/AIChat';
 import { ExamList } from '@/components/exam/ExamList';
 import { SettingsModal } from '@/components/settings/SettingsModal';
 import { useSchedules } from '@/hooks/useSchedules';
+import { useProfile } from '@/hooks/useProfile';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { api } from '@/lib/api';
@@ -39,6 +40,14 @@ export default function DashboardPage() {
   const { user, logout } = useAuthStore();
   const { isChatOpen, toggleChat, openClassForm, isShareModalOpen, openShareModal, closeShareModal } = useUIStore();
   const { data: schedules = [], isLoading } = useSchedules();
+  const { data: profile, isLoading: isProfileLoading } = useProfile();
+
+  // 온보딩 미완료 시 온보딩 페이지로 이동
+  useEffect(() => {
+    if (!isProfileLoading && profile && !profile.onboarding_completed) {
+      router.replace('/onboarding');
+    }
+  }, [profile, isProfileLoading, router]);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
