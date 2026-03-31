@@ -18,12 +18,18 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user }),
       setToken: (token) => {
         set({ token });
-        if (token) localStorage.setItem('token', token);
-        else localStorage.removeItem('token');
+        if (token) {
+          localStorage.setItem('token', token);
+          document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
+        } else {
+          localStorage.removeItem('token');
+          document.cookie = 'token=; path=/; max-age=0';
+        }
       },
       logout: () => {
         set({ user: null, token: null });
         localStorage.removeItem('token');
+        document.cookie = 'token=; path=/; max-age=0';
       },
     }),
     { name: 'auth-storage', partialize: (state) => ({ token: state.token }) }

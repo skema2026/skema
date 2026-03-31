@@ -162,3 +162,158 @@
   -webkit-font-smoothing: antialiased;
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── FullCalendar SKEMA Theme ── */
+.fc {
+  font-family: var(--font-headline), sans-serif;
+  font-size: 13px;
+}
+
+/* Toolbar */
+.fc .fc-toolbar {
+  padding: 12px 16px 10px;
+  margin-bottom: 0 !important;
+  border-bottom: 1px solid var(--skema-container);
+  background: #fff;
+  align-items: center;
+}
+.fc .fc-toolbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--skema-on-surface);
+}
+.fc .fc-button-group,
+.fc .fc-button {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.fc .fc-button-primary {
+  background: var(--skema-surface-low) !important;
+  color: var(--skema-on-surface-variant) !important;
+  border-radius: 8px !important;
+  padding: 5px 10px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  transition: background 0.15s !important;
+}
+.fc .fc-button-primary:hover {
+  background: var(--skema-container) !important;
+  color: var(--skema-on-surface) !important;
+}
+.fc .fc-button-primary:not(:disabled):active,
+.fc .fc-button-primary.fc-button-active {
+  background: var(--skema-secondary-container) !important;
+  color: var(--skema-primary) !important;
+}
+.fc .fc-button-group .fc-button-primary {
+  border-radius: 8px !important;
+  margin: 0 2px !important;
+}
+
+/* Column headers (요일) */
+.fc .fc-col-header {
+  background: #fff;
+}
+.fc .fc-col-header-cell {
+  padding: 8px 0 !important;
+  border-bottom: 1px solid var(--skema-container) !important;
+  border-right: 1px solid var(--skema-container) !important;
+}
+.fc .fc-col-header-cell-cushion {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: var(--skema-on-surface-variant) !important;
+  text-decoration: none !important;
+  padding: 0 !important;
+}
+/* 오늘 요일 강조 */
+.fc .fc-day-today .fc-col-header-cell-cushion {
+  color: var(--skema-primary) !important;
+}
+
+/* Time grid */
+.fc .fc-timegrid-slot {
+  height: 28px !important;
+  border-color: var(--skema-container) !important;
+}
+.fc .fc-timegrid-slot-minor {
+  border-top-style: dotted !important;
+  border-color: var(--skema-surface-low) !important;
+}
+.fc .fc-timegrid-slot-label {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  color: var(--skema-outline-strong) !important;
+  vertical-align: top !important;
+  padding-top: 3px !important;
+}
+.fc .fc-timegrid-axis {
+  border-color: var(--skema-container) !important;
+  width: 48px !important;
+}
+
+/* Columns */
+.fc .fc-timegrid-col {
+  border-color: var(--skema-container) !important;
+}
+.fc .fc-day-today {
+  background: rgba(26, 77, 178, 0.03) !important;
+}
+.fc .fc-non-business {
+  background: rgba(0, 0, 0, 0.025) !important;
+}
+
+/* Now indicator */
+.fc .fc-now-indicator-line {
+  border-color: #ef4444 !important;
+  border-width: 2px !important;
+}
+.fc .fc-now-indicator-arrow {
+  border-top-color: #ef4444 !important;
+  border-bottom-color: #ef4444 !important;
+}
+
+/* Events */
+.fc .fc-timegrid-event {
+  border-radius: 6px !important;
+  border: none !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+  margin: 0 1px !important;
+  cursor: grab !important;
+}
+.fc .fc-timegrid-event:active {
+  cursor: grabbing !important;
+}
+.fc .fc-timegrid-event .fc-event-main {
+  padding: 0 !important;
+  /* 포인터 이벤트를 .fc-event 래퍼로 위임 → 드래그 정상 동작 */
+  pointer-events: none;
+}
+.fc .fc-event:focus::after {
+  display: none !important;
+}
+.fc .fc-event-dragging {
+  opacity: 0.75 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18) !important;
+}
+.fc .fc-event-mirror {
+  opacity: 0.6 !important;
+}
+
+/* Scroll / borders */
+.fc .fc-scrollgrid {
+  border-color: var(--skema-container) !important;
+}
+.fc .fc-scrollgrid td,
+.fc .fc-scrollgrid th {
+  border-color: var(--skema-container) !important;
+}
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: var(--skema-container) !important;
+}

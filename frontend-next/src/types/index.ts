@@ -16,11 +16,13 @@ export type Schedule = {
 export type UserProfile = {
   id: number;
   user_id: number;
+  user_type?: string; // 'exam_prep' | 'civil_service' | 'student' | 'worker' | 'other'
   occupation?: string;
   sleep_start: string; // HH:MM, default 23:00
   sleep_end: string; // HH:MM, default 07:00
+  goal_tasks?: string;
   onboarding_completed: boolean;
-  updated_at: string;
+  updated_at?: string;
 };
 
 export type ExamSchedule = {

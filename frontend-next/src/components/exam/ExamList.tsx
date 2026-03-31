@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +17,7 @@ import {
 import { useExams, useCreateExam, useDeleteExam } from '@/hooks/useExams';
 import { formatDate } from '@/lib/utils';
 import { ExamSchedule } from '@/types';
+import { api } from '@/lib/api';
 
 function getDaysUntil(dateStr: string): number {
   const today = new Date();
@@ -45,9 +47,11 @@ export function ExamList() {
   const { data: exams, isLoading } = useExams();
   const createExam = useCreateExam();
   const deleteExam = useDeleteExam();
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -70,11 +74,23 @@ export function ExamList() {
     };
 
     createExam.mutate(payload, {
-      onSuccess: () => {
-        toast.success('시험 일정이 추가되었습니다');
+      onSuccess: async (exam) => {
         setIsOpen(false);
         setForm(defaultForm);
         setErrors({});
+        toast.success('시험 일정이 추가되었습니다. AI가 준비 일정을 생성하는 중...');
+        setIsGenerating(true);
+        try {
+          const subject = exam.subject || exam.title;
+          const msg = `시험 '${exam.title}'${exam.subject ? ` (${exam.subject})` : ''} 날짜는 ${exam.exam_date}야. 내 현재 시간표를 분석해서 이 시험에 맞는 준비 학습 일정을 시간표 빈 시간에 자동으로 만들어줘. 시험 D-7부터 시작하고, 가까울수록 강도를 높여서 배치해줘.`;
+          await api.post('/ai/chat', { message: msg, messages: [] });
+          queryClient.invalidateQueries({ queryKey: ['schedules'] });
+          toast.success(`${subject} 시험 준비 일정이 시간표에 추가되었습니다 📚`);
+        } catch {
+          toast.error('준비 일정 자동 생성에 실패했습니다. AI 채팅에서 직접 요청해보세요.');
+        } finally {
+          setIsGenerating(false);
+        }
       },
       onError: () => toast.error('추가 중 오류가 발생했습니다'),
     });
@@ -89,56 +105,96 @@ export function ExamList() {
     }
   };
 
+  const handleRegenerate = async (exam: ExamSchedule) => {
+    setIsGenerating(true);
+    try {
+      const msg = `시험 '${exam.title}'${exam.subject ? ` (${exam.subject})` : ''} 날짜는 ${exam.exam_date}야. 내 현재 시간표를 분석해서 이 시험에 맞는 준비 학습 일정을 시간표 빈 시간에 자동으로 만들어줘. 시험 D-7부터 시작하고, 가까울수록 강도를 높여서 배치해줘.`;
+      await api.post('/ai/chat', { message: msg, messages: [] });
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      toast.success('준비 일정이 재생성되었습니다 📚');
+    } catch {
+      toast.error('생성 중 오류가 발생했습니다');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const sortedExams = [...(exams || [])].sort(
     (a, b) => new Date(a.exam_date).getTime() - new Date(b.exam_date).getTime()
   );
 
   return (
-    <div>
+    <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white">시험 일정</h2>
-        <Button
-          size="sm"
+        <div>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--skema-on-surface)' }}>시험 일정</h2>
+          <p style={{ fontSize: 11, color: 'var(--skema-outline-strong)', marginTop: 2 }}>
+            시험을 추가하면 AI가 자동으로 준비 일정을 시간표에 배치합니다
+          </p>
+        </div>
+        <button
           onClick={() => setIsOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-700"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--skema-primary)', color: '#fff', border: 'none', borderRadius: 10, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
         >
-          + 추가
-        </Button>
+          + 시험 추가
+        </button>
       </div>
 
+      {/* AI 생성 중 배너 */}
+      {isGenerating && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 12, background: '#eef1ff', border: '1px solid var(--skema-secondary-container)', marginBottom: 16 }}>
+          <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2.5px solid var(--skema-primary)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--skema-primary)' }}>AI가 준비 일정을 분석 중입니다...</p>
+            <p style={{ fontSize: 11, color: 'var(--skema-on-surface-variant)', marginTop: 1 }}>시험까지 남은 기간에 맞춰 공부 블록을 배치하고 있습니다</p>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
-        <div className="text-center py-8 text-gray-400">로딩 중...</div>
+        <div className="text-center py-8" style={{ color: 'var(--skema-outline-strong)', fontSize: 13 }}>로딩 중...</div>
       ) : sortedExams.length === 0 ? (
-        <div className="text-center py-8 text-gray-400 text-sm">
-          등록된 시험 일정이 없습니다
+        <div style={{ textAlign: 'center', padding: '40px 0' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
+          <p style={{ fontSize: 13, color: 'var(--skema-outline-strong)' }}>등록된 시험 일정이 없습니다</p>
+          <p style={{ fontSize: 12, color: 'var(--skema-outline-strong)', marginTop: 4, opacity: 0.7 }}>시험을 추가하면 AI가 자동으로 준비 일정을 만들어드려요</p>
         </div>
       ) : (
         <div className="space-y-2">
           {sortedExams.map((exam) => {
             const days = getDaysUntil(exam.exam_date);
+            const urgency = days <= 3 ? '#fef2f2' : days <= 7 ? '#fffbeb' : '#f7fafd';
             return (
               <div
                 key={exam.id}
-                className="flex items-center justify-between p-3 rounded-lg border bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, border: '1px solid var(--skema-container)', background: urgency, gap: 12 }}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="font-medium text-gray-900 dark:text-white truncate">{exam.title}</p>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--skema-on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exam.title}</p>
                     {exam.subject && (
-                      <Badge variant="secondary" className="text-xs flex-shrink-0">{exam.subject}</Badge>
+                      <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--skema-secondary-container)', color: 'var(--skema-primary)', borderRadius: 6, padding: '1px 7px', flexShrink: 0 }}>{exam.subject}</span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p style={{ fontSize: 11, color: 'var(--skema-outline-strong)' }}>
                     {formatDate(exam.exam_date)}
                     {exam.exam_time && ` ${exam.exam_time}`}
                     {exam.location && ` • ${exam.location}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 ml-3">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <ExamBadge days={days} />
                   <button
+                    onClick={() => handleRegenerate(exam)}
+                    disabled={isGenerating}
+                    title="AI 준비 일정 재생성"
+                    style={{ fontSize: 11, fontWeight: 600, color: 'var(--skema-primary)', background: '#eef1ff', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: isGenerating ? 'not-allowed' : 'pointer', opacity: isGenerating ? 0.5 : 1 }}
+                  >
+                    AI 재생성
+                  </button>
+                  <button
                     onClick={() => handleDelete(exam.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors text-sm"
+                    style={{ color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
                   >
                     ✕
                   </button>
@@ -210,8 +266,8 @@ export function ExamList() {
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                 취소
               </Button>
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={createExam.isPending}>
-                {createExam.isPending ? '저장 중...' : '추가'}
+              <Button type="submit" disabled={createExam.isPending} style={{ background: 'var(--skema-primary)', color: '#fff' }}>
+                {createExam.isPending ? '저장 중...' : 'AI 준비 일정까지 자동 생성'}
               </Button>
             </DialogFooter>
           </form>

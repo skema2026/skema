@@ -2,13 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Schedule } from '@/types';
 
-export function useSchedules() {
+export function useSchedules(initialData?: Schedule[]) {
   return useQuery({
     queryKey: ['schedules'],
     queryFn: async () => {
       const { data } = await api.get<Schedule[]>('/schedules');
       return data;
     },
+    initialData,
   });
 }
 

@@ -126,6 +126,30 @@ TOOLS_SPEC = [
             },
         },
     },
+    {
+        "name": "list_exam_schedules",
+        "description": "등록된 시험 일정 목록을 조회합니다. 학습 계획 생성 전에 항상 먼저 호출하세요.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "generate_exam_prep_schedule",
+        "description": (
+            "시험 일정을 기준으로 역산하여 기존 수업·일정 사이의 빈 슬롯에 학습 일정을 자동 생성합니다. "
+            "시험이 가까울수록 학습 강도가 높아지며, 색상으로 긴급도를 표시합니다. "
+            "사용자가 시험 대비 또는 전반적인 시간표 생성을 요청하면 이 도구를 우선 사용하세요."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "exam_id": {"type": "integer", "description": "특정 시험 ID (미지정 시 모든 예정 시험 대상)"},
+                "target_days": {"type": "integer", "description": "학습 일정 생성 기간(일수), 기본 14"},
+                "daily_study_hours": {"type": "number", "description": "기본 하루 학습 시간(시간), 기본 2. 시험 임박 시 자동 증가"},
+            },
+        },
+    },
 ]
 
 
@@ -392,6 +416,129 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             return f"😅 {target_days}일 내에 재배치 가능한 빈 시간을 찾지 못했습니다."
         return f"🔄 미완료 일정 {len(moved)}개를 재배치했습니다:\n" + "\n".join(moved)
 
+    elif tool_name == "list_exam_schedules":
+        exams = db.query(ExamSchedule).filter(ExamSchedule.user_id == user_id).all()
+        if not exams:
+            return "📭 등록된 시험 일정이 없습니다."
+        lines = ["📝 시험 일정 목록:\n"]
+        for e in sorted(exams, key=lambda x: x.exam_date):
+            days_left = (datetime.strptime(e.exam_date, "%Y-%m-%d").date() - today).days
+            if days_left > 0:
+                status = f"D-{days_left}"
+            elif days_left == 0:
+                status = "오늘!"
+            else:
+                status = "종료"
+            line = f"  [ID:{e.id}] 📝 {e.title}  {e.exam_date} ({status})"
+            if e.subject:
+                line += f"  과목: {e.subject}"
+            if e.exam_time:
+                line += f"  {e.exam_time}"
+            lines.append(line)
+        return "\n".join(lines)
+
+    elif tool_name == "generate_exam_prep_schedule":
+        exam_id = tool_input.get("exam_id")
+        target_days = tool_input.get("target_days", 14)
+        daily_hours = tool_input.get("daily_study_hours", 2.0)
+
+        exams = db.query(ExamSchedule).filter(ExamSchedule.user_id == user_id).all()
+        if exam_id:
+            exams = [e for e in exams if e.id == exam_id]
+
+        upcoming = [e for e in exams if e.exam_date >= today.isoformat()]
+        if not upcoming:
+            return "📭 예정된 시험이 없습니다. 먼저 시험 일정을 등록해 주세요."
+
+        profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+        wake = _t2m(profile.sleep_end if profile and profile.sleep_end else "07:00")
+        sleep = _t2m(profile.sleep_start if profile and profile.sleep_start else "23:00")
+
+        created = 0
+        results = []
+
+        for exam in sorted(upcoming, key=lambda e: e.exam_date):
+            exam_date_obj = datetime.strptime(exam.exam_date, "%Y-%m-%d").date()
+            days_until_exam = (exam_date_obj - today).days
+            study_days = min(days_until_exam, target_days)
+            if study_days <= 0:
+                continue
+
+            subject = exam.title
+            exam_created = 0
+
+            for offset in range(study_days):
+                tdate = today + timedelta(days=offset)
+                date_str = tdate.strftime("%Y-%m-%d")
+                dow = tdate.weekday()
+                days_left = (exam_date_obj - tdate).days
+
+                # 시험 임박할수록 학습 강도 증가
+                if days_left <= 3:
+                    day_hours = daily_hours * 1.5
+                    color = "#EF4444"   # 빨강 - 긴급
+                    priority = 2
+                elif days_left <= 7:
+                    day_hours = daily_hours * 1.2
+                    color = "#F59E0B"   # 주황 - 높음
+                    priority = 1
+                else:
+                    day_hours = daily_hours
+                    color = "#8B5CF6"   # 보라 - 보통
+                    priority = 1
+
+                existing = _day_schedules(db, user_id, dow, date_str)
+                busy = sorted((_t2m(s.start_time), _t2m(s.end_time)) for s in existing)
+                remaining = int(day_hours * 60)
+                cursor = max(8 * 60, wake)
+                blocks = []
+
+                for bs, be in busy:
+                    if cursor + 30 <= bs and remaining > 0:
+                        block_len = min(bs - cursor, remaining, 120)
+                        blocks.append((cursor, cursor + block_len))
+                        remaining -= block_len
+                    cursor = max(cursor, be)
+
+                if remaining >= 30 and cursor + 30 <= sleep:
+                    block_len = min(sleep - cursor, remaining, 120)
+                    blocks.append((cursor, cursor + block_len))
+
+                label = "복습" if days_left <= 1 else "시험 준비"
+                for sm, em in blocks:
+                    db.add(Schedule(
+                        user_id=user_id,
+                        title=f"📚 {subject} {label}",
+                        day_of_week=dow,
+                        date=date_str,
+                        start_time=_m2t(sm),
+                        end_time=_m2t(em),
+                        color=color,
+                        priority=priority,
+                        schedule_type="study",
+                    ))
+                    exam_created += 1
+                    created += 1
+
+            if exam_created > 0:
+                results.append(
+                    f"  • {subject} ({exam.exam_date} D-{days_until_exam}): {exam_created}개 생성"
+                )
+
+        db.commit()
+
+        if created == 0:
+            return "😅 여유 시간이 부족하여 시험 준비 일정을 생성하지 못했습니다."
+
+        summary = "\n".join(results)
+        return (
+            f"📚 시험 준비 일정 총 {created}개 생성 완료!\n\n"
+            f"{summary}\n\n"
+            f"🔴 D-3 이내: 빨강 (긴급)\n"
+            f"🟡 D-7 이내: 주황 (높음)\n"
+            f"🟣 그 외: 보라 (보통)"
+        )
+
     return f"❌ 알 수 없는 도구: {tool_name}"
 
 
@@ -469,6 +616,16 @@ def run_ai_agent(
 5. 제목·날짜·시간 중 필수 정보 누락 시 사용자에게 질문
 6. 긴급 일정은 priority=2
 7. 수정 대상 모호 시 list_schedules로 목록 확인 후 ID 특정
+
+## 시험 기반 학습 계획 (최우선)
+사용자가 학습 계획·시간표 생성을 요청하면:
+1. 먼저 list_exam_schedules로 시험 일정 확인
+2. 시험이 있으면 → generate_exam_prep_schedule 사용
+   - 시험 날짜 역산으로 학습 강도 자동 조절
+   - 기존 수업·고정 일정 사이의 빈 슬롯에만 배치
+   - D-7 이내: 강도 증가 / D-3 이내: 최고 강도 (빨강)
+   - 시험 전날: 복습 위주
+3. 시험이 없으면 → generate_study_schedule 사용
 
 작업 완료 후 결과를 간결하게 안내하세요."""
 

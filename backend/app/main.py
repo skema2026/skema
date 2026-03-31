@@ -29,6 +29,20 @@ def _migrate():
                 conn.execute(text(stmt))
             conn.commit()
 
+    # user_profiles table migrations
+    if "user_profiles" in insp.get_table_names():
+        profile_cols = {c["name"] for c in insp.get_columns("user_profiles")}
+        profile_migrations = []
+        if "user_type" not in profile_cols:
+            profile_migrations.append("ALTER TABLE user_profiles ADD COLUMN user_type TEXT")
+        if "goal_tasks" not in profile_cols:
+            profile_migrations.append("ALTER TABLE user_profiles ADD COLUMN goal_tasks TEXT")
+        if profile_migrations:
+            with engine.connect() as conn:
+                for stmt in profile_migrations:
+                    conn.execute(text(stmt))
+                conn.commit()
+
     schedule_cols = {c["name"] for c in insp.get_columns("schedules")}
     migrations = []
     if "date" not in schedule_cols:

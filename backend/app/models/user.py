@@ -26,9 +26,11 @@ class UserProfile(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    user_type = Column(String, nullable=True)                       # "exam_prep" | "civil_service" | "student" | "worker" | "other"
     occupation = Column(String, nullable=True)
     sleep_start = Column(String, nullable=True, default="23:00")   # HH:MM (bedtime)
     sleep_end = Column(String, nullable=True, default="07:00")     # HH:MM (wake-up)
+    goal_tasks = Column(String, nullable=True)                      # 목표 작업 (자유 텍스트)
     onboarding_completed = Column(Boolean, default=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
