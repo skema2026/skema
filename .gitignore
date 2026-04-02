@@ -12,16 +12,6 @@ __pycache__/
 venv/
 *.egg-info/
 
-# ── SQLite DB ─────────────────────────────────────────────
-*.db
-*.sqlite
-*.sqlite3
-
-# ── Frontend (Vite — 구버전) ──────────────────────────────
-frontend/node_modules/
-frontend/dist/
-frontend/.cache/
-
 # ── Frontend (Next.js) ────────────────────────────────────
 frontend-next/node_modules/
 frontend-next/.next/
@@ -42,6 +32,3 @@ desktop.ini
 
 # ── Claude Code ───────────────────────────────────────────
 .claude/
-
-# ── 기타 ──────────────────────────────────────────────────
-backend/deep-research-skills/
