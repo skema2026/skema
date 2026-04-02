@@ -3,13 +3,13 @@ from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.schedule import Schedule
-from app.models.user import ExamSchedule, UserProfile
+from app.schedule.models import ExamSchedule, Schedule
+from app.auth.models import UserProfile
 
 DAY_NAMES = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
 DAY_NAMES_SHORT = ["월", "화", "수", "목", "금", "토", "일"]
 
-# ─── Tool definitions (OpenAPI-style, converted to Gemini format) ─────────────
+# ─── Tool definitions ─────────────────────────────────────────────────────────
 
 TOOLS_SPEC = [
     {
@@ -365,7 +365,6 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         wake = _t2m(profile.sleep_end if profile and profile.sleep_end else "07:00")
         sleep = _t2m(profile.sleep_start if profile and profile.sleep_start else "23:00")
 
-        # 미완료 날짜 지정 일정 중 오늘 이전 것만 대상
         incomplete = db.query(Schedule).filter(
             Schedule.user_id == user_id,
             Schedule.is_completed == False,
@@ -379,7 +378,6 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         moved = []
         for s in incomplete:
             duration = _t2m(s.end_time) - _t2m(s.start_time)
-            # 오늘부터 target_days일 내 빈 슬롯 탐색
             for offset in range(target_days):
                 tdate = today + timedelta(days=offset)
                 date_str = tdate.strftime("%Y-%m-%d")
@@ -473,18 +471,17 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                 dow = tdate.weekday()
                 days_left = (exam_date_obj - tdate).days
 
-                # 시험 임박할수록 학습 강도 증가
                 if days_left <= 3:
                     day_hours = daily_hours * 1.5
-                    color = "#EF4444"   # 빨강 - 긴급
+                    color = "#EF4444"
                     priority = 2
                 elif days_left <= 7:
                     day_hours = daily_hours * 1.2
-                    color = "#F59E0B"   # 주황 - 높음
+                    color = "#F59E0B"
                     priority = 1
                 else:
                     day_hours = daily_hours
-                    color = "#8B5CF6"   # 보라 - 보통
+                    color = "#8B5CF6"
                     priority = 1
 
                 existing = _day_schedules(db, user_id, dow, date_str)
@@ -542,7 +539,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
     return f"❌ 알 수 없는 도구: {tool_name}"
 
 
-# ─── Gemini tool builder (google-genai SDK) ───────────────────────────────────
+# ─── Gemini tool builder ──────────────────────────────────────────────────────
 
 def _build_genai_tool():
     from google.genai import types
@@ -631,7 +628,6 @@ def run_ai_agent(
 
     genai_tool = _build_genai_tool()
 
-    # 대화 히스토리 변환
     history = []
     for msg in (conversation_history or []):
         role = "model" if msg["role"] == "assistant" else "user"
@@ -651,7 +647,6 @@ def run_ai_agent(
     response = chat.send_message(user_message)
 
     for _ in range(15):
-        # 이번 응답에서 function call 수집
         fn_calls = [
             part.function_call
             for part in response.candidates[0].content.parts
@@ -659,14 +654,12 @@ def run_ai_agent(
         ]
 
         if not fn_calls:
-            # 텍스트 응답 반환
             return "".join(
                 part.text
                 for part in response.candidates[0].content.parts
                 if part.text
             )
 
-        # 모든 tool 실행 후 결과 전달
         result_parts = []
         for fc in fn_calls:
             tool_input = dict(fc.args) if fc.args else {}
