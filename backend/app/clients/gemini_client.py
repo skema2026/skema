@@ -1,11 +1,13 @@
 """
-Thin wrapper around the google-genai SDK.
-All direct Gemini API calls are isolated here.
+Gemini API 클라이언트 모듈.
+AI 채팅에 사용할 도구(Tool) 정의 및 API 호출을 담당.
+실제 비즈니스 로직은 schedule/service.py에 있으며, 여기서는 API 통신만 처리.
 """
-
 from app.core.config import settings
 
-# Tool spec shared with service layer (read-only, defined once here)
+# ── Function Calling 도구 정의 ────────────────────────────────────────────────
+# AI가 호출할 수 있는 도구 목록. 실제 구현은 schedule/service.py에 있음.
+
 TOOLS_SPEC = [
     {
         "name": "add_schedule",
@@ -148,8 +150,10 @@ TOOLS_SPEC = [
 ]
 
 
+# ── Gemini Tool 빌더 ─────────────────────────────────────────────────────────
+
 def build_genai_tool():
-    """Convert TOOLS_SPEC into a google-genai Tool object."""
+    """TOOLS_SPEC을 google-genai Tool 객체로 변환."""
     from google.genai import types
 
     type_map = {
@@ -183,43 +187,37 @@ def build_genai_tool():
     return types.Tool(function_declarations=function_declarations)
 
 
-def create_chat_session(system_prompt: str, history: list):
-    """
-    Create and return a Gemini chat session.
+# ── 채팅 세션 생성 ────────────────────────────────────────────────────────────
 
-    Parameters
-    ----------
-    system_prompt : str
-        The system instruction text.
-    history : list
-        List of google.genai.types.Content objects for conversation history.
-    """
+def create_chat_session(system_prompt: str, history: list):
+    """Gemini 채팅 세션 생성."""
     from google import genai
     from google.genai import types
 
     if not settings.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not configured")
+        raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다.")
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    genai_tool = build_genai_tool()
 
     return client.chats.create(
-        model="gemini-2.5-flash",
+        model=settings.GEMINI_MODEL,
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
-            tools=[genai_tool],
+            tools=[build_genai_tool()],
         ),
         history=history,
     )
 
 
+# ── 메시지 송수신 ─────────────────────────────────────────────────────────────
+
 def send_message(chat, message):
-    """Send a message (str or list of Parts) to the chat session and return the response."""
+    """채팅 세션에 메시지(str 또는 Part 리스트)를 전송하고 응답 반환."""
     return chat.send_message(message)
 
 
 def extract_text(response) -> str:
-    """Extract plain text from a Gemini response object."""
+    """응답에서 텍스트 파트를 추출해 이어붙인 문자열 반환."""
     return "".join(
         part.text
         for part in response.candidates[0].content.parts
@@ -228,7 +226,7 @@ def extract_text(response) -> str:
 
 
 def extract_function_calls(response) -> list:
-    """Return a list of function_call objects from the response, or empty list."""
+    """응답에서 function_call 파트 목록 반환. 없으면 빈 리스트."""
     return [
         part.function_call
         for part in response.candidates[0].content.parts
@@ -237,37 +235,26 @@ def extract_function_calls(response) -> list:
 
 
 def make_function_response_parts(fn_calls: list, tool_results: list):
-    """
-    Build a list of FunctionResponse Part objects.
-
-    Parameters
-    ----------
-    fn_calls : list
-        Function call objects from the model response.
-    tool_results : list[str]
-        Parallel list of result strings from executing each tool call.
-    """
+    """tool_results 문자열 목록을 FunctionResponse Part 객체 리스트로 변환."""
     from google.genai import types
 
-    parts = []
-    for fc, result in zip(fn_calls, tool_results):
-        parts.append(
-            types.Part.from_function_response(
-                name=fc.name,
-                response={"result": result},
-            )
+    return [
+        types.Part.from_function_response(
+            name=fc.name,
+            response={"result": result},
         )
-    return parts
+        for fc, result in zip(fn_calls, tool_results)
+    ]
 
 
 def history_to_contents(conversation_history: list) -> list:
-    """Convert plain dict conversation history to google-genai Content objects."""
+    """dict 형태의 대화 히스토리를 google-genai Content 객체 리스트로 변환."""
     from google.genai import types
 
-    contents = []
-    for msg in conversation_history:
-        role = "model" if msg["role"] == "assistant" else "user"
-        contents.append(
-            types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])])
+    return [
+        types.Content(
+            role="model" if msg["role"] == "assistant" else "user",
+            parts=[types.Part.from_text(text=msg["content"])],
         )
-    return contents
+        for msg in conversation_history
+    ]

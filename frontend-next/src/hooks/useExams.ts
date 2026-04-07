@@ -6,7 +6,7 @@ export function useExams() {
   return useQuery({
     queryKey: ['exams'],
     queryFn: async () => {
-      const { data } = await api.get<ExamSchedule[]>('/exams');
+      const { data } = await api.get<ExamSchedule[]>('/exam-schedules');
       return data;
     },
   });
@@ -16,7 +16,7 @@ export function useCreateExam() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (exam: Omit<ExamSchedule, 'id' | 'user_id'>) => {
-      const { data } = await api.post<ExamSchedule>('/exams', exam);
+      const { data } = await api.post<ExamSchedule>('/exam-schedules', exam);
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams'] }),
@@ -27,7 +27,7 @@ export function useDeleteExam() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      await api.delete(`/exams/${id}`);
+      await api.delete(`/exam-schedules/${id}`);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['exams'] }),
   });
