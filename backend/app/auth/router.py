@@ -1,6 +1,7 @@
 import secrets
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Form, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -28,14 +29,30 @@ router = APIRouter(tags=["auth"])
 @router.post("/auth/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def signup(data: SignupRequest, db: Session = Depends(get_db)):
     """이메일 + 비밀번호로 신규 계정을 생성합니다."""
-    user = service.signup(db, data)
-    return user
+    return service.signup(db, data)
+
+
+@router.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def register(data: SignupRequest, db: Session = Depends(get_db)):
+    """회원가입 별칭 엔드포인트 (/auth/signup과 동일)."""
+    return service.signup(db, data)
 
 
 @router.post("/auth/login", response_model=TokenResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
-    """이메일 + 비밀번호 검증 후 Bearer JWT를 발급합니다."""
+    """이메일 + 비밀번호 검증 후 Bearer JWT를 발급합니다. (JSON body)"""
     token = service.login(db, data.email, data.password)
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@router.post("/auth/token", response_model=TokenResponse)
+def login_form(
+    username: str = Form(...),   # OAuth2 convention: 'username' field = email
+    password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """OAuth2 호환 로그인 (form-data, username 필드에 이메일 입력)."""
+    token = service.login(db, username, password)
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -45,8 +62,15 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+@router.get("/auth/me", response_model=UserResponse)
+def get_me_alias(current_user: User = Depends(get_current_user)):
+    """현재 인증된 사용자 정보를 반환합니다 (/users/me 별칭)."""
+    return current_user
+
+
 # ── 프로필 ────────────────────────────────────────────────────────────────────
 
+@router.get("/profile", response_model=ProfileResponse)
 @router.get("/profiles", response_model=ProfileResponse)
 def get_profile(
     db: Session = Depends(get_db),
@@ -73,6 +97,7 @@ def create_profile(
     return repo_create(db, current_user.id, data.model_dump(exclude_none=True))
 
 
+@router.put("/profile", response_model=ProfileResponse)
 @router.put("/profiles", response_model=ProfileResponse)
 def update_profile(
     data: ProfileUpdate,

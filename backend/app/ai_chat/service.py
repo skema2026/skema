@@ -420,14 +420,15 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             return "📭 등록된 시험 일정이 없습니다."
         lines = ["📝 시험 일정 목록:\n"]
         for e in sorted(exams, key=lambda x: x.exam_date):
-            days_left = (datetime.strptime(e.exam_date, "%Y-%m-%d").date() - today).days
+            days_left = (e.exam_date - today).days
             if days_left > 0:
                 status = f"D-{days_left}"
             elif days_left == 0:
                 status = "오늘!"
             else:
                 status = "종료"
-            line = f"  [ID:{e.id}] 📝 {e.title}  {e.exam_date} ({status})"
+            exam_date_str = e.exam_date.strftime("%Y-%m-%d") if hasattr(e.exam_date, "strftime") else e.exam_date
+            line = f"  [ID:{e.id}] 📝 {e.title}  {exam_date_str} ({status})"
             if e.subject:
                 line += f"  과목: {e.subject}"
             if e.exam_time:
@@ -444,7 +445,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         if exam_id:
             exams = [e for e in exams if e.id == exam_id]
 
-        upcoming = [e for e in exams if e.exam_date >= today.isoformat()]
+        upcoming = [e for e in exams if e.exam_date >= today]
         if not upcoming:
             return "📭 예정된 시험이 없습니다. 먼저 시험 일정을 등록해 주세요."
 
@@ -456,7 +457,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         results = []
 
         for exam in sorted(upcoming, key=lambda e: e.exam_date):
-            exam_date_obj = datetime.strptime(exam.exam_date, "%Y-%m-%d").date()
+            exam_date_obj = exam.exam_date
             days_until_exam = (exam_date_obj - today).days
             study_days = min(days_until_exam, target_days)
             if study_days <= 0:

@@ -25,7 +25,7 @@ def list_schedules(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """내 수업 시간표 전체 목록을 반환합니다."""
+    """내 일정 전체 목록을 반환합니다."""
     return service.list_schedules(db, current_user.id)
 
 
@@ -35,7 +35,7 @@ def create_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """새 수업 시간표를 추가합니다."""
+    """새 일정을 추가합니다."""
     return service.create_schedule(db, current_user.id, data)
 
 
@@ -45,7 +45,7 @@ def get_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """특정 수업 시간표 상세 정보를 반환합니다."""
+    """특정 일정 상세 정보를 반환합니다."""
     return service.get_schedule_or_404(db, schedule_id, current_user.id)
 
 
@@ -56,7 +56,7 @@ def update_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """수업 시간표를 수정합니다."""
+    """일정을 수정합니다."""
     return service.update_schedule(db, schedule_id, current_user.id, data)
 
 
@@ -66,7 +66,7 @@ def delete_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """수업 시간표를 삭제합니다. 연결된 시험 일정도 함께 삭제됩니다."""
+    """일정을 삭제합니다."""
     service.delete_schedule(db, schedule_id, current_user.id)
 
 
@@ -87,7 +87,7 @@ def create_exam(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """시험 일정을 추가합니다. schedule_id를 설정하면 특정 수업에 연결됩니다."""
+    """시험 일정을 추가합니다."""
     return service.create_exam(db, current_user.id, data)
 
 

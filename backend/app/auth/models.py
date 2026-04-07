@@ -15,13 +15,14 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), nullable=True)              # 표시 이름 (선택)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=True)   # 소셜 로그인 시 null 허용
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    hashed_password = Column(String(255), nullable=True)       # 소셜 로그인 시 null 허용
+    is_active = Column(Boolean, default=True, nullable=True, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     # 소셜 로그인 정보
-    social_provider = Column(String(50), nullable=True)   # "google" | "naver" | "kakao"
+    social_provider = Column(String(50), nullable=True)        # "google" | "naver" | "kakao"
     social_id = Column(String(255), nullable=True)
 
     # Relationships
@@ -37,19 +38,22 @@ class User(Base):
 class UserProfile(Base):
     """
     사용자 프로필. USER와 1:1 관계.
-    온보딩 완료 여부, 학과, 학기 등 부가 정보를 저장.
+    수면 시간(sleep_start/sleep_end)은 AI 일정 최적화에 사용됨.
     """
     __tablename__ = "user_profiles"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
-    nickname = Column(String(100), nullable=True)
-    avatar_url = Column(String(512), nullable=True)
-    department = Column(String(100), nullable=True)
-    semester = Column(Integer, nullable=True)            # 예: 1~8 학기
-    # AI 일정 최적화에 사용되는 수면 시간 설정
+
+    # 사용자 유형 및 목표
+    user_type = Column(String(50), nullable=True)     # student | exam_prep | civil_service | worker | other
+    occupation = Column(String(100), nullable=True)
+    goal_tasks = Column(String(500), nullable=True)
+
+    # AI 일정 최적화에 사용되는 수면 시간
     sleep_start = Column(String(5), nullable=True, default="23:00")  # HH:MM
     sleep_end = Column(String(5), nullable=True, default="07:00")    # HH:MM
+
     onboarding_completed = Column(Boolean, default=False, nullable=False)
     updated_at = Column(
         DateTime(timezone=True),
