@@ -1,5 +1,3 @@
-from datetime import date
-
 from sqlalchemy.orm import Session
 
 from app.schedule.models import ExamSchedule, Schedule

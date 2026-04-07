@@ -54,15 +54,24 @@ def signup(db: Session, data: SignupRequest) -> User:
             status_code=status.HTTP_409_CONFLICT,
             detail="이미 사용 중인 이메일입니다.",
         )
-    return repository.create_user(db, data.email, hash_password(data.password))
+    user = User(
+        email=data.email,
+        username=data.username,
+        hashed_password=hash_password(data.password),
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def login(db: Session, email: str, password: str) -> str:
     """
-    이메일 + 비밀번호 검증 후 JWT 발급.
-    비활성 계정도 여기서 차단 (deps.py의 get_current_user와 이중 방어).
+    username 또는 이메일 + 비밀번호 검증 후 JWT 발급.
+    비활성 계정도 여기서 차단.
     """
-    user = repository.get_user_by_email(db, email)
+    user = repository.get_user_by_username_or_email(db, email)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -73,7 +82,7 @@ def login(db: Session, email: str, password: str) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="이메일 또는 비밀번호가 올바르지 않습니다.",
         )
-    if not user.is_active:
+    if user.is_active is False:  # None treated as active (legacy rows)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="비활성화된 계정입니다.",

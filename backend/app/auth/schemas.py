@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr
 
 
 # ── 회원가입 / 로그인 ──────────────────────────────────────────────────────────
@@ -9,13 +9,11 @@ from pydantic import BaseModel, EmailStr, field_validator
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str
+    username: Optional[str] = None
 
-    @field_validator("password")
-    @classmethod
-    def password_strength(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("비밀번호는 8자 이상이어야 합니다.")
-        return v
+    def model_post_init(self, __context) -> None:  # type: ignore[override]
+        if len(self.password) < 6:
+            raise ValueError("비밀번호는 6자 이상이어야 합니다.")
 
 
 class LoginRequest(BaseModel):
@@ -32,9 +30,9 @@ class TokenResponse(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
+    username: Optional[str] = None
     email: str
-    is_active: bool
-    created_at: datetime
+    is_active: Optional[bool] = True
 
     model_config = {"from_attributes": True}
 
@@ -42,19 +40,11 @@ class UserResponse(BaseModel):
 # ── 프로필 ────────────────────────────────────────────────────────────────────
 
 class ProfileCreate(BaseModel):
-    nickname: Optional[str] = None
-    avatar_url: Optional[str] = None
-    department: Optional[str] = None
-    semester: Optional[int] = None
-    sleep_start: Optional[str] = "23:00"
-    sleep_end: Optional[str] = "07:00"
-
-    @field_validator("semester")
-    @classmethod
-    def semester_range(cls, v: Optional[int]) -> Optional[int]:
-        if v is not None and not (1 <= v <= 12):
-            raise ValueError("학기는 1~12 사이여야 합니다.")
-        return v
+    user_type: Optional[str] = None       # student | exam_prep | civil_service | worker | other
+    occupation: Optional[str] = None
+    goal_tasks: Optional[str] = None
+    sleep_start: Optional[str] = "23:00"  # HH:MM
+    sleep_end: Optional[str] = "07:00"    # HH:MM
 
 
 class ProfileUpdate(ProfileCreate):
@@ -64,10 +54,9 @@ class ProfileUpdate(ProfileCreate):
 class ProfileResponse(BaseModel):
     id: int
     user_id: int
-    nickname: Optional[str] = None
-    avatar_url: Optional[str] = None
-    department: Optional[str] = None
-    semester: Optional[int] = None
+    user_type: Optional[str] = None
+    occupation: Optional[str] = None
+    goal_tasks: Optional[str] = None
     sleep_start: Optional[str] = None
     sleep_end: Optional[str] = None
     onboarding_completed: bool = False

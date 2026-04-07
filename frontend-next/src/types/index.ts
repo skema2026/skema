@@ -3,7 +3,7 @@ export type Schedule = {
   user_id: number;
   title: string;
   day_of_week: number; // 0=Mon, 6=Sun
-  date?: string; // YYYY-MM-DD, optional
+  date?: string; // YYYY-MM-DD, null = recurring weekly
   start_time: string; // HH:MM
   end_time: string; // HH:MM
   location?: string;
@@ -18,9 +18,9 @@ export type UserProfile = {
   user_id: number;
   user_type?: string; // 'exam_prep' | 'civil_service' | 'student' | 'worker' | 'other'
   occupation?: string;
+  goal_tasks?: string;
   sleep_start: string; // HH:MM, default 23:00
   sleep_end: string; // HH:MM, default 07:00
-  goal_tasks?: string;
   onboarding_completed: boolean;
   updated_at?: string;
 };
