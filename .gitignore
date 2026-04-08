@@ -1,3 +1,4 @@
+#주요 목적은 불필요한 파일 및 폴더 제외, 민감한 정보 보호 
 # ── 환경변수 ──────────────────────────────────────────────
 .env
 .env.local
@@ -11,6 +12,16 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+
+# ── SQLite DB ─────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Frontend (Vite — 구버전) ──────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.cache/
 
 # ── Frontend (Next.js) ────────────────────────────────────
 frontend-next/node_modules/
@@ -30,10 +41,5 @@ desktop.ini
 .idea/
 *.swp
 
-# ── Claude Code ───────────────────────────────────────────
-.claude/
-
 # ── 기타 ──────────────────────────────────────────────────
-capstone/
-node_modules/
-*.db
+backend/deep-research-skills/
