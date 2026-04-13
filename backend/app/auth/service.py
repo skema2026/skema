@@ -114,8 +114,7 @@ def exchange_oauth_code(provider: str, code: str) -> tuple[str, str, str]:
     cfg = OAUTH_CONFIGS[provider]
     client_id = getattr(settings, cfg["client_id_key"])
     client_secret = getattr(settings, cfg["client_secret_key"])
-    backend_base = settings.BACKEND_URL.rstrip("/")
-    redirect_uri = f"{backend_base}/auth/{provider}/callback"
+    redirect_uri = f"{settings.BACKEND_URL}/auth/{provider}/callback"
 
     token_resp = http_requests.post(
         cfg["token_url"],

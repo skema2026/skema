@@ -27,6 +27,11 @@ class ScheduleCreate(BaseModel):
     priority: Optional[int] = 0                 # 0=보통 1=높음 2=긴급
     is_completed: Optional[bool] = False
     schedule_type: Optional[str] = "class"      # class | event | study
+    schedule_source: Optional[str] = "user_created"
+    linked_exam_id: Optional[int] = None
+    user_override: Optional[bool] = False
+    deleted_by_user: Optional[bool] = False
+    original_generated_title: Optional[str] = None
 
     @field_validator("day_of_week")
     @classmethod
@@ -58,6 +63,8 @@ class ScheduleUpdate(BaseModel):
     day_of_week: Optional[int] = None
     date: Optional[str] = None
     start_time: Optional[str] = None
+    user_override: Optional[bool] = None
+    deleted_by_user: Optional[bool] = None
     end_time: Optional[str] = None
     color: Optional[str] = None
     priority: Optional[int] = None
@@ -97,8 +104,20 @@ class ScheduleResponse(BaseModel):
     priority: int = 0
     is_completed: bool = False
     schedule_type: str = "class"
+    schedule_source: Optional[str] = "user_created"
+    linked_exam_id: Optional[int] = None
+    user_override: Optional[bool] = False
+    deleted_by_user: Optional[bool] = False
+    original_generated_title: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class ConflictItem(BaseModel):
+    """충돌하는 두 일정 쌍."""
+    schedule_a: ScheduleResponse
+    schedule_b: ScheduleResponse
+    day_label: str   # "2026-04-10" 또는 "매주 월요일"
 
 
 # ── ExamSchedule ──────────────────────────────────────────────────────────────
@@ -108,7 +127,11 @@ class ExamScheduleCreate(BaseModel):
     subject: Optional[str] = None
     exam_date: date
     exam_time: Optional[str] = None             # HH:MM 시험 시작 시간
+    exam_duration_minutes: Optional[int] = 120  # 시험 시간(분)
     location: Optional[str] = None
+    source: Optional[str] = None                # onboarding_external_exam | syllabus | user_created
+    progress_note: Optional[str] = None         # 현재 어디까지 했는지
+    weak_parts: Optional[str] = None            # 약한 파트
 
     @field_validator("exam_time")
     @classmethod
@@ -121,6 +144,7 @@ class ExamScheduleUpdate(BaseModel):
     subject: Optional[str] = None
     exam_date: Optional[date] = None
     exam_time: Optional[str] = None
+    exam_duration_minutes: Optional[int] = None
     location: Optional[str] = None
 
     @field_validator("exam_time")
@@ -136,6 +160,10 @@ class ExamScheduleResponse(BaseModel):
     subject: Optional[str] = None
     exam_date: date
     exam_time: Optional[str] = None
+    exam_duration_minutes: Optional[int] = 120
     location: Optional[str] = None
+    source: Optional[str] = None
+    progress_note: Optional[str] = None
+    weak_parts: Optional[str] = None
 
     model_config = {"from_attributes": True}

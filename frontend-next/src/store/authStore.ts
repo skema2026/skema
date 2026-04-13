@@ -5,8 +5,10 @@ import { User } from '@/types';
 interface AuthState {
   user: User | null;
   token: string | null;
+  _hasHydrated: boolean;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
+  setHasHydrated: (v: boolean) => void;
   logout: () => void;
 }
 
@@ -15,6 +17,8 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       token: null,
+      _hasHydrated: false,
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
       setUser: (user) => set({ user }),
       setToken: (token) => {
         set({ token });
@@ -32,6 +36,12 @@ export const useAuthStore = create<AuthState>()(
         document.cookie = 'token=; path=/; max-age=0';
       },
     }),
-    { name: 'auth-storage', partialize: (state) => ({ token: state.token }) }
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({ token: state.token }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
   )
 );

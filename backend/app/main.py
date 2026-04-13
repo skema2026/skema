@@ -1,5 +1,5 @@
 """
-AI 기반 개인 일정 관리 플랫폼 - FastAPI 애플리케이션 진입점.
+AI 기반 개인 시간표·일정 관리 — FastAPI 진입점
 
 실행:
     uvicorn app.main:app --reload
@@ -7,43 +7,76 @@ AI 기반 개인 일정 관리 플랫폼 - FastAPI 애플리케이션 진입점.
 Swagger UI:  http://localhost:8000/docs
 ReDoc:       http://localhost:8000/redoc
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-# ── 모든 모델을 metadata에 등록 (Alembic autogenerate 및 create_all 용) ───────
+# 모든 ORM 모델 metadata 등록 (Alembic autogenerate / create_all 대상)
 import app.db.base  # noqa: F401
 
+from app.auth.router import router as auth_router
+from app.schedule.router import router as schedule_router
+from app.share.router import router as share_router
+from app.ai_chat.router import router as ai_chat_router
+from app.syllabus.router import router as syllabus_router
+from app.eta.router import router as eta_router
 from app.core.config import settings
-from app.api.v1.router import api_router
 
 
 # ── FastAPI 앱 생성 ───────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="Skema API",
-    description="AI 기반 개인 시간표 & 일정 관리 플랫폼",
-    version="2.0.0",
+    description="AI 기반 개인 시간표·일정 관리 백엔드",
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
 
-# ── CORS ─────────────────────────────────────────────────────────────────────
+# ── 에러 응답 형식 통일 ───────────────────────────────────────────────────────
+# 모든 에러를 {"detail": "..."} 단일 구조로 반환.
 
-_default_cors = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-]
-_extra = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
-_allow_origins = list(dict.fromkeys(_default_cors + [settings.FRONTEND_URL] + _extra))
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    if len(errors) == 1:
+        detail = errors[0].get("msg", str(exc))
+    else:
+        detail = "; ".join(e.get("msg", "") for e in errors)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": detail},
+    )
+
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# CORS_ORIGINS 환경변수(쉼표 구분) 우선. 없으면 FRONTEND_URL + 로컬 개발 포트.
+
+if settings.CORS_ORIGINS:
+    _origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+else:
+    _origins = [
+        settings.FRONTEND_URL,
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ]
+# 중복 제거 (순서 유지)
+_origins = list(dict.fromkeys(_origins))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allow_origins,
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,7 +85,12 @@ app.add_middleware(
 
 # ── 라우터 등록 ───────────────────────────────────────────────────────────────
 
-app.include_router(api_router)
+app.include_router(auth_router)      # /auth/*, /users/me, /profiles
+app.include_router(schedule_router)  # /schedules/*, /exam-schedules/*
+app.include_router(share_router)     # /share-tokens/*, /share/{token}
+app.include_router(ai_chat_router)   # /ai/chat, /ai-chat-logs/*
+app.include_router(syllabus_router)  # /syllabi/*
+app.include_router(eta_router)       # /eta/parse-image, /eta/save-schedules
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────

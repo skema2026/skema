@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -23,11 +23,11 @@ import { useUIStore } from '@/store/uiStore';
 import { useCreateSchedule, useUpdateSchedule } from '@/hooks/useSchedules';
 import {
   DAY_NAMES_FULL,
-  SCHEDULE_COLORS,
   PRIORITY_LABELS,
   SCHEDULE_TYPE_LABELS,
   cn,
 } from '@/lib/utils';
+import { ALL_SCHEDULE_COLORS, getAutoColor } from '@/lib/scheduleColor';
 import { Schedule } from '@/types';
 
 const defaultForm = {
@@ -43,6 +43,13 @@ const defaultForm = {
   is_completed: false,
 };
 
+/** YYYY-MM-DD 문자열 → day_of_week (0=월…6=일, 로컬 시간 기준) */
+function dateStringToDow(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const day = new Date(y, m - 1, d).getDay(); // 0=Sun
+  return day === 0 ? 6 : day - 1;
+}
+
 export function ClassForm() {
   const { isClassFormOpen, editingSchedule, closeClassForm } = useUIStore();
   const createSchedule = useCreateSchedule();
@@ -50,9 +57,16 @@ export function ClassForm() {
 
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // true = color was not manually overridden by the user; auto-follows title hash
+  const autoColorRef = useRef(true);
+  // true = 매주 반복(요일 기반), false = 특정 날짜 1회
+  const [isRecurring, setIsRecurring] = useState(true);
 
   useEffect(() => {
     if (editingSchedule) {
+      autoColorRef.current = false; // editing: keep stored color as-is
+      const hasDate = !!editingSchedule.date;
+      setIsRecurring(!hasDate);
       setForm({
         title: editingSchedule.title,
         schedule_type: editingSchedule.schedule_type,
@@ -66,6 +80,8 @@ export function ClassForm() {
         is_completed: editingSchedule.is_completed,
       });
     } else {
+      autoColorRef.current = true; // new schedule: auto-derive from title
+      setIsRecurring(true);
       setForm(defaultForm);
     }
     setErrors({});
@@ -89,7 +105,7 @@ export function ClassForm() {
       title: form.title,
       schedule_type: form.schedule_type,
       day_of_week: form.day_of_week,
-      date: form.date || undefined,
+      date: isRecurring ? undefined : (form.date || undefined),
       start_time: form.start_time,
       end_time: form.end_time,
       location: form.location || undefined,
@@ -136,7 +152,15 @@ export function ClassForm() {
               id="title"
               placeholder="일정 제목"
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onChange={(e) => {
+                const title = e.target.value;
+                // 새 일정이고 색상을 수동으로 바꾸지 않았으면 제목에서 자동 파생
+                if (autoColorRef.current) {
+                  setForm({ ...form, title, color: title.trim() ? getAutoColor(title, form.schedule_type) : defaultForm.color });
+                } else {
+                  setForm({ ...form, title });
+                }
+              }}
               className={errors.title ? 'border-red-500' : ''}
             />
             {errors.title && <p className="text-red-500 text-xs">{errors.title}</p>}
@@ -160,34 +184,73 @@ export function ClassForm() {
             </Select>
           </div>
 
-          {/* Day of Week */}
+          {/* 반복 방식 토글 */}
           <div className="space-y-1.5">
-            <Label>요일</Label>
-            <Select
-              value={String(form.day_of_week)}
-              onValueChange={(v) => setForm({ ...form, day_of_week: Number(v) })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DAY_NAMES_FULL.map((day, idx) => (
-                  <SelectItem key={idx} value={String(idx)}>{day}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>일정 방식</Label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setIsRecurring(true); setForm((f) => ({ ...f, date: '' })); }}
+                className={cn(
+                  'flex-1 py-1.5 rounded-lg text-sm font-semibold border transition-colors',
+                  isRecurring
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-400'
+                )}
+              >
+                매주 반복
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsRecurring(false)}
+                className={cn(
+                  'flex-1 py-1.5 rounded-lg text-sm font-semibold border transition-colors',
+                  !isRecurring
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-400'
+                )}
+              >
+                특정 날짜
+              </button>
+            </div>
           </div>
 
-          {/* Date (optional) */}
-          <div className="space-y-1.5">
-            <Label htmlFor="date">날짜 (선택)</Label>
-            <Input
-              id="date"
-              type="date"
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-            />
-          </div>
+          {/* 매주 반복 → 요일 선택 / 특정 날짜 → 날짜 입력 */}
+          {isRecurring ? (
+            <div className="space-y-1.5">
+              <Label>요일</Label>
+              <Select
+                value={String(form.day_of_week)}
+                onValueChange={(v) => setForm({ ...form, day_of_week: Number(v) })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAY_NAMES_FULL.map((day, idx) => (
+                    <SelectItem key={idx} value={String(idx)}>{day}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label htmlFor="date">날짜 *</Label>
+              <Input
+                id="date"
+                type="date"
+                value={form.date}
+                onChange={(e) => {
+                  const dateVal = e.target.value;
+                  const dow = dateVal ? dateStringToDow(dateVal) : form.day_of_week;
+                  setForm((f) => ({ ...f, date: dateVal, day_of_week: dow }));
+                }}
+              />
+              {form.date && (
+                <p className="text-xs text-gray-500">요일: {DAY_NAMES_FULL[form.day_of_week]} (자동 계산)</p>
+              )}
+            </div>
+          )}
 
           {/* Time */}
           <div className="grid grid-cols-2 gap-3">
@@ -228,9 +291,9 @@ export function ClassForm() {
 
           {/* Color */}
           <div className="space-y-1.5">
-            <Label>색상</Label>
-            <div className="flex gap-2">
-              {SCHEDULE_COLORS.map((color) => (
+            <Label>색상 {autoColorRef.current && <span className="text-xs font-normal text-gray-400">(제목 기반 자동 선택 — 클릭으로 변경)</span>}</Label>
+            <div className="flex flex-wrap gap-2">
+              {ALL_SCHEDULE_COLORS.map((color) => (
                 <button
                   key={color}
                   type="button"
@@ -239,7 +302,10 @@ export function ClassForm() {
                     form.color === color ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent'
                   )}
                   style={{ backgroundColor: color }}
-                  onClick={() => setForm({ ...form, color })}
+                  onClick={() => {
+                    autoColorRef.current = false; // 수동 선택 시 자동 파생 중단
+                    setForm({ ...form, color });
+                  }}
                 />
               ))}
             </div>

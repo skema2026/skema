@@ -12,8 +12,8 @@ class Settings(BaseSettings):
 
     # ── AI ────────────────────────────────────────────────────────────────────
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
     OPENAI_API_KEY: str = ""
+    OPENROUTER_API_KEY: str = ""
 
     # ── OAuth ─────────────────────────────────────────────────────────────────
     GOOGLE_CLIENT_ID: str = ""
@@ -23,14 +23,14 @@ class Settings(BaseSettings):
     KAKAO_CLIENT_ID: str = ""
     KAKAO_CLIENT_SECRET: str = ""
 
-    # ── 프론트엔드 ─────────────────────────────────────────────────────────────
+    # ── 프론트엔드 / CORS ──────────────────────────────────────────────────────
     FRONTEND_URL: str = "http://localhost:3000"
-    BACKEND_URL: str = "http://localhost:8000"
-
-    # ── CORS (배포) ────────────────────────────────────────────────────────────
-    # 쉼표로 구분한 브라우저 출처. 비우면 로컬 개발용 기본 출처만 사용.
-    # 예: https://your-app.vercel.app,https://www.example.com
+    # 쉼표로 구분된 허용 Origin 목록 (비어있으면 FRONTEND_URL 단독 사용)
     CORS_ORIGINS: str = ""
+
+    # ── 백엔드 공개 URL (OAuth redirect_uri 등) ───────────────────────────────
+    # 로컬: http://localhost:8000  / 배포: https://api.yourdomain.com
+    BACKEND_URL: str = "http://localhost:8000"
 
     model_config = {"env_file": ".env"}
 

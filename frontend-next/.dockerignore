@@ -1,0 +1,25 @@
+# 빌드 아티팩트 (컨테이너에서 새로 빌드)
+.next/
+out/
+
+# 의존성 (컨테이너에서 npm ci로 설치)
+node_modules/
+
+# 환경변수
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# 문서
+*.md
+docs/
+
+# Git
+.git/
+.gitignore

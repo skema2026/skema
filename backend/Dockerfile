@@ -2,15 +2,26 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 시스템 패키지 (pymysql은 순수 Python이므로 별도 빌드 의존성 불필요)
+# 시스템 패키지 (OpenCV headless 의존성 포함)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    libglib2.0-0 \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
+# 의존성 먼저 설치 (레이어 캐시 활용)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 소스 복사
 COPY . .
 
-# Alembic 마이그레이션 실행 후 서버 시작
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# 업로드 디렉토리 생성
+RUN mkdir -p /app/uploads/syllabi
+
+# entrypoint 실행 권한
+RUN chmod +x /app/entrypoint.sh
+
+EXPOSE 8000
+
+ENTRYPOINT ["/app/entrypoint.sh"]

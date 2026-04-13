@@ -13,8 +13,9 @@ __pycache__/
 venv/
 *.egg-info/
 
-# ── SQLite DB ─────────────────────────────────────────────
+# ── SQLite DB / 백업 (MySQL Docker만 사용) ────────────────
 *.db
+*.db.bak*
 *.sqlite
 *.sqlite3
 
@@ -41,5 +42,16 @@ desktop.ini
 .idea/
 *.swp
 
+# ── Claude Code ───────────────────────────────────────────
+.claude/
+
+# ── Node.js (루트) ────────────────────────────────────────
+node_modules/
+
+# ── 업로드 파일 (Docker volume으로 관리) ──────────────────
+backend/uploads/
+
 # ── 기타 ──────────────────────────────────────────────────
 backend/deep-research-skills/
+backend/.venv/
+CON

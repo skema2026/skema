@@ -1,0 +1,30 @@
+# Python 가상환경 및 캐시
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 로컬 DB 파일 (컨테이너에서는 MySQL 사용)
+*.db
+*.db-journal
+*.db-wal
+*.db.bak.*
+
+# 환경변수 (docker-compose에서 주입)
+.env
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# 업로드 파일 (볼륨으로 관리)
+uploads/
+
+# 문서
+docs/
+*.md

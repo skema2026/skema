@@ -40,6 +40,7 @@ const defaultForm = {
   subject: '',
   exam_date: '',
   exam_time: '',
+  exam_duration_minutes: '120',
   location: '',
 };
 
@@ -70,6 +71,7 @@ export function ExamList() {
       subject: form.subject || undefined,
       exam_date: form.exam_date,
       exam_time: form.exam_time || undefined,
+      exam_duration_minutes: form.exam_duration_minutes ? Number(form.exam_duration_minutes) : 120,
       location: form.location || undefined,
     };
 
@@ -82,9 +84,11 @@ export function ExamList() {
         setIsGenerating(true);
         try {
           const subject = exam.subject || exam.title;
-          const msg = `시험 '${exam.title}'${exam.subject ? ` (${exam.subject})` : ''} 날짜는 ${exam.exam_date}야. 내 현재 시간표를 분석해서 이 시험에 맞는 준비 학습 일정을 시간표 빈 시간에 자동으로 만들어줘. 시험 D-7부터 시작하고, 가까울수록 강도를 높여서 배치해줘.`;
+          const msg = `generate_exam_prep_schedule 툴을 사용해서 시험 ID ${exam.id} (${exam.title}${exam.subject ? `, 과목: ${exam.subject}` : ''}, 날짜: ${exam.exam_date})에 대한 학습 준비 일정을 생성해줘. 14일 기간으로 빈 시간대에 배치해줘.`;
           await api.post('/ai/chat', { message: msg, messages: [] });
           queryClient.invalidateQueries({ queryKey: ['schedules'] });
+          queryClient.invalidateQueries({ queryKey: ['schedules', 'today'] });
+          queryClient.invalidateQueries({ queryKey: ['schedules', 'conflicts'] });
           toast.success(`${subject} 시험 준비 일정이 시간표에 추가되었습니다 📚`);
         } catch {
           toast.error('준비 일정 자동 생성에 실패했습니다. AI 채팅에서 직접 요청해보세요.');
@@ -108,9 +112,11 @@ export function ExamList() {
   const handleRegenerate = async (exam: ExamSchedule) => {
     setIsGenerating(true);
     try {
-      const msg = `시험 '${exam.title}'${exam.subject ? ` (${exam.subject})` : ''} 날짜는 ${exam.exam_date}야. 내 현재 시간표를 분석해서 이 시험에 맞는 준비 학습 일정을 시간표 빈 시간에 자동으로 만들어줘. 시험 D-7부터 시작하고, 가까울수록 강도를 높여서 배치해줘.`;
+      const msg = `generate_exam_prep_schedule 툴을 사용해서 시험 ID ${exam.id} (${exam.title}${exam.subject ? `, 과목: ${exam.subject}` : ''}, 날짜: ${exam.exam_date})에 대한 학습 준비 일정을 생성해줘. 14일 기간으로 빈 시간대에 배치해줘.`;
       await api.post('/ai/chat', { message: msg, messages: [] });
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['schedules', 'today'] });
+      queryClient.invalidateQueries({ queryKey: ['schedules', 'conflicts'] });
       toast.success('준비 일정이 재생성되었습니다 📚');
     } catch {
       toast.error('생성 중 오류가 발생했습니다');
@@ -253,14 +259,27 @@ export function ExamList() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="exam-location">장소 (선택)</Label>
+                <Label htmlFor="exam-duration">시험 시간(분)</Label>
                 <Input
-                  id="exam-location"
-                  placeholder="시험 장소"
-                  value={form.location}
-                  onChange={(e) => setForm({ ...form, location: e.target.value })}
+                  id="exam-duration"
+                  type="number"
+                  min="30"
+                  max="360"
+                  step="30"
+                  placeholder="120"
+                  value={form.exam_duration_minutes}
+                  onChange={(e) => setForm({ ...form, exam_duration_minutes: e.target.value })}
                 />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="exam-location">장소 (선택)</Label>
+              <Input
+                id="exam-location"
+                placeholder="시험 장소"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+              />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
