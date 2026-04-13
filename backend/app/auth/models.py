@@ -54,6 +54,8 @@ class UserProfile(Base):
     sleep_start = Column(String(5), nullable=True, default="23:00")  # HH:MM
     sleep_end = Column(String(5), nullable=True, default="07:00")    # HH:MM
 
+    is_college_student = Column(Boolean, nullable=True, default=False)
+    semester_start_date = Column(String(10), nullable=True)      # YYYY-MM-DD (학기 시작일)
     onboarding_completed = Column(Boolean, default=False, nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

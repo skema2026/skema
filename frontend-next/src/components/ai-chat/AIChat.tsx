@@ -48,6 +48,39 @@ export function AIChat({ onClose }: AIChatProps) {
     ]);
   };
 
+  /**
+   * AI 응답 후 항상 모든 관련 캐시를 무효화한다.
+   * schedules, exams 모두 무조건 갱신 (키워드 조건 제거).
+   */
+  const invalidateAfterReply = () => {
+    queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    queryClient.invalidateQueries({ queryKey: ['schedules', 'today'] });
+    queryClient.invalidateQueries({ queryKey: ['schedules', 'conflicts'] });
+    queryClient.invalidateQueries({ queryKey: ['exams'] }); // 항상 갱신
+  };
+
+  /** AI 응답에서 주목할 사항 토스트로 표시 */
+  const showReplyToasts = (reply: string) => {
+    if (reply.includes('⚠️ 시간 충돌 경고')) {
+      toast.warning('일정 시간 충돌이 감지되었습니다', {
+        description: '시간표에서 확인하세요',
+        duration: 5000,
+      });
+    }
+    if (reply.includes('개 생성 완료') || reply.includes('자동 학습 일정 생성')) {
+      toast.success('학습 일정이 시간표에 추가되었습니다 📚', { duration: 3000 });
+    }
+    if (reply.includes('완료 처리')) {
+      toast.success('일정 완료!', { duration: 2000 });
+    }
+    if (reply.includes('연기 완료')) {
+      toast.info('일정이 연기되었습니다', { duration: 2000 });
+    }
+    if (reply.includes('연관 학습 일정') && reply.includes('자동 정리')) {
+      toast.info('시험 삭제 및 연관 학습 일정 정리 완료', { duration: 3000 });
+    }
+  };
+
   const sendMessage = async (text?: string) => {
     const msgText = (text ?? input).trim();
     if (!msgText || loading) return;
@@ -64,8 +97,11 @@ export function AIChat({ onClose }: AIChatProps) {
       });
 
       setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
-      // Refresh schedules in case AI modified them
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+
+      // 변경된 데이터 모두 갱신
+      invalidateAfterReply();
+      // 중요 알림 토스트
+      showReplyToasts(data.reply);
     } catch {
       toast.error('AI 응답 중 오류가 발생했습니다');
       setMessages((prev) => [

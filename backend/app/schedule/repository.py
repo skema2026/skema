@@ -1,3 +1,4 @@
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.schedule.models import ExamSchedule, Schedule
@@ -5,16 +6,35 @@ from app.schedule.models import ExamSchedule, Schedule
 
 # ── Schedule CRUD ─────────────────────────────────────────────────────────────
 
-def get_schedules(db: Session, user_id: int) -> list[Schedule]:
-    return db.query(Schedule).filter(Schedule.user_id == user_id).all()
+# soft-delete 공통 조건식 (함수가 아닌 표현식으로 정의)
+# → get_schedules / get_schedule / 오늘 할 일 / 충돌 감지 전부 동일 정책 적용
+_NOT_DELETED = or_(
+    Schedule.deleted_by_user.is_(None),
+    Schedule.deleted_by_user == False,
+)
 
 
-def get_schedule(db: Session, schedule_id: int, user_id: int) -> Schedule | None:
-    return (
-        db.query(Schedule)
-        .filter(Schedule.id == schedule_id, Schedule.user_id == user_id)
-        .first()
+def get_schedules(db: Session, user_id: int, include_deleted: bool = False) -> list[Schedule]:
+    q = db.query(Schedule).filter(Schedule.user_id == user_id)
+    if not include_deleted:
+        q = q.filter(_NOT_DELETED)
+    return q.all()
+
+
+def get_schedule(
+    db: Session,
+    schedule_id: int,
+    user_id: int,
+    include_deleted: bool = False,
+) -> Schedule | None:
+    """단건 조회. 기본적으로 soft-deleted 항목은 반환하지 않는다."""
+    q = db.query(Schedule).filter(
+        Schedule.id == schedule_id,
+        Schedule.user_id == user_id,
     )
+    if not include_deleted:
+        q = q.filter(_NOT_DELETED)
+    return q.first()
 
 
 def create_schedule(db: Session, user_id: int, data: dict) -> Schedule:

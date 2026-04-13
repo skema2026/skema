@@ -32,7 +32,19 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _is_mysql() -> bool:
+    return op.get_bind().dialect.name == "mysql"
+
+
 def upgrade() -> None:
+    # MySQL은 FK 제약이 활성화된 상태에서 참조되는 테이블을 DROP할 수 없다.
+    # exam_schedules.schedule_id → schedules.id 참조가 있으므로
+    # schedules 재생성 전후로 FK 체크를 임시 비활성화한다.
+    conn = op.get_bind()
+    mysql = _is_mysql()
+    if mysql:
+        conn.execute(sa.text("SET FOREIGN_KEY_CHECKS=0"))
+
     # ── 1. Add transition columns to schedules ────────────────────────────────
     with op.batch_alter_table("schedules", schema=None) as batch_op:
         batch_op.add_column(sa.Column("title", sa.String(200), nullable=True))
@@ -81,13 +93,13 @@ def upgrade() -> None:
         sa.Column("end_time", sa.String(5), nullable=False),
         sa.Column("color", sa.String(7), nullable=True, server_default="#6366F1"),
         sa.Column("priority", sa.Integer(), nullable=True, server_default="0"),
-        sa.Column("is_completed", sa.Boolean(), nullable=True, server_default="false"),
+        sa.Column("is_completed", sa.Boolean(), nullable=True, server_default="0"),
         sa.Column("schedule_type", sa.String(20), nullable=True, server_default="class"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
 
-    # Copy data (exam_schedules FK still references old table by name – handled below)
+    # Copy data
     op.execute(
         """
         INSERT INTO schedules_v2
@@ -117,8 +129,17 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column("occupation", sa.String(100), nullable=True))
         batch_op.add_column(sa.Column("goal_tasks", sa.String(500), nullable=True))
 
+    # MySQL FK 체크 복원
+    if mysql:
+        conn.execute(sa.text("SET FOREIGN_KEY_CHECKS=1"))
+
 
 def downgrade() -> None:
+    conn = op.get_bind()
+    mysql = _is_mysql()
+    if mysql:
+        conn.execute(sa.text("SET FOREIGN_KEY_CHECKS=0"))
+
     # user_profiles
     with op.batch_alter_table("user_profiles", schema=None) as batch_op:
         batch_op.drop_column("goal_tasks")
@@ -160,3 +181,6 @@ def downgrade() -> None:
 
     op.create_index("ix_schedules_id", "schedules", ["id"])
     op.create_index("ix_schedules_user_id", "schedules", ["user_id"])
+
+    if mysql:
+        conn.execute(sa.text("SET FOREIGN_KEY_CHECKS=1"))

@@ -1,232 +1,683 @@
 'use client';
 
-import { useMemo } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import koLocale from '@fullcalendar/core/locales/ko';
-import type { EventInput, EventClickArg, EventContentArg } from '@fullcalendar/core';
-import type { EventDropArg } from '@fullcalendar/core';
-import { Schedule } from '@/types';
-import { useDeleteSchedule, useToggleComplete, useUpdateSchedule } from '@/hooks/useSchedules';
-import { useUIStore } from '@/store/uiStore';
+/**
+ * Timetable — custom CSS grid, up to 7 columns (Mon–Sun).
+ *
+ * Rendering rules (deterministic, no legacy hacks):
+ *   left   = colIndex × colWidth         (weekday column ONLY)
+ *   top    = (startSlot) × SLOT_H        (time ONLY)
+ *   height = durationSlots × SLOT_H − 1
+ *
+ * Drag-and-drop:
+ *   - Pointer events (pointerdown / pointermove / pointerup) on document.
+ *   - Vertical snap: nearest 30-min slot  → Math.round(relY / SLOT_H)
+ *   - Horizontal snap: nearest column     → Math.floor(relX / colWidth)
+ *   - Duration is preserved across the whole drag.
+ *   - Ghost block shows the snapped target position; original block fades.
+ *   - On drop: PATCH /schedules/{id} with new day_of_week + start_time + end_time.
+ *   - Date-based schedules (s.date ≠ null): horizontal movement locked.
+ *
+ * Timezone fix:
+ *   new Date("2026-04-07") → UTC midnight → wrong .getDay() in UTC+9.
+ *   dateStringToDow() parses components as local time.
+ */
+
+import { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import type { Schedule, ExamSchedule } from '@/types';
+import { useUIStore } from '@/store/uiStore';
+import { useUpdateSchedule } from '@/hooks/useSchedules';
+import { getScheduleColor } from '@/lib/scheduleColor';
+import { timeToMinutes, minutesToTime, dateStringToDow } from '@/lib/timetableParser';
 
-interface TimetableProps {
-  schedules: Schedule[];
-  readOnly?: boolean;
+// ── Grid constants ────────────────────────────────────────────────────────────
+
+const ALL_DAYS = ['월', '화', '수', '목', '금', '토', '일'] as const;
+
+const START_HOUR  = 8;
+const END_HOUR    = 22;
+const SLOT_H      = 28;   // px per 30-min slot
+const GUTTER_W    = 44;   // time-label column width (px)
+const MIN_BLOCK_H = 18;   // minimum rendered block height (px)
+const DRAG_THRESHOLD = 5; // px — below this, treat as click not drag
+
+const TOTAL_SLOTS = (END_HOUR - START_HOUR) * 2;
+const GRID_H      = TOTAL_SLOTS * SLOT_H;
+
+// ── Pure grid helpers ─────────────────────────────────────────────────────────
+
+/** "HH:MM" → slot index measured from START_HOUR. "08:00" → 0, "08:30" → 1 */
+function timeToSlot(time: string): number {
+  const mins = timeToMinutes(time);
+  if (mins < 0) return 0;
+  return (mins - START_HOUR * 60) / 30;
 }
 
-// 0=Mon → ISO date string for this week
-function getWeekDate(dow: number): string {
-  const today = new Date();
-  const jsDow = today.getDay(); // 0=Sun
-  const todayDow = jsDow === 0 ? 6 : jsDow - 1; // 0=Mon
-  const target = new Date(today);
-  target.setDate(today.getDate() + (dow - todayDow));
-  return target.toISOString().slice(0, 10);
+/** Slot index → "HH:MM" */
+function slotToTime(slot: number): string {
+  return minutesToTime(START_HOUR * 60 + slot * 30);
 }
 
-function isSameDay(a: Schedule, b: Schedule): boolean {
-  if (a.date && b.date) return a.date === b.date;
-  if (!a.date && !b.date) return a.day_of_week === b.day_of_week;
-  const dated = a.date ? a : b;
-  const recurring = a.date ? b : a;
-  const dow = new Date(dated.date!).getDay();
-  const dowMon = dow === 0 ? 6 : dow - 1;
-  return dowMon === recurring.day_of_week;
+/** Clamp a number to [lo, hi] */
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
 }
 
-function hasConflict(a: Schedule, b: Schedule): boolean {
-  if (!isSameDay(a, b)) return false;
-  const parse = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-  return parse(a.start_time) < parse(b.end_time) && parse(b.start_time) < parse(a.end_time);
+/**
+ * Resolve effective day_of_week for a schedule.
+ * For date-based schedules, compute from date string in LOCAL time.
+ */
+function effectiveDow(s: Schedule): number {
+  if (s.date) return dateStringToDow(s.date);
+  return s.day_of_week;
 }
 
-function EventContent({ arg, conflictIds }: { arg: EventContentArg; conflictIds: Set<number> }) {
-  const s: Schedule = arg.event.extendedProps.schedule;
-  const isConflict = conflictIds.has(s.id);
-  const start = arg.event.start!;
-  const end = arg.event.end ?? new Date(start.getTime() + 60 * 60000);
-  const durationMin = (end.getTime() - start.getTime()) / 60000;
-  const isCompact = durationMin < 45;
+// ── Drag state types ──────────────────────────────────────────────────────────
 
-  const priorityColor =
-    s.priority === 2 ? '#f97316' : s.priority === 1 ? '#facc15' : null;
+interface DragState {
+  schedule:      Schedule;
+  durationSlots: number;   // preserved throughout
+  grabPx:        number;   // px from block top where pointer landed
+  initialDowIdx: number;   // column index at drag-start (for locked date schedules)
+  isDateBased:   boolean;  // if true, horizontal movement is locked
+  startClientX:  number;   // for "did the user actually move?" detection
+  startClientY:  number;
+  didMove:       boolean;  // set true once threshold exceeded
+}
+
+interface DragSnap {
+  scheduleId: number;
+  slot:       number;   // snapped start slot
+  dowIdx:     number;   // snapped column index into visibleDays
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+interface BlockProps {
+  schedule:     Schedule;
+  isConflict:   boolean;
+  readOnly:     boolean;
+  isFaded:      boolean;   // true while this block is being dragged
+  onPointerDown: (e: React.PointerEvent<HTMLDivElement>, s: Schedule, blockTopClientY: number) => void;
+}
+
+function EventBlock({ schedule: s, isConflict, readOnly, isFaded, onPointerDown }: BlockProps) {
+  const startSlot   = timeToSlot(s.start_time);
+  const endSlot     = timeToSlot(s.end_time);
+  const top         = startSlot * SLOT_H;
+  const rawH        = (endSlot - startSlot) * SLOT_H - 1;
+  const height      = Math.max(MIN_BLOCK_H, rawH);
+  const durationMin = timeToMinutes(s.end_time) - timeToMinutes(s.start_time);
+  const isCompact   = durationMin < 45;
+  const color       = getScheduleColor(s);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (readOnly) return;
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    onPointerDown(e, s, rect.top);
+  };
 
   return (
     <div
+      onPointerDown={handlePointerDown}
+      tabIndex={readOnly ? undefined : 0}
       style={{
-        padding: isCompact ? '1px 4px' : '3px 6px',
-        height: '100%',
-        overflow: 'hidden',
-        opacity: s.is_completed ? 0.55 : 1,
-        outline: isConflict ? '2px solid #f87171' : 'none',
-        outlineOffset: '-2px',
-        borderRadius: 4,
-        cursor: 'pointer',
+        position:      'absolute',
+        top,
+        left:          2,
+        right:         2,
+        height,
+        background:    color,
+        borderRadius:  5,
+        padding:       isCompact ? '1px 4px' : '3px 6px',
+        overflow:      'hidden',
+        cursor:        readOnly ? 'default' : isFaded ? 'grabbing' : 'grab',
+        opacity:       isFaded ? 0.3 : s.is_completed ? 0.5 : 1,
+        outline:       isConflict ? '2px solid #f87171' : 'none',
+        outlineOffset: -2,
+        userSelect:    'none',
+        touchAction:   'none',
+        zIndex:        isFaded ? 0 : 1,
+        boxSizing:     'border-box',
+        transition:    isFaded ? 'none' : 'opacity 0.1s',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 3 }}>
-        {priorityColor && !isCompact && (
-          <span style={{
-            width: 6, height: 6, borderRadius: '50%',
-            background: priorityColor, flexShrink: 0, marginTop: 3,
-          }} />
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: isCompact ? 10 : 11,
-            fontWeight: 700,
-            lineHeight: 1.2,
-            color: '#fff',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: isCompact ? 'nowrap' : 'normal',
-            display: isCompact ? 'block' : '-webkit-box',
-            WebkitLineClamp: isCompact ? undefined : 2,
-            WebkitBoxOrient: isCompact ? undefined : 'vertical' as const,
-            textDecoration: s.is_completed ? 'line-through' : 'none',
-          }}>
-            {s.title}
-          </div>
-          {!isCompact && (
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
-              {s.start_time}–{s.end_time}
-            </div>
-          )}
-          {!isCompact && s.location && (
-            <div style={{
-              fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 1,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              📍 {s.location}
-            </div>
-          )}
-        </div>
+      <div style={{
+        fontSize:       isCompact ? 9 : 10,
+        fontWeight:     700,
+        color:          '#fff',
+        overflow:       'hidden',
+        textOverflow:   'ellipsis',
+        whiteSpace:     'nowrap',
+        textDecoration: s.is_completed ? 'line-through' : 'none',
+        lineHeight:     1.2,
+      }}>
+        {s.title}
       </div>
+      {!isCompact && (
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginTop: 1 }}>
+          {s.start_time}–{s.end_time}
+        </div>
+      )}
+      {!isCompact && s.location && (
+        <div style={{
+          fontSize:     9,
+          color:        'rgba(255,255,255,0.7)',
+          marginTop:    1,
+          overflow:     'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace:   'nowrap',
+        }}>
+          📍 {s.location}
+        </div>
+      )}
     </div>
   );
 }
 
-export function Timetable({ schedules, readOnly = false }: TimetableProps) {
-  const openClassForm = useUIStore((s) => s.openClassForm);
-  const updateSchedule = useUpdateSchedule();
-
-  const conflictIds = useMemo(() => {
-    const ids = new Set<number>();
-    schedules.forEach((a) => {
-      schedules.forEach((b) => {
-        if (a.id !== b.id && hasConflict(a, b)) {
-          ids.add(a.id);
-          ids.add(b.id);
-        }
-      });
-    });
-    return ids;
-  }, [schedules]);
-
-  const events: EventInput[] = useMemo(() =>
-    schedules.map((s) => {
-      const date = s.date ?? getWeekDate(s.day_of_week);
-      return {
-        id: String(s.id),
-        title: s.title,
-        start: `${date}T${s.start_time}`,
-        end: `${date}T${s.end_time}`,
-        backgroundColor: s.color || '#6366F1',
-        borderColor: conflictIds.has(s.id) ? '#f87171' : (s.color || '#6366F1'),
-        extendedProps: { schedule: s },
-      };
-    }), [schedules, conflictIds]);
-
-  const slotMin = useMemo(() => {
-    if (!schedules.length) return '08:00:00';
-    const minH = Math.max(6, Math.min(...schedules.map(s => parseInt(s.start_time))) - 1);
-    return `${String(minH).padStart(2, '0')}:00:00`;
-  }, [schedules]);
-
-  const slotMax = useMemo(() => {
-    if (!schedules.length) return '22:00:00';
-    const maxH = Math.min(23, Math.max(...schedules.map(s => parseInt(s.end_time.split(':')[0]))) + 1);
-    return `${String(maxH).padStart(2, '0')}:00:00`;
-  }, [schedules]);
-
-  const handleEventClick = (arg: EventClickArg) => {
-    if (readOnly) return;
-    const s: Schedule = arg.event.extendedProps.schedule;
-    openClassForm(s);
-  };
-
-  const handleEventDrop = (arg: EventDropArg) => {
-    if (readOnly) { arg.revert(); return; }
-    const s: Schedule = arg.event.extendedProps.schedule;
-    const newStart = arg.event.start!;
-    const newEnd = arg.event.end ?? new Date(newStart.getTime() + (
-      (parseInt(s.end_time.split(':')[0]) * 60 + parseInt(s.end_time.split(':')[1]))
-      - (parseInt(s.start_time.split(':')[0]) * 60 + parseInt(s.start_time.split(':')[1]))
-    ) * 60000);
-
-    const jsDow = newStart.getDay();
-    const newDow = jsDow === 0 ? 6 : jsDow - 1;
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const newStartTime = `${pad(newStart.getHours())}:${pad(newStart.getMinutes())}`;
-    const newEndTime = `${pad(newEnd.getHours())}:${pad(newEnd.getMinutes())}`;
-
-    updateSchedule.mutate(
-      {
-        id: s.id,
-        day_of_week: newDow,
-        start_time: newStartTime,
-        end_time: newEndTime,
-        ...(s.date ? { date: newStart.toISOString().slice(0, 10) } : {}),
-      },
-      {
-        onSuccess: () => toast.success('일정이 이동되었습니다'),
-        onError: () => { arg.revert(); toast.error('이동 중 오류가 발생했습니다'); },
-      }
-    );
-  };
+/** Ghost block — shown at the snapped drop target while dragging */
+function GhostBlock({ schedule: s, slot, durationSlots }: {
+  schedule: Schedule;
+  slot: number;
+  durationSlots: number;
+}) {
+  const top    = slot * SLOT_H;
+  const height = Math.max(MIN_BLOCK_H, durationSlots * SLOT_H - 1);
+  const color  = getScheduleColor(s);
+  const durationMin = durationSlots * 30;
+  const isCompact   = durationMin < 45;
 
   return (
-    <div style={{ borderRadius: 14, border: '1px solid var(--skema-container)', background: '#fff', overflow: 'hidden', boxShadow: '0 2px 8px rgba(24,28,30,0.06)' }}>
-      {conflictIds.size > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: '#fef2f2', borderBottom: '1px solid #fecaca', color: '#b91c1c', fontSize: 12, fontWeight: 600 }}>
-          <span>⚠️</span>
-          <span>시간이 겹치는 일정이 {conflictIds.size}개 있습니다. 빨간 테두리로 표시된 일정을 확인하세요.</span>
+    <div
+      style={{
+        position:      'absolute',
+        top,
+        left:          2,
+        right:         2,
+        height,
+        background:    color,
+        borderRadius:  5,
+        opacity:       0.75,
+        border:        `2px dashed rgba(255,255,255,0.7)`,
+        outline:       `2px solid ${color}`,
+        outlineOffset: 1,
+        boxSizing:     'border-box',
+        pointerEvents: 'none',
+        zIndex:        20,
+        padding:       isCompact ? '1px 4px' : '3px 6px',
+      }}
+    >
+      <div style={{
+        fontSize:   isCompact ? 9 : 10,
+        fontWeight: 700,
+        color:      '#fff',
+        overflow:   'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        lineHeight: 1.2,
+      }}>
+        {s.title}
+      </div>
+      {!isCompact && (
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', marginTop: 1 }}>
+          {slotToTime(slot)}–{slotToTime(slot + durationSlots)}
         </div>
       )}
-      <FullCalendar
-        plugins={[timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
-        locale={koLocale}
-        headerToolbar={{
-          left: 'prev,next today',
-          center: 'title',
-          right: '',
+    </div>
+  );
+}
+
+// ── Week helpers ──────────────────────────────────────────────────────────────
+
+/** Returns the Monday (00:00:00 local) of the week containing `ref` */
+export function getWeekStart(ref: Date = new Date()): Date {
+  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+/** True if dateStr (YYYY-MM-DD) falls within [weekStart, weekStart+6] (local) */
+function isDateInWeek(dateStr: string, weekStart: Date): boolean {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const t = new Date(y, m - 1, d).getTime();
+  const ws = weekStart.getTime();
+  return t >= ws && t < ws + 7 * 24 * 3600 * 1000;
+}
+
+/** Local date string YYYY-MM-DD for a Date */
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ── Public component ──────────────────────────────────────────────────────────
+
+interface TimetableProps {
+  schedules:  Schedule[];
+  exams?:     ExamSchedule[];
+  readOnly?:  boolean;
+  weekStart?: Date;   // Monday of the displayed week (default: current week)
+}
+
+export function Timetable({ schedules, exams = [], readOnly = false, weekStart: weekStartProp }: TimetableProps) {
+  const weekStart = weekStartProp ?? getWeekStart();
+  const openClassForm = useUIStore((s) => s.openClassForm);
+  const { mutate: updateSchedule } = useUpdateSchedule();
+
+  // ── Drag state ──────────────────────────────────────────────────────────────
+  // dragStateRef: stable data captured at drag-start (no stale closures in effect)
+  // dragSnapRef:  latest snapped position (read inside effect handlers)
+  // dragSnap:     drives re-renders for ghost + faded block
+  const gridRef      = useRef<HTMLDivElement>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const dragSnapRef  = useRef<DragSnap | null>(null);
+  const [dragSnap, setDragSnapState] = useState<DragSnap | null>(null);
+  const visibleDaysRef = useRef<number[]>([0, 1, 2, 3, 4, 5, 6]);
+
+  // Stable refs for callbacks used inside the pointer-event effect
+  const openClassFormRef = useRef(openClassForm);
+  const updateScheduleRef = useRef(updateSchedule);
+  useEffect(() => { openClassFormRef.current = openClassForm; }, [openClassForm]);
+  useEffect(() => { updateScheduleRef.current = updateSchedule; }, [updateSchedule]);
+
+  const updateDragSnap = useCallback((snap: DragSnap | null) => {
+    dragSnapRef.current = snap;
+    setDragSnapState(snap);
+  }, []);
+
+  // ── 1. Deduplicate by id ────────────────────────────────────────────────────
+  const unique = useMemo<Schedule[]>(() => {
+    const seen = new Set<number>();
+    return schedules.filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+  }, [schedules]);
+
+  // ── 2. Conflict detection ───────────────────────────────────────────────────
+  const conflictIds = useMemo<Set<number>>(() => {
+    const ids = new Set<number>();
+    for (let i = 0; i < unique.length; i++) {
+      for (let j = i + 1; j < unique.length; j++) {
+        const a = unique[i], b = unique[j];
+        if (effectiveDow(a) !== effectiveDow(b)) continue;
+        const aS = timeToMinutes(a.start_time), aE = timeToMinutes(a.end_time);
+        const bS = timeToMinutes(b.start_time), bE = timeToMinutes(b.end_time);
+        if (aS < bE && bS < aE) { ids.add(a.id); ids.add(b.id); }
+      }
+    }
+    return ids;
+  }, [unique]);
+
+  // ── 3. Group by dow — date-based schedules filtered to current week ─────────
+  const byDow = useMemo<Record<number, Schedule[]>>(() => {
+    const g: Record<number, Schedule[]> = { 0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] };
+    for (const s of unique) {
+      // Date-based schedule: only render in the week it belongs to
+      if (s.date && !isDateInWeek(s.date, weekStart)) continue;
+      const dow = effectiveDow(s);
+      if (dow >= 0 && dow <= 6) g[dow].push(s);
+    }
+    return g;
+  }, [unique, weekStart]);
+
+  // ── 4. Group exams by dow — filtered to current week ───────────────────────
+  const examByDow = useMemo<Record<number, ExamSchedule[]>>(() => {
+    const g: Record<number, ExamSchedule[]> = { 0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] };
+    for (const e of exams) {
+      if (!isDateInWeek(e.exam_date, weekStart)) continue;
+      const dow = dateStringToDow(e.exam_date);
+      if (dow >= 0 && dow <= 6) g[dow].push(e);
+    }
+    return g;
+  }, [exams, weekStart]);
+
+  // ── 5. Always show all 7 days ───────────────────────────────────────────────
+  const visibleDays = [0, 1, 2, 3, 4, 5, 6] as const;
+
+  // Keep visibleDays ref in sync (read inside pointer event handlers)
+  useEffect(() => { visibleDaysRef.current = [...visibleDays]; }, [visibleDays]);
+
+  // ── 6. Drag start ───────────────────────────────────────────────────────────
+  const handleBlockPointerDown = useCallback((
+    e: React.PointerEvent<HTMLDivElement>,
+    schedule: Schedule,
+    blockTopClientY: number,
+  ) => {
+    if (readOnly) return;
+
+    const vd = visibleDaysRef.current;
+    const dow = effectiveDow(schedule);
+    const initialDowIdx = clamp(vd.indexOf(dow), 0, vd.length - 1);
+
+    dragStateRef.current = {
+      schedule,
+      durationSlots: timeToSlot(schedule.end_time) - timeToSlot(schedule.start_time),
+      grabPx:        e.clientY - blockTopClientY,
+      initialDowIdx,
+      isDateBased:   !!schedule.date,
+      startClientX:  e.clientX,
+      startClientY:  e.clientY,
+      didMove:       false,
+    };
+
+    updateDragSnap({
+      scheduleId: schedule.id,
+      slot:       timeToSlot(schedule.start_time),
+      dowIdx:     initialDowIdx,
+    });
+  }, [readOnly, updateDragSnap]);
+
+  // ── 7. Pointer move / up — attached to document while dragging ─────────────
+  useEffect(() => {
+    if (!dragSnap) return;  // not dragging
+
+    const handleMove = (e: PointerEvent) => {
+      const drag = dragStateRef.current;
+      if (!drag || !gridRef.current) return;
+
+      // Detect whether movement threshold was crossed
+      const dx = Math.abs(e.clientX - drag.startClientX);
+      const dy = Math.abs(e.clientY - drag.startClientY);
+      if (dx + dy > DRAG_THRESHOLD) drag.didMove = true;
+
+      const rect      = gridRef.current.getBoundingClientRect();
+      const scrollTop = gridRef.current.scrollTop;
+      const vd        = visibleDaysRef.current;
+      const colWidth  = (rect.width - GUTTER_W) / vd.length;
+
+      // ── Vertical snap ──────────────────────────────────────────────────────
+      // gridTop in viewport coords = rect.top − scrollTop
+      const gridTop = rect.top - scrollTop;
+      const relY    = e.clientY - gridTop - drag.grabPx;
+      const maxStart = TOTAL_SLOTS - drag.durationSlots;
+      const snapSlot = clamp(Math.round(relY / SLOT_H), 0, maxStart);
+
+      // ── Horizontal snap ────────────────────────────────────────────────────
+      // Locked for date-based schedules (can't change the calendar date here)
+      let snapDowIdx: number;
+      if (drag.isDateBased) {
+        snapDowIdx = drag.initialDowIdx;
+      } else {
+        const colsLeft = rect.left + GUTTER_W;
+        const relX     = e.clientX - colsLeft;
+        snapDowIdx = clamp(Math.floor(relX / colWidth), 0, vd.length - 1);
+      }
+
+      updateDragSnap({ scheduleId: drag.schedule.id, slot: snapSlot, dowIdx: snapDowIdx });
+    };
+
+    const handleUp = (_e: PointerEvent) => {
+      const drag = dragStateRef.current;
+      const snap = dragSnapRef.current;
+
+      if (!drag) { cleanup(); return; }
+
+      if (!drag.didMove) {
+        // Treat as a regular click → open edit form
+        openClassFormRef.current(drag.schedule);
+      } else if (snap) {
+        const vd      = visibleDaysRef.current;
+        const newDow  = vd[snap.dowIdx];
+        const newStart = slotToTime(snap.slot);
+        const newEnd   = slotToTime(snap.slot + drag.durationSlots);
+
+        const unchanged =
+          newDow   === effectiveDow(drag.schedule) &&
+          newStart === drag.schedule.start_time &&
+          newEnd   === drag.schedule.end_time;
+
+        if (!unchanged) {
+          updateScheduleRef.current({
+            id:           drag.schedule.id,
+            day_of_week:  newDow,
+            start_time:   newStart,
+            end_time:     newEnd,
+          });
+          toast.success(
+            `${drag.schedule.title} → ${ALL_DAYS[newDow]} ${newStart}–${newEnd}`,
+            { duration: 2000 }
+          );
+        }
+      }
+
+      cleanup();
+    };
+
+    const cleanup = () => {
+      dragStateRef.current = null;
+      updateDragSnap(null);
+    };
+
+    document.addEventListener('pointermove', handleMove, { passive: true });
+    document.addEventListener('pointerup',   handleUp);
+    return () => {
+      document.removeEventListener('pointermove', handleMove);
+      document.removeEventListener('pointerup',   handleUp);
+    };
+  // Only re-attach when drag starts (dragSnap goes null→nonNull) or ends.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragSnap !== null, updateDragSnap]);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  return (
+    <div style={{
+      borderRadius: 14,
+      border:       '1px solid #ebeef1',
+      background:   '#fff',
+      overflow:     'hidden',
+      boxShadow:    '0 2px 8px rgba(24,28,30,0.06)',
+      // Prevent text selection while dragging
+      userSelect:   dragSnap ? 'none' : undefined,
+    }}>
+
+      {/* Conflict banner */}
+      {conflictIds.size > 0 && (
+        <div style={{
+          display:      'flex',
+          alignItems:   'center',
+          gap:          8,
+          padding:      '8px 16px',
+          background:   '#fef2f2',
+          borderBottom: '1px solid #fecaca',
+          color:        '#b91c1c',
+          fontSize:     12,
+          fontWeight:   600,
+        }}>
+          ⚠️ 시간이 겹치는 일정이 {conflictIds.size}개 있습니다. 빨간 테두리로 표시된 일정을 확인하세요.
+        </div>
+      )}
+
+      {/* ── Day header (weekday + date) ── */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #ebeef1' }}>
+        <div style={{ width: GUTTER_W, flexShrink: 0 }} />
+        {visibleDays.map((dow) => {
+          // Compute the calendar date for this column
+          const colDate = new Date(weekStart);
+          colDate.setDate(weekStart.getDate() + dow);
+          const isToday = localDateStr(colDate) === localDateStr(new Date());
+          const dateLabel = `${colDate.getMonth() + 1}/${colDate.getDate()}`;
+          return (
+            <div key={`hdr-${dow}`} style={{
+              flex:        1,
+              textAlign:   'center',
+              padding:     '6px 0',
+              borderRadius: isToday ? 8 : 0,
+              background:  isToday ? '#eef1ff' : 'transparent',
+            }}>
+              <div style={{
+                fontSize:   11,
+                fontWeight: 800,
+                color:      dow >= 5 ? '#e11d48' : isToday ? '#1a4db2' : '#747684',
+                lineHeight: 1.2,
+              }}>
+                {ALL_DAYS[dow]}
+              </div>
+              <div style={{
+                fontSize:   10,
+                fontWeight: isToday ? 700 : 400,
+                color:      dow >= 5 ? '#e11d48' : isToday ? '#1a4db2' : '#aaa',
+                lineHeight: 1.2,
+                marginTop:  1,
+              }}>
+                {dateLabel}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Scrollable grid body ── */}
+      <div
+        ref={gridRef}
+        style={{
+          display:        'flex',
+          overflowY:      'auto',
+          maxHeight:      600,
+          scrollbarWidth: 'thin',
         }}
-        buttonText={{ today: '오늘' }}
-        events={events}
-        editable={!readOnly}
-        eventDrop={handleEventDrop}
-        eventClick={handleEventClick}
-        eventContent={(arg) => <EventContent arg={arg} conflictIds={conflictIds} />}
-        slotMinTime={slotMin}
-        slotMaxTime={slotMax}
-        slotDuration="00:30:00"
-        snapDuration="00:15:00"
-        nowIndicator
-        allDaySlot={false}
-        height="auto"
-        scrollTime={slotMin}
-        dayHeaderFormat={{ weekday: 'short' }}
-        businessHours={{
-          daysOfWeek: [1, 2, 3, 4, 5],
-          startTime: '08:00',
-          endTime: '22:00',
-        }}
-        eventMinHeight={24}
-      />
+      >
+        {/* Time gutter — :00 labels + :30 minor marks */}
+        <div style={{
+          width:     GUTTER_W,
+          flexShrink: 0,
+          position:  'relative',
+          height:    GRID_H,
+        }}>
+          {Array.from({ length: TOTAL_SLOTS }, (_, i) => {
+            const isHour = i % 2 === 0;
+            return (
+              <div key={`t-${i}`} style={{
+                position:   'absolute',
+                top:        i * SLOT_H - 6,
+                right:      6,
+                fontSize:   isHour ? 10 : 8,
+                color:      isHour ? '#bbb' : '#ddd',
+                lineHeight: 1,
+                userSelect: 'none',
+              }}>
+                {isHour
+                  ? String(START_HOUR + i / 2).padStart(2, '0')
+                  : '30'}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Weekday columns */}
+        {visibleDays.map((dow, colIdx) => (
+          <div
+            key={`col-${dow}`}
+            style={{
+              flex:       1,
+              position:   'relative',
+              height:     GRID_H,
+              borderLeft: '1px solid #f0f0f0',
+              background: dow >= 5 ? 'rgba(225,29,72,0.02)' : 'transparent',
+            }}
+          >
+            {/* Grid lines */}
+            {Array.from({ length: TOTAL_SLOTS }, (_, i) => (
+              <div key={`gl-${dow}-${i}`} style={{
+                position:      'absolute',
+                left:          0,
+                right:         0,
+                top:           i * SLOT_H,
+                borderTop:     i % 2 === 0
+                  ? '1px solid #e8eaed'
+                  : '1px dashed #f3f4f6',
+                pointerEvents: 'none',
+              }} />
+            ))}
+
+            {/* Schedule blocks */}
+            {(byDow[dow] ?? []).map((s) => (
+              <EventBlock
+                key={s.id}
+                schedule={s}
+                isConflict={conflictIds.has(s.id)}
+                readOnly={readOnly}
+                isFaded={dragSnap?.scheduleId === s.id}
+                onPointerDown={handleBlockPointerDown}
+              />
+            ))}
+
+            {/* Ghost block — renders in the snapped target column */}
+            {dragSnap && dragSnap.dowIdx === colIdx && dragStateRef.current && (
+              <GhostBlock
+                schedule={dragStateRef.current.schedule}
+                slot={dragSnap.slot}
+                durationSlots={dragStateRef.current.durationSlots}
+              />
+            )}
+
+            {/* Exam blocks (read-only, always on top) */}
+            {(examByDow[dow] ?? []).map((e) => {
+              // Exams without time: show as all-day banner at top of column
+              if (!e.exam_time) {
+                return (
+                  <div key={`exam-${e.id}`} style={{
+                    position:     'absolute',
+                    top:          2,
+                    left:         2,
+                    right:        2,
+                    height:       MIN_BLOCK_H,
+                    background:   '#dc2626',
+                    borderRadius: 4,
+                    padding:      '2px 4px',
+                    overflow:     'hidden',
+                    pointerEvents: 'none',
+                    zIndex:        3,
+                  }}>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      📝 {e.title}
+                    </div>
+                  </div>
+                );
+              }
+              const startMins = timeToMinutes(e.exam_time);
+              if (startMins < 0) return null;
+              const durationMins = (e as ExamSchedule & { exam_duration_minutes?: number }).exam_duration_minutes ?? 120;
+              const endMins = startMins + durationMins;
+              const top    = (startMins - START_HOUR * 60) / 30 * SLOT_H;
+              const height = Math.max(MIN_BLOCK_H, (endMins - startMins) / 30 * SLOT_H - 1);
+              return (
+                <div
+                  key={`exam-${e.id}`}
+                  style={{
+                    position:     'absolute',
+                    top,
+                    left:         2,
+                    right:        2,
+                    height,
+                    background:   '#dc2626',
+                    borderRadius: 5,
+                    padding:      '2px 5px',
+                    overflow:     'hidden',
+                    pointerEvents: 'none',
+                    zIndex:        2,
+                  }}
+                >
+                  <div style={{
+                    fontSize:     9,
+                    fontWeight:   700,
+                    color:        '#fff',
+                    overflow:     'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace:   'nowrap',
+                  }}>
+                    📝 {e.title}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

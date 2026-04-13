@@ -23,12 +23,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Timetable } from '@/components/timetable/Timetable';
+import { Timetable, getWeekStart } from '@/components/timetable/Timetable';
 import { ClassForm } from '@/components/class-form/ClassForm';
 import { AIChat } from '@/components/ai-chat/AIChat';
 import { ExamList } from '@/components/exam/ExamList';
 import { SettingsModal } from '@/components/settings/SettingsModal';
-import { useSchedules } from '@/hooks/useSchedules';
+import { useConflicts, useSchedules, useToggleComplete } from '@/hooks/useSchedules';
+import { useExams } from '@/hooks/useExams';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
@@ -136,7 +137,10 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const { user, logout } = useAuthStore();
   const { isChatOpen, toggleChat, openClassForm, isShareModalOpen, openShareModal, closeShareModal } = useUIStore();
   const { data: schedules = [] } = useSchedules(initialSchedules);
+  const { data: exams = [] } = useExams();
   const { data: profile } = useProfile(initialProfile ?? undefined);
+  const { data: conflicts = [] } = useConflicts();
+  const toggleComplete = useToggleComplete();
 
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
@@ -145,6 +149,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [isRegenerateOpen, setIsRegenerateOpen] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [regenerateForm, setRegenerateForm] = useState({ subject: '', days: '7', hours: '2' });
+  const [weekOffset, setWeekOffset] = useState(0);
   const queryClient = useQueryClient();
 
   // 온보딩 미완료 시 온보딩 페이지로 이동 (SSR에서 처리 안된 경우 fallback)
@@ -163,7 +168,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     const now = new Date();
     const todayDow = now.getDay() === 0 ? 6 : now.getDay() - 1;
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    const todayStr = now.toISOString().slice(0, 10);
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const upcoming = schedules.find((s) => {
       if (s.is_completed) return false;
       const matchDay = s.date ? s.date === todayStr : s.day_of_week === todayDow;
@@ -193,7 +198,8 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   // 오늘 할 일
   const now = new Date();
   const todayDow = now.getDay() === 0 ? 6 : now.getDay() - 1;
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const weekStart = getWeekStart(new Date(now.getFullYear(), now.getMonth(), now.getDate() + weekOffset * 7));
   const todaySchedules = schedules
     .filter((s) => s.date ? s.date === todayStr : s.day_of_week === todayDow)
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -206,25 +212,31 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     return (eh * 60 + em) < nowMin;
   });
 
-  // 완료 토글
-  const handleToggleComplete = async (s: Schedule) => {
-    try {
-      await api.put(`/schedules/${s.id}`, { is_completed: !s.is_completed });
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    } catch {
-      toast.error('업데이트 중 오류가 발생했습니다');
-    }
+  // 완료 토글 — optimistic update (useToggleComplete 훅 사용)
+  const handleToggleComplete = (s: Schedule) => {
+    toggleComplete.mutate(
+      { id: s.id, is_completed: !s.is_completed },
+      { onError: () => toast.error('업데이트 중 오류가 발생했습니다') },
+    );
+  };
+
+  /** AI 액션 후 관련 모든 쿼리 무효화 */
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    queryClient.invalidateQueries({ queryKey: ['schedules', 'today'] });
+    queryClient.invalidateQueries({ queryKey: ['schedules', 'conflicts'] });
+    queryClient.invalidateQueries({ queryKey: ['exams'] });
   };
 
   const handleReschedule = async () => {
     setIsRegenerating(true);
     try {
-      const { data } = await api.post<{ response: string }>('/ai/chat', {
+      const { data } = await api.post<{ reply: string }>('/ai/chat', {
         message: '미완료 일정을 오늘 이후 빈 시간에 자동으로 재배치해줘',
         messages: [],
       });
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-      toast.success(data.response.includes('재배치했습니다') ? '일정이 재배치되었습니다' : data.response);
+      invalidateAll();
+      toast.success(data.reply.includes('재배치했습니다') ? '일정이 재배치되었습니다' : '재배치 완료');
     } catch {
       toast.error('재배치 중 오류가 발생했습니다');
     } finally {
@@ -239,7 +251,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     try {
       const message = `기존 학습 일정을 모두 삭제하고 ${subject} 학습 일정을 ${days}일간 하루 ${hours}시간씩 새로 만들어줘`;
       await api.post('/ai/chat', { message, messages: [] });
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateAll();
       toast.success('학습 시간표가 재생성되었습니다');
       setIsRegenerateOpen(false);
       setRegenerateForm({ subject: '', days: '7', hours: '2' });
@@ -396,10 +408,10 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
         </header>
 
         {/* Main Content */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-h-0">
 
           {/* ── 오늘 할 일 사이드바 ── */}
-          <div className="w-60 flex-shrink-0 overflow-y-auto border-r p-3 flex flex-col gap-3" style={{ background: '#fff' }}>
+          <div className="w-60 flex-shrink-0 overflow-y-auto border-r p-3 flex flex-col gap-3 min-h-0" style={{ background: '#fff' }}>
 
             {/* 동기부여 카드 */}
             <div className="rounded-xl p-3" style={{ background: 'var(--skema-primary)' }}>
@@ -423,6 +435,34 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
               </div>
               <p style={{ fontSize: 10, color: '#747684', marginTop: 6 }}>{done}/{total}개 완료</p>
             </div>
+
+            {/* 충돌 경고 배너 */}
+            {conflicts.length > 0 && (
+              <div
+                style={{
+                  padding: '8px 10px', borderRadius: 10,
+                  background: '#fff7ed', border: '1px solid #fed7aa',
+                  display: 'flex', alignItems: 'flex-start', gap: 6,
+                }}
+              >
+                <MaterialIcon icon="warning" size={13} color="#f59e0b" filled />
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: '#92400e' }}>
+                    시간 충돌 {conflicts.length}건
+                  </p>
+                  {conflicts.slice(0, 2).map((c, i) => (
+                    <p key={i} style={{ fontSize: 10, color: '#92400e', marginTop: 1, lineHeight: 1.4 }}>
+                      {c.schedule_a.title} ↔ {c.schedule_b.title}
+                      <br />
+                      <span style={{ opacity: 0.7 }}>{c.day_label}</span>
+                    </p>
+                  ))}
+                  {conflicts.length > 2 && (
+                    <p style={{ fontSize: 10, color: '#92400e', marginTop: 1 }}>외 {conflicts.length - 2}건...</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 오늘 할 일 */}
             <div className="flex-1">
@@ -497,7 +537,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
           </div>
 
           {/* ── 메인 콘텐츠 ── */}
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 overflow-auto p-4 min-h-0">
             <Tabs defaultValue="timetable">
               <TabsList className="mb-4">
                 <TabsTrigger value="timetable">시간표</TabsTrigger>
@@ -505,24 +545,48 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                 <TabsTrigger value="report">주간 리포트</TabsTrigger>
               </TabsList>
               <TabsContent value="timetable">
-                <div className="flex justify-end gap-2 mb-3">
-                  <button
-                    onClick={handleReschedule}
-                    disabled={isRegenerating}
-                    style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: isRegenerating ? 'not-allowed' : 'pointer' }}
-                  >
-                    <MaterialIcon icon="update" size={15} color="var(--skema-on-surface-variant)" />
-                    미완료 재배치
-                  </button>
-                  <button
-                    onClick={() => setIsRegenerateOpen(true)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
-                  >
-                    <MaterialIcon icon="refresh" size={15} color="var(--skema-on-surface-variant)" />
-                    시간표 재생성
-                  </button>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  {/* 주간 네비게이션 */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setWeekOffset((o) => o - 1)}
+                      style={{ display: 'flex', alignItems: 'center', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', color: 'var(--skema-on-surface-variant)' }}
+                    >
+                      <MaterialIcon icon="chevron_left" size={16} color="var(--skema-on-surface-variant)" />
+                    </button>
+                    <button
+                      onClick={() => setWeekOffset(0)}
+                      style={{ fontSize: '12px', fontWeight: 600, padding: '6px 10px', background: weekOffset === 0 ? 'var(--skema-primary)' : 'var(--skema-surface-low)', color: weekOffset === 0 ? '#fff' : 'var(--skema-on-surface-variant)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                    >
+                      이번 주
+                    </button>
+                    <button
+                      onClick={() => setWeekOffset((o) => o + 1)}
+                      style={{ display: 'flex', alignItems: 'center', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', color: 'var(--skema-on-surface-variant)' }}
+                    >
+                      <MaterialIcon icon="chevron_right" size={16} color="var(--skema-on-surface-variant)" />
+                    </button>
+                  </div>
+                  {/* 재배치 / 재생성 버튼 */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleReschedule}
+                      disabled={isRegenerating}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: isRegenerating ? 'not-allowed' : 'pointer' }}
+                    >
+                      <MaterialIcon icon="update" size={15} color="var(--skema-on-surface-variant)" />
+                      미완료 재배치
+                    </button>
+                    <button
+                      onClick={() => setIsRegenerateOpen(true)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
+                    >
+                      <MaterialIcon icon="refresh" size={15} color="var(--skema-on-surface-variant)" />
+                      시간표 재생성
+                    </button>
+                  </div>
                 </div>
-                <Timetable schedules={schedules} />
+                <Timetable schedules={schedules} exams={exams} weekStart={weekStart} />
               </TabsContent>
               <TabsContent value="exams">
                 <ExamList />

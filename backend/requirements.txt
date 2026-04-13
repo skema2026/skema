@@ -13,3 +13,9 @@ openai>=1.0.0
 python-dotenv>=1.0.0
 email-validator>=2.1.0
 requests>=2.31.0
+
+# Positional grid detection (image processing)
+opencv-python-headless>=4.9.0.80
+numpy>=1.26.0
+Pillow>=10.0.0
+

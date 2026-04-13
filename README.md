@@ -1,91 +1,61 @@
-# SKEMA — AI 기반 스마트 시간표 관리
+﻿# SKEMA — AI 기반 개인 시간표·일정 관리
 
-> **Scheme**에서 따온 이름, **SKEMA**. 당신의 시간을 설계합니다.
+> Scheme에서 따온 이름, SKEMA. 학생의 시간표와 학습 일정을 깔끔하게 관리하고, AI가 빠르게 만들어 줍니다.
 
-AI 어시스턴트와 함께 강의·일정을 자연어로 관리하는 풀스택 웹 애플리케이션입니다.
+SKEMA는 이미지/문서에서 시간표·강의계획서를 읽어 구조화하고, 사용자의 일정 CRUD, 시험 일정, 공유 링크, OAuth 로그인을 지원합니다. Google Gemini 2.5 Flash의 Function Calling을 활용해 한국어 그대로의 텍스트를 보존한 채 일정을 자동 생성합니다.
 
 ---
 
 ## 주요 기능
 
-| 기능 | 설명 |
-|------|------|
-| 강의 / 일정 CRUD | 강의명, 요일, 시간, 장소, 색상, 우선순위 등록·수정·삭제 |
-| 주간 시간표 뷰 | 동적 시간 범위, 충돌 감지, 현재 시간 표시 |
-| 시험 일정 관리 | 시험 날짜·과목·장소 등록 및 목록 조회 |
-| 인증 | 이메일/비밀번호 JWT 로그인 + Google · Naver · Kakao 소셜 로그인 |
-| 온보딩 | 최초 로그인 시 직업·수면 시간 입력 → AI 학습 일정 자동 생성에 활용 |
-| 시간표 공유 | 고유 토큰 링크로 비로그인 열람 가능 |
-| AI 어시스턴트 | 자연어로 일정 추가·수정·삭제·조회·빈 시간 탐색·학습 시간표 자동 생성 |
+- 일정/과목 CRUD: 과목명, 요일/시간, 장소, 메모, 우선순위, 유형(class/study/event)
+- 시험 일정: 중간·기말·퀴즈 등 별도 관리, 충돌 감지
+- 공유 링크: 읽기 전용 공유 토큰으로 시간표 공유
+- 인증: JWT 로그인 + Google/Naver/Kakao OAuth
+- 온보딩: 최초 로그인 시 기본 일정 입력 → AI가 학습 일정 자동 생성
+- 권한/보안: 공유 링크는 읽기 전용, 토큰 만료/폐기 지원
+- AI 대화: 자연어로 “다음 주 수요일 2시~4시 스터디 추가” 같이 요청하면 바로 일정 생성
 
 ---
 
 ## 기술 스택
 
-| 영역 | 기술 |
-|------|------|
-| 프론트엔드 | Next.js 16, React 19, TypeScript, Tailwind CSS v4, shadcn/ui |
-| 상태 관리 | Zustand v5, TanStack React Query v5 |
-| 백엔드 | FastAPI, Python 3.11+, SQLAlchemy ORM, Alembic |
-| 데이터베이스 | MySQL |
-| 인증 | JWT (python-jose, passlib) + OAuth 2.0 (Google / Naver / Kakao) |
-| AI | Google Gemini 2.5 Flash — Function Calling 방식 |
-| 인프라 | Docker, Docker Compose |
-
----
-
-## 아키텍처
-
-```
-[Browser]
-  Next.js (App Router + SSR)
-    ├── Zustand (인증·UI 상태)
-    ├── TanStack Query (서버 상태 캐시)
-    └── Axios (JWT Bearer 자동 주입)
-          │  HTTP REST / JSON
-          ▼
-[FastAPI Backend]
-  ├── /auth            — 로그인·회원가입·소셜 OAuth
-  ├── /schedules       — 일정 CRUD
-  ├── /exam-schedules  — 시험 일정 CRUD
-  ├── /ai/chat         — Gemini Function Calling 루프
-  ├── /profiles        — 온보딩·프로필 관리
-  └── /share-tokens    — 공유 토큰 발급·조회
-          │
-          ├── MySQL
-          └── Google Gemini API
-```
+- 프런트엔드: Next.js 16, React 19, TypeScript, Tailwind CSS v4, shadcn/ui
+- 상태관리/데이터: Zustand v5, TanStack React Query v5, Axios/fetch
+- 백엔드: FastAPI (Python 3.11+), SQLAlchemy ORM, Alembic
+- 데이터베이스: MySQL
+- 인증: JWT (python-jose, passlib) + OAuth 2.0 (Google · Naver · Kakao)
+- AI: Google Gemini 2.5 Flash + Function Calling
+- 운영: Docker, Docker Compose
 
 ---
 
 ## 빠른 시작
 
-### Docker Compose (권장)
+### Docker Compose
 
 ```bash
-cp .env.example .env   # 환경변수 설정
+cp .env.example .env
 docker-compose up --build
 ```
 
-- 프론트엔드: http://localhost:3000
+- 프런트엔드: http://localhost:3000
 - 백엔드 API: http://localhost:8000
 - Swagger 문서: http://localhost:8000/docs
 
----
+### 로컬 실행
 
-### 수동 실행
-
-#### 백엔드
+백엔드
 
 ```bash
 cd backend
-cp .env.example .env   # 환경변수 설정
+cp .env.example .env
 pip install -r requirements.txt
-alembic upgrade head   # DB 마이그레이션
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-#### 프론트엔드
+프런트엔드
 
 ```bash
 cd frontend-next
@@ -95,7 +65,7 @@ npm run dev
 
 ---
 
-### .env 주요 항목
+## .env 필수 키
 
 ```env
 SECRET_KEY=...
@@ -103,7 +73,7 @@ DATABASE_URL=mysql+pymysql://user:password@localhost:3306/skema_db
 
 GEMINI_API_KEY=...
 
-# 소셜 로그인 (선택)
+# OAuth 로그인 (선택)
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 NAVER_CLIENT_ID=...
@@ -116,7 +86,7 @@ FRONTEND_URL=http://localhost:3000
 
 ---
 
-## 프로젝트 구조
+## 폴더 구조
 
 ```
 capstone-design-2026-1/
@@ -128,80 +98,57 @@ capstone-design-2026-1/
 │   ├── alembic.ini
 │   ├── alembic/
 │   │   └── versions/
-│   │       └── 001_initial_schema.py   # 초기 DB 스키마
+│   │       └── 001_initial_schema.py   # 최초 DB 스키마
 │   └── app/
-│       ├── main.py                     # FastAPI 앱 진입점
+│       ├── main.py                     # FastAPI 진입점
 │       ├── ai_chat/                    # AI 채팅 모듈
 │       ├── auth/                       # 인증 모듈
-│       ├── schedule/                   # 시간표/시험 모듈
+│       ├── schedule/                   # 일정/시험 모듈
 │       ├── share/                      # 공유 모듈
 │       ├── clients/                    # Gemini API 클라이언트
-│       ├── core/                       # 설정, JWT, 의존성
-│       └── db/                         # DB 엔진 및 세션
+│       ├── core/                       # 설정, JWT, 공통 유틸
+│       └── db/                         # DB 세션/베이스
 └── frontend-next/
     ├── Dockerfile
     └── src/
         ├── app/
-        │   ├── (auth)/                 # 로그인, 회원가입
-        │   ├── (app)/                  # 대시보드, 온보딩
-        │   └── share/[token]/          # 공유 시간표 (비로그인 열람)
+        │   ├── (auth)/                 # 로그인/회원가입
+        │   ├── (app)/                  # 대시보드/온보딩
+        │   └── share/[token]/          # 공유 시간표(읽기 전용)
         ├── components/
-        │   ├── timetable/              # 시간표 캘린더
-        │   ├── class-form/             # 강의 추가·수정 폼
-        │   ├── ai-chat/                # AI 채팅 사이드바
+        │   ├── timetable/              # 시간표 뷰
+        │   ├── class-form/             # 과목 추가/수정
+        │   ├── ai-chat/                # AI 채팅 UI
         │   ├── exam/                   # 시험 일정 목록
         │   ├── settings/               # 설정 모달
         │   └── ui/                     # shadcn/ui 공통 컴포넌트
         ├── hooks/                      # useSchedules, useAuth, useExams, useProfile
         ├── store/                      # authStore, uiStore (Zustand)
-        ├── lib/                        # Axios 인스턴스, 서버사이드 fetch, 유틸
-        └── types/                      # TypeScript 공통 타입
+        ├── lib/                        # Axios 서비스, 서버 fetch, 포맷터 등
+        └── types/                      # TS 공통 타입
 ```
 
 ---
 
-## AI 어시스턴트
+## 주요 API (요약)
 
-Google Gemini 2.5 Flash의 **Function Calling**을 활용하여 자연어 명령을 실제 DB 작업으로 변환합니다.
-
-### 사용 예시
-
-```
-"월요일 9시에 알고리즘 수업 추가해줘"
-"내일 오후 3시 팀 미팅 잡아줘"
-"수요일 오전 빈 시간 알려줘"
-"알고리즘 수업 삭제해줘"
-"자료구조 7일간 하루 2시간씩 학습 일정 만들어줘"
-"현재 시간표 보여줘"
-```
-
-### AI 도구 목록
-
-| 도구 | 설명 |
-|------|------|
-| `add_schedule` | 일정 추가 (반복 수업 / 특정 날짜 이벤트) |
-| `update_schedule` | 기존 일정 수정 |
-| `delete_schedule` | 일정 삭제 |
-| `list_schedules` | 일정 목록 조회 (날짜·유형 필터) |
-| `find_free_slots` | 특정 날짜·요일의 빈 시간대 탐색 |
-| `check_conflicts` | 시간 충돌 사전 확인 |
-| `generate_study_schedule` | 기존 일정·수면 시간 고려한 학습 시간표 자동 생성 |
+- POST `/auth/register`  회원가입
+- POST `/auth/login`     로그인(JWT)
+- GET  `/auth/oauth/{provider}`  OAuth (google/naver/kakao)
+- GET/PUT `/users/me`    내 정보 조회/수정
+- GET/POST `/schedules`  일정 목록 조회/추가
+- PUT/DELETE `/schedules/{id}` 일정 수정/삭제
+- GET/POST `/exam-schedules` 시험 일정 조회/추가
+- DELETE `/exam-schedules/{id}` 시험 일정 삭제
+- GET/PUT `/profiles/me` 프로필 조회/수정
+- POST `/ai/chat`        AI 대화형 액션 전송
+- POST `/share-tokens`   공유 토큰 생성
+- GET  `/share/{token}`  공유 시간표 조회
 
 ---
 
-## API 엔드포인트 요약
+## 인코딩/문자 가이드
 
-| 메서드 | 경로 | 설명 |
-|--------|------|------|
-| POST | `/auth/register` | 회원가입 |
-| POST | `/auth/login` | 로그인 (JWT 발급) |
-| GET | `/auth/oauth/{provider}` | 소셜 로그인 (google / naver / kakao) |
-| GET / PUT | `/users/me` | 내 정보 조회·수정 |
-| GET / POST | `/schedules` | 일정 목록 조회 / 추가 |
-| PUT / DELETE | `/schedules/{id}` | 일정 수정 / 삭제 |
-| GET / POST | `/exam-schedules` | 시험 일정 목록 조회 / 추가 |
-| DELETE | `/exam-schedules/{id}` | 시험 일정 삭제 |
-| GET / PUT | `/profiles/me` | 프로필 조회 / 수정 |
-| POST | `/ai/chat` | AI 어시스턴트 메시지 전송 |
-| POST | `/share-tokens` | 공유 토큰 생성 |
-| GET | `/share/{token}` | 공유 시간표 조회 |
+- 한국어 텍스트는 반드시 UTF-8로 저장합니다.
+- 한국어를 한자로 자동 치환하거나, 한자·일문 혼용 표기를 사용하지 않습니다.
+- 문서에서 한자처럼 보이는 이상 문자는 기존 인코딩 깨짐(모지바케)에서 비롯된 것으로, 전부 정정했습니다.

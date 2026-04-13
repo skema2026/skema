@@ -68,12 +68,10 @@ export default function RegisterPage() {
           router.push('/login');
         },
         onError: (err: unknown) => {
-          const error = err as { response?: { data?: { detail?: string } } };
-          const detail = error?.response?.data?.detail;
-          if (detail?.includes('username')) {
-            toast.error('이미 사용 중인 아이디입니다');
-          } else if (detail?.includes('email')) {
-            toast.error('이미 사용 중인 이메일입니다');
+          const error = err as { response?: { status?: number; data?: { detail?: string } } };
+          const detail = error?.response?.data?.detail ?? '';
+          if (error?.response?.status === 409) {
+            toast.error(detail || '이미 사용 중인 이메일 또는 아이디입니다');
           } else {
             toast.error('회원가입 중 오류가 발생했습니다');
           }

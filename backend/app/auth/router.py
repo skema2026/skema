@@ -122,7 +122,7 @@ def oauth_authorize(provider: str):
             url=f"{settings.FRONTEND_URL}/login?error=oauth_not_configured&provider={provider}"
         )
 
-    redirect_uri = f"http://localhost:8000/auth/{provider}/callback"
+    redirect_uri = f"{settings.BACKEND_URL}/auth/{provider}/callback"
     params = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,

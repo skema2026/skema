@@ -45,6 +45,8 @@ class ProfileCreate(BaseModel):
     goal_tasks: Optional[str] = None
     sleep_start: Optional[str] = "23:00"  # HH:MM
     sleep_end: Optional[str] = "07:00"    # HH:MM
+    is_college_student: Optional[bool] = None
+    semester_start_date: Optional[str] = None  # YYYY-MM-DD
 
 
 class ProfileUpdate(ProfileCreate):
@@ -59,6 +61,8 @@ class ProfileResponse(BaseModel):
     goal_tasks: Optional[str] = None
     sleep_start: Optional[str] = None
     sleep_end: Optional[str] = None
+    is_college_student: Optional[bool] = None
+    semester_start_date: Optional[str] = None
     onboarding_completed: bool = False
     updated_at: datetime
 
