@@ -23,7 +23,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("hashed_password", sa.String(length=255), nullable=True),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
         sa.Column("social_provider", sa.String(length=50), nullable=True),
         sa.Column("social_id", sa.String(length=255), nullable=True),
         sa.Column(
@@ -48,7 +48,7 @@ def upgrade() -> None:
         sa.Column("semester", sa.Integer(), nullable=True),
         sa.Column("sleep_start", sa.String(length=5), nullable=True, server_default="23:00"),
         sa.Column("sleep_end", sa.String(length=5), nullable=True, server_default="07:00"),
-        sa.Column("onboarding_completed", sa.Boolean(), nullable=False, server_default="false"),
+        sa.Column("onboarding_completed", sa.Boolean(), nullable=False, server_default=sa.text("0")),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -111,7 +111,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("token", sa.String(length=64), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
