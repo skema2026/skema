@@ -7,6 +7,8 @@ AI 기반 개인 시간표·일정 관리 — FastAPI 진입점
 Swagger UI:  http://localhost:8000/docs
 ReDoc:       http://localhost:8000/redoc
 """
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -22,16 +24,26 @@ from app.share.router import router as share_router
 from app.ai_chat.router import router as ai_chat_router
 from app.syllabus.router import router as syllabus_router
 from app.eta.router import router as eta_router
+from app.notification.router import router as notification_router
 from app.core.config import settings
 
 
 # ── FastAPI 앱 생성 ───────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app.notification.scheduler import start_scheduler, stop_scheduler
+    start_scheduler()
+    yield
+    stop_scheduler()
+
 
 app = FastAPI(
     title="Skema API",
     description="AI 기반 개인 시간표·일정 관리 백엔드",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 
@@ -85,12 +97,13 @@ app.add_middleware(
 
 # ── 라우터 등록 ───────────────────────────────────────────────────────────────
 
-app.include_router(auth_router)      # /auth/*, /users/me, /profiles
-app.include_router(schedule_router)  # /schedules/*, /exam-schedules/*
-app.include_router(share_router)     # /share-tokens/*, /share/{token}
-app.include_router(ai_chat_router)   # /ai/chat, /ai-chat-logs/*
-app.include_router(syllabus_router)  # /syllabi/*
-app.include_router(eta_router)       # /eta/parse-image, /eta/save-schedules
+app.include_router(auth_router)         # /auth/*, /users/me, /profiles
+app.include_router(schedule_router)     # /schedules/*, /exam-schedules/*
+app.include_router(share_router)        # /share-tokens/*, /share/{token}
+app.include_router(ai_chat_router)      # /ai/chat, /ai-chat-logs/*
+app.include_router(syllabus_router)     # /syllabi/*
+app.include_router(eta_router)          # /eta/parse-image, /eta/save-schedules
+app.include_router(notification_router) # /notifications/*
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────

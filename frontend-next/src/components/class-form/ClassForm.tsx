@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useUIStore } from '@/store/uiStore';
-import { useCreateSchedule, useUpdateSchedule } from '@/hooks/useSchedules';
+import { useCreateSchedule, useDeleteSchedule, useUpdateSchedule } from '@/hooks/useSchedules';
 import {
   DAY_NAMES_FULL,
   PRIORITY_LABELS,
@@ -54,6 +54,7 @@ export function ClassForm() {
   const { isClassFormOpen, editingSchedule, closeClassForm } = useUIStore();
   const createSchedule = useCreateSchedule();
   const updateSchedule = useUpdateSchedule();
+  const deleteSchedule = useDeleteSchedule();
 
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -90,6 +91,7 @@ export function ClassForm() {
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!form.title.trim()) newErrors.title = '제목을 입력해주세요';
+    if (!isRecurring && !form.date) newErrors.date = '날짜를 선택해주세요';
     if (!form.start_time) newErrors.start_time = '시작 시간을 입력해주세요';
     if (!form.end_time) newErrors.end_time = '종료 시간을 입력해주세요';
     if (form.start_time >= form.end_time) newErrors.end_time = '종료 시간은 시작 시간 이후여야 합니다';
@@ -136,7 +138,18 @@ export function ClassForm() {
     }
   };
 
-  const isPending = createSchedule.isPending || updateSchedule.isPending;
+  const isPending = createSchedule.isPending || updateSchedule.isPending || deleteSchedule.isPending;
+
+  const handleDelete = () => {
+    if (!editingSchedule) return;
+    deleteSchedule.mutate(editingSchedule.id, {
+      onSuccess: () => {
+        toast.success('일정이 삭제되었습니다');
+        closeClassForm();
+      },
+      onError: () => toast.error('삭제 중 오류가 발생했습니다'),
+    });
+  };
 
   return (
     <Dialog open={isClassFormOpen} onOpenChange={(open) => !open && closeClassForm()}>
@@ -245,7 +258,9 @@ export function ClassForm() {
                   const dow = dateVal ? dateStringToDow(dateVal) : form.day_of_week;
                   setForm((f) => ({ ...f, date: dateVal, day_of_week: dow }));
                 }}
+                className={errors.date ? 'border-red-500' : ''}
               />
+              {errors.date && <p className="text-red-500 text-xs">{errors.date}</p>}
               {form.date && (
                 <p className="text-xs text-gray-500">요일: {DAY_NAMES_FULL[form.day_of_week]} (자동 계산)</p>
               )}
@@ -343,13 +358,27 @@ export function ClassForm() {
             </div>
           )}
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={closeClassForm}>
-              취소
-            </Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={isPending}>
-              {isPending ? '저장 중...' : editingSchedule ? '수정' : '추가'}
-            </Button>
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between gap-2">
+            <div>
+              {editingSchedule && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={isPending}
+                >
+                  삭제
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={closeClassForm}>
+                취소
+              </Button>
+              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={isPending}>
+                {isPending ? '저장 중...' : editingSchedule ? '수정' : '추가'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

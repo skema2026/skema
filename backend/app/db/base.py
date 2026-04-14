@@ -9,3 +9,4 @@ from app.schedule.models import Schedule, ExamSchedule  # noqa: F401
 from app.share.models import ShareToken             # noqa: F401
 from app.ai_chat.models import AIChatLog            # noqa: F401
 from app.syllabus.models import Syllabus, SyllabusAnalysis  # noqa: F401
+from app.notification.models import Notification            # noqa: F401

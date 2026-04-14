@@ -467,6 +467,44 @@ def _get_weekly_scope(db: Session, user_id: int, subject: str, exam_type: str) -
         return []
 
 
+def _weekly_topics_to_tasks(
+    weekly_topics: list[dict],
+    subject: str,
+) -> list[dict]:
+    """
+    weekly_topics JSON → action + 범위(주차/챕터) + 수량이 포함된 구체적 study task 목록.
+    LLM 없이 직접 생성. 추상 task 금지.
+    """
+    _ACTION = {
+        "high":   ("심화 개념 정리 + 문제 5개 풀기", 2),
+        "medium": ("핵심 개념 정리 + 예제 3개 풀기", 1),
+        "low":    ("기본 개념 학습 + 예제 2개 확인", 1),
+    }
+    tasks = []
+    for item in (weekly_topics or []):
+        if not isinstance(item, dict):
+            continue
+        week = item.get("week")
+        topic = (item.get("topic") or "").strip()
+        subtopics: list = item.get("subtopics") or []
+        difficulty = item.get("difficulty") or "medium"
+        if difficulty not in _ACTION:
+            difficulty = "medium"
+        if not topic or week is None:
+            continue
+        action, priority = _ACTION[difficulty]
+        sub_part = f" ({', '.join(str(s) for s in subtopics[:2])})" if subtopics else ""
+        title = f"{subject} {week}주차 {topic}{sub_part} — {action}"
+        tasks.append({
+            "title": title,
+            "task_type": "study",
+            "priority": priority,
+            "estimated_minutes": 75 if difficulty == "high" else 60,
+            "reason": f"{week}주차 {topic}",
+        })
+    return tasks
+
+
 def _scope_to_syllabus_context(scope_items: list[dict], exam_type: str) -> str:
     """scope weekly_topics 항목을 AI 프롬프트용 문자열로 변환."""
     if not scope_items:
@@ -550,14 +588,43 @@ _PHASE_LABEL = {
 
 
 def _call_gemini(prompt: str, temperature: float = 0.2) -> str:
-    """LLM 텍스트 호출. Gemini 실패 시 OpenRouter fallback 자동 사용."""
+    """LLM 텍스트 호출. Gemini 실패 시 gpt-4.1 fallback 자동 사용."""
     from app.core.llm import call_llm
-    import logging as _logging
-    _log = _logging.getLogger(__name__)
     result = call_llm(prompt, temperature=temperature)
     if result.status == "fallback_used":
-        _log.info(f"ai_chat used fallback: provider={result.provider} model={result.model}")
+        logger.info(f"ai_chat used fallback: provider={result.provider} model={result.model}")
     return result.content
+
+
+def _create_chat_completion(messages: list, tools: list):
+    """
+    Gemini (OpenAI-compat endpoint) 우선 호출, 실패 시 OpenAI gpt-4.1 fallback.
+    tool_calls 지원. 둘 다 실패 시 RuntimeError.
+    """
+    from app.core.llm import OPENAI_MODEL
+    if settings.GEMINI_API_KEY:
+        try:
+            _gclient = OpenAI(
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                api_key=settings.GEMINI_API_KEY,
+            )
+            return _gclient.chat.completions.create(
+                model="gemini-2.5-flash",
+                messages=messages,
+                tools=tools,
+                tool_choice="auto",
+            )
+        except Exception as _exc:
+            logger.warning(f"Gemini chat completion failed, falling back to gpt-4.1: {_exc}")
+    if not settings.OPENAI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY와 OPENAI_API_KEY가 모두 설정되지 않았습니다.")
+    _oclient = OpenAI(api_key=settings.OPENAI_API_KEY)
+    return _oclient.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+    )
 
 
 def _extract_json_array(text: str) -> list:
@@ -1022,7 +1089,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         for bs, be in busy:
             if cursor + duration <= bs:
                 free.append((_m2t(cursor), _m2t(bs)))
-            cursor = max(cursor, be)
+            cursor = max(cursor, be + 60)  # +1시간 버퍼
         if cursor + duration <= 22 * 60:
             free.append((_m2t(cursor), _m2t(22 * 60)))
         label = date_str if date_str else DAY_NAMES[dow]
@@ -1065,10 +1132,31 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         wake = _t2m(profile.sleep_end if profile and profile.sleep_end else "07:00")
         sleep = _t2m(profile.sleep_start if profile and profile.sleep_start else "23:00")
 
-        # 강의계획서 컨텍스트 + 구체적 task 풀 사전 생성
+        # 강의계획서 주차별 데이터 → 구체적 task 풀 생성
         syllabus_ctx = _get_syllabus_context(db, user_id, subject)
         task_pool: list[dict] = []
-        if settings.GEMINI_API_KEY:
+
+        # 1순위: weekly_topics 직접 변환 (LLM 없이 구체적 task 생성)
+        try:
+            from app.syllabus.models import SyllabusAnalysis as _SA
+            _sa = (
+                db.query(_SA)
+                .filter(
+                    _SA.user_id == user_id,
+                    _SA.subject_name.ilike(f"%{subject}%"),
+                    _SA.analysis_status != "failed",
+                )
+                .first()
+            )
+            if _sa and _sa.weekly_topics:
+                _raw = json.loads(_sa.weekly_topics) if isinstance(_sa.weekly_topics, str) else _sa.weekly_topics
+                if isinstance(_raw, list) and _raw:
+                    task_pool = _weekly_topics_to_tasks(_raw, subject)
+        except Exception as _e:
+            logger.warning(f"_weekly_topics_to_tasks failed: {_e}")
+
+        # 2순위: LLM 기반 task 생성 (weekly_topics 없는 경우)
+        if not task_pool and (settings.GEMINI_API_KEY or settings.OPENAI_API_KEY):
             task_pool = _get_subject_study_tasks(
                 subject=subject,
                 syllabus_context=syllabus_ctx,
@@ -1088,20 +1176,32 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             blocks = []
             for bs, be in busy:
                 if cursor + 30 <= bs and remaining > 0:
-                    b = min(bs - cursor, remaining, 120)
+                    b = min(bs - cursor, remaining, 180)
                     blocks.append((cursor, cursor + b))
                     remaining -= b
-                cursor = max(cursor, be)
+                cursor = max(cursor, be + 60)  # +1시간 버퍼
             if remaining >= 30 and cursor + 30 <= sleep:
-                b = min(sleep - cursor, remaining, 120)
+                b = min(sleep - cursor, remaining, 180)
                 blocks.append((cursor, cursor + b))
             for sm, em in blocks:
                 if task_pool:
                     task = task_pool[task_idx % len(task_pool)]
-                    title = f"📚 {task['title']}"
+                    raw_task_title = task["title"]
+                    title = f"📚 {raw_task_title}"
                     priority = task.get("priority", 1)
+                    # dedup: 동일 task title이 같은 날 이미 존재하면 skip
+                    _already = db.query(Schedule).filter(
+                        Schedule.user_id == user_id,
+                        Schedule.date == date_str,
+                        Schedule.schedule_type == "study",
+                        Schedule.original_generated_title == raw_task_title,
+                        Schedule.deleted_by_user != True,
+                    ).first()
+                    if _already:
+                        task_idx += 1
+                        continue
                 else:
-                    # AI 실패 시 최소한 주차 기반 fallback (과목명 단독 금지)
+                    raw_task_title = None
                     title = f"📚 {subject} — 강의 내용 정리 및 예제 풀기"
                     priority = 1
                 task_idx += 1
@@ -1115,6 +1215,8 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                     color=_subject_color(subject),
                     priority=priority,
                     schedule_type="study",
+                    schedule_source="ai_generated",
+                    original_generated_title=raw_task_title,
                 ))
                 created += 1
         db.commit()
@@ -1165,7 +1267,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                         moved.append(f"  • {s.title} → {date_str} {s.start_time}~{s.end_time}")
                         placed = True
                         break
-                    cursor = max(cursor, be)
+                    cursor = max(cursor, be + 60)  # +1시간 버퍼
                 if not placed and cursor + duration <= sleep:
                     s.date = date_str
                     s.day_of_week = dow
@@ -1211,7 +1313,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         )
 
         # ── 자동 학습 일정 생성 (백그라운드 스레드) ──────────────────────────
-        if days_left > 0 and settings.GEMINI_API_KEY:
+        if days_left > 0 and (settings.GEMINI_API_KEY or settings.OPENAI_API_KEY):
             exam_id_bg = e.id
             target_days_bg = min(days_left, 14)
             _uid = user_id
@@ -1309,7 +1411,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             # ── 2. 시험 종류 분석 → phase별 구체적 컴포넌트 생성 ─────────────
             #    (한 번만 호출, 결과를 day 루프에서 재사용)
             exam_components: list[dict] = []
-            if settings.GEMINI_API_KEY:
+            if settings.GEMINI_API_KEY or settings.OPENAI_API_KEY:
                 exam_components = _analyze_exam_requirements(
                     exam_title=exam.title,
                     subject=subject,
@@ -1404,13 +1506,13 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
 
                 for bs, be in busy:
                     if cursor + 30 <= bs and remaining > 0:
-                        block_len = min(bs - cursor, remaining, 120)
+                        block_len = min(bs - cursor, remaining, 180)
                         blocks.append((cursor, cursor + block_len))
                         remaining -= block_len
-                    cursor = max(cursor, be)
+                    cursor = max(cursor, be + 60)  # +1시간 버퍼
 
                 if remaining >= 30 and cursor + 30 <= sleep:
-                    block_len = min(sleep - cursor, remaining, 120)
+                    block_len = min(sleep - cursor, remaining, 180)
                     blocks.append((cursor, cursor + block_len))
 
                 for sm, em in blocks:
@@ -1435,7 +1537,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                         # task의 estimated_minutes가 있으면 블록 크기에 반영
                         task_mins = task.get("estimated_minutes")
                         if task_mins and 20 <= task_mins <= 180:
-                            task_em = min(sm + task_mins, em, sm + 120)
+                            task_em = min(sm + task_mins, em, sm + 180)
                             em = max(task_em, sm + 20)
 
                         # ── dedup: 이미 삭제하거나 완료한 동일 task 재생성 금지 ──
@@ -1624,9 +1726,14 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                 try:
                     topics = json.loads(a.weekly_topics)
                     if topics:
-                        preview = topics[:4]
+                        preview_strs = []
+                        for _t in topics[:4]:
+                            if isinstance(_t, dict):
+                                preview_strs.append(f"{_t.get('week','')}주차 {_t.get('topic','')}")
+                            elif isinstance(_t, str):
+                                preview_strs.append(_t)
                         suffix = " ..." if len(topics) > 4 else ""
-                        lines.append(f"  주차별: {', '.join(preview)}{suffix}")
+                        lines.append(f"  주차별: {', '.join(preview_strs)}{suffix}")
                 except Exception:
                     pass
         return "\n".join(lines)
@@ -1704,13 +1811,8 @@ def run_ai_agent(
     user_message: str,
     conversation_history: list | None = None,
 ) -> str:
-    if not settings.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not configured")
-
-    client = OpenAI(
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        api_key=settings.GEMINI_API_KEY,
-    )
+    if not settings.GEMINI_API_KEY and not settings.OPENAI_API_KEY:
+        return "AI 서비스 키가 설정되지 않았습니다. 관리자에게 문의하세요."
 
     today = date.today()
     tomorrow = today + timedelta(days=1)
@@ -1786,12 +1888,11 @@ def run_ai_agent(
     tools = _build_tools()
 
     for _ in range(15):
-        response = client.chat.completions.create(
-            model="gemini-2.5-flash",
-            messages=messages,
-            tools=tools,
-            tool_choice="auto",
-        )
+        try:
+            response = _create_chat_completion(messages, tools)
+        except Exception as _exc:
+            logger.error(f"run_ai_agent completion error: {_exc}")
+            return "AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
 
         assistant_msg = response.choices[0].message
 

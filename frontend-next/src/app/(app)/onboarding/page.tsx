@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { normalizeTimeString } from '@/lib/utils';
 import { useUpdateProfile } from '@/hooks/useProfile';
 import { useUploadSyllabus, useReAnalyzeSyllabus, useAutoCreateExam, type SyllabusItem, type SyllabusAnalysis } from '@/hooks/useSyllabi';
 
@@ -37,6 +38,7 @@ interface PersonalSchedule {
   start_time: string;                  // HH:MM
   end_time: string;                    // HH:MM
   is_recurring: boolean;
+  date?: string;                       // YYYY-MM-DD (is_recurring=false 시 사용)
 }
 
 const DAY_LABELS = ['월','화','수','목','금','토','일'] as const;
@@ -225,7 +227,7 @@ export default function OnboardingPage() {
   // external-exam 입력 폼 임시 상태
   const [examDraft, setExamDraft] = useState<Omit<ExternalExam, '_id'>>({ name: '', date: '', status: 'studying', progress: '', weak_parts: '' });
   // personal-schedule 입력 폼 임시 상태
-  const [scheduleDraft, setScheduleDraft] = useState<Omit<PersonalSchedule, '_id'>>({ title: '', day_of_week: 0, start_time: '', end_time: '', is_recurring: true });
+  const [scheduleDraft, setScheduleDraft] = useState<Omit<PersonalSchedule, '_id'>>({ title: '', day_of_week: 0, start_time: '', end_time: '', is_recurring: true, date: '' });
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [stepIdx, setStepIdx] = useState(0);
@@ -283,8 +285,8 @@ export default function OnboardingPage() {
         _id: `eta-${Date.now()}-${i}`,
         subject_name: (e.title && e.title !== '수업') ? e.title : '',
         day_of_week: dayMap[e.day] ?? 0,
-        start_time: e.startTime,
-        end_time: e.endTime,
+        start_time: normalizeTimeString(e.startTime) || e.startTime,
+        end_time: normalizeTimeString(e.endTime) || e.endTime,
         location: e.location ?? '',
         raw_text: `${dayKo[dayMap[e.day] ?? 0]} ${e.startTime}~${e.endTime}`,
         source: 'eta_image_v2',
@@ -372,9 +374,10 @@ export default function OnboardingPage() {
               day_of_week: sched.day_of_week,
               start_time: sched.start_time,
               end_time: sched.end_time,
-              schedule_type: 'personal',
+              schedule_type: 'event',
               schedule_source: 'user_created',
-              date: sched.is_recurring ? null : undefined,
+              // 반복: date 생략(null 저장됨) / 단일: date 전송
+              ...(sched.is_recurring ? {} : { date: sched.date || undefined }),
               color: '#f59e0b',
             });
           } catch { /* 개별 일정 등록 실패 시 무시 */ }
@@ -820,17 +823,29 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
                 </select>
                 {/* 시작 시간 */}
                 <input
-                  type="time"
+                  type="text"
                   value={entry.start_time}
                   onChange={(e) => updateEntry(entry._id, 'start_time', e.target.value)}
+                  onBlur={(e) => {
+                    const norm = normalizeTimeString(e.target.value);
+                    if (norm) updateEntry(entry._id, 'start_time', norm);
+                  }}
+                  placeholder="09:00"
+                  pattern="[0-9]{2}:[0-9]{2}"
                   className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
                   style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
                 />
                 {/* 종료 시간 */}
                 <input
-                  type="time"
+                  type="text"
                   value={entry.end_time}
                   onChange={(e) => updateEntry(entry._id, 'end_time', e.target.value)}
+                  onBlur={(e) => {
+                    const norm = normalizeTimeString(e.target.value);
+                    if (norm) updateEntry(entry._id, 'end_time', norm);
+                  }}
+                  placeholder="11:00"
+                  pattern="[0-9]{2}:[0-9]{2}"
                   className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
                   style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
                 />
@@ -1112,11 +1127,11 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
               <p className="text-xs font-bold mb-1.5" style={{ color: '#434653' }}>평가 구성</p>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { label: '묎컙', value: eval_.midterm },
-                  { label: '곕쭚', value: eval_.final },
-                  { label: '쇱젣', value: eval_.assignment },
-                  { label: '쒖꽍', value: eval_.attendance },
-                  { label: '쒗몴', value: eval_.presentation },
+                  { label: '중간', value: eval_.midterm },
+                  { label: '기말', value: eval_.final },
+                  { label: '과제', value: eval_.assignment },
+                  { label: '출석', value: eval_.attendance },
+                  { label: '발표', value: eval_.presentation },
                 ]
                   .filter((item) => item.value != null && item.value > 0)
                   .map((item) => (
@@ -1155,15 +1170,15 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
                   {exams.map((e, i) => (
                     <div key={i} className="flex items-center gap-2 text-xs" style={{ color: '#434653' }}>
                       <span className="ms text-xs" style={{ color: '#1a4db2', fontVariationSettings: "'FILL' 1" }}>event</span>
-                      <span className="font-semibold">{e.type === 'midterm' ? '중간고사' : e.type === 'final' ? '기말고사' : e.type}</span>
-                      <span style={{ color: '#747684' }}>{e.date}</span>
+                      <span className="font-semibold">{e.type === 'midterm' ? '중간고사' : e.type === 'final' ? '기말고사' : String(e.type)}</span>
+                      <span style={{ color: '#747684' }}>{String(e.date || '')}</span>
                     </div>
                   ))}
                 </div>
               ) : (
                 <p className="text-xs" style={{ color: '#747684' }}>
                   {result.midterm_week && `중간고사: ${result.midterm_week}주차`}
-                  {result.midterm_week && result.final_week && ' 쨌 '}
+                  {result.midterm_week && result.final_week && ' / '}
                   {result.final_week && `기말고사: ${result.final_week}주차`}
                   {!semesterStartDate && ' (학기 시작일 입력 시 날짜 자동 계산)'}
                 </p>
@@ -1660,12 +1675,20 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
   // ?? 쒖씤 ?일정 ?낅젰 ?붾㈃ (??숈깮 ?꾩슜 STEP 5) ??
   if (phase === 'personal-schedule') {
     const SCHED_EXAMPLES = ['알바', '면접', '프로젝트', '동아리 활동'];
-    const canAddSched = scheduleDraft.title.trim() && scheduleDraft.start_time && scheduleDraft.end_time;
+    const canAddSched = scheduleDraft.title.trim() && scheduleDraft.start_time && scheduleDraft.end_time &&
+      (scheduleDraft.is_recurring || !!scheduleDraft.date);
 
     const addSched = () => {
       if (!canAddSched) return;
-      setPersonalSchedules((prev) => [...prev, { ...scheduleDraft, _id: `ps-${Date.now()}` }]);
-      setScheduleDraft({ title: '', day_of_week: 0, start_time: '', end_time: '', is_recurring: true });
+      let draft = { ...scheduleDraft };
+      // 특정 날짜인 경우 day_of_week를 날짜에서 자동 계산
+      if (!draft.is_recurring && draft.date) {
+        const [y, m, d] = draft.date.split('-').map(Number);
+        const jsDay = new Date(y, m - 1, d).getDay(); // 0=Sun
+        draft.day_of_week = jsDay === 0 ? 6 : jsDay - 1;
+      }
+      setPersonalSchedules((prev) => [...prev, { ...draft, _id: `ps-${Date.now()}` }]);
+      setScheduleDraft({ title: '', day_of_week: 0, start_time: '', end_time: '', is_recurring: true, date: '' });
     };
 
     return (
@@ -1710,20 +1733,52 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
                 onFocus={(e) => e.target.style.borderColor = '#1a4db2'}
                 onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
               />
-              {/* ?붿씪 ?좏깮 */}
-              <div>
-                <p className="text-xs font-medium mb-2" style={{ color: '#434653' }}>요일</p>
-                <div className="flex gap-1.5">
-                  {DAY_LABELS.map((d, i) => (
-                    <button key={i} onClick={() => setScheduleDraft((prev) => ({ ...prev, day_of_week: i }))}
-                      className="flex-1 py-2 text-xs rounded-lg font-semibold border-2 transition-colors"
-                      style={{ borderColor: scheduleDraft.day_of_week === i ? '#1a4db2' : '#ebeef1', background: scheduleDraft.day_of_week === i ? '#eef1ff' : '#fff', color: scheduleDraft.day_of_week === i ? '#1a4db2' : '#747684' }}>
-                      {d}
-                    </button>
-                  ))}
-                </div>
+              {/* 반복/단일 날짜 선택 */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setScheduleDraft((d) => ({ ...d, is_recurring: true, date: '' }))}
+                  className="flex-1 py-2 text-xs rounded-xl font-semibold border-2 transition-colors"
+                  style={{ borderColor: scheduleDraft.is_recurring ? '#1a4db2' : '#ebeef1', background: scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: scheduleDraft.is_recurring ? '#1a4db2' : '#747684' }}>
+                  매주 반복
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleDraft((d) => ({ ...d, is_recurring: false }))}
+                  className="flex-1 py-2 text-xs rounded-xl font-semibold border-2 transition-colors"
+                  style={{ borderColor: !scheduleDraft.is_recurring ? '#1a4db2' : '#ebeef1', background: !scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: !scheduleDraft.is_recurring ? '#1a4db2' : '#747684' }}>
+                  특정 날짜
+                </button>
               </div>
-              {/* ?시간 */}
+              {/* 요일 (매주 반복) / 날짜 (특정 날짜) */}
+              {scheduleDraft.is_recurring ? (
+                <div>
+                  <p className="text-xs font-medium mb-2" style={{ color: '#434653' }}>요일</p>
+                  <div className="flex gap-1.5">
+                    {DAY_LABELS.map((d, i) => (
+                      <button key={i} onClick={() => setScheduleDraft((prev) => ({ ...prev, day_of_week: i }))}
+                        className="flex-1 py-2 text-xs rounded-lg font-semibold border-2 transition-colors"
+                        style={{ borderColor: scheduleDraft.day_of_week === i ? '#1a4db2' : '#ebeef1', background: scheduleDraft.day_of_week === i ? '#eef1ff' : '#fff', color: scheduleDraft.day_of_week === i ? '#1a4db2' : '#747684' }}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs font-medium mb-2" style={{ color: '#434653' }}>날짜</p>
+                  <input
+                    type="date"
+                    className="w-full px-4 py-2.5 text-sm border-2 rounded-xl outline-none"
+                    style={{ borderColor: scheduleDraft.date ? '#1a4db2' : '#ebeef1' }}
+                    value={scheduleDraft.date ?? ''}
+                    onChange={(e) => setScheduleDraft((d) => ({ ...d, date: e.target.value }))}
+                    onFocus={(ev) => ev.target.style.borderColor = '#1a4db2'}
+                    onBlur={(ev) => ev.target.style.borderColor = scheduleDraft.date ? '#1a4db2' : '#ebeef1'}
+                  />
+                </div>
+              )}
+              {/* 시간 */}
               <div className="flex gap-2">
                 <div className="flex-1">
                   <p className="text-xs font-medium mb-1" style={{ color: '#434653' }}>시작</p>
@@ -1742,13 +1797,6 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
                     onBlur={(e) => e.target.style.borderColor = '#ebeef1'} />
                 </div>
               </div>
-              {/* 섎났 ?щ? */}
-              <button onClick={() => setScheduleDraft((d) => ({ ...d, is_recurring: !d.is_recurring }))}
-                className="flex items-center gap-2 w-full py-2.5 px-4 rounded-xl border-2 text-sm font-medium transition-colors"
-                style={{ borderColor: scheduleDraft.is_recurring ? '#1a4db2' : '#ebeef1', background: scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: scheduleDraft.is_recurring ? '#1a4db2' : '#747684' }}>
-                <span className="ms text-base" style={{ fontVariationSettings: "'FILL' 1" }}>{scheduleDraft.is_recurring ? 'repeat' : 'event'}</span>
-                {scheduleDraft.is_recurring ? '매주 반복' : '특정 날짜만'}
-              </button>
               <button onClick={addSched} disabled={!canAddSched}
                 className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
                 style={{ background: canAddSched ? '#1a4db2' : '#d1d5db', cursor: canAddSched ? 'pointer' : 'not-allowed' }}>
@@ -1764,7 +1812,11 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
                 <div key={s._id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: '#fef3c7', border: '1px solid #fcd34d' }}>
                   <div>
                     <p className="text-sm font-semibold" style={{ color: '#92400e' }}>{s.title}</p>
-                    <p className="text-xs" style={{ color: '#78350f' }}>{DAY_LABELS[s.day_of_week]}요일 {s.start_time}~{s.end_time} · {s.is_recurring ? '매주' : '1회'}</p>
+                    <p className="text-xs" style={{ color: '#78350f' }}>
+                      {s.is_recurring
+                        ? `${DAY_LABELS[s.day_of_week]}요일 ${s.start_time}~${s.end_time} · 매주`
+                        : `${s.date} ${s.start_time}~${s.end_time} · 1회`}
+                    </p>
                   </div>
                   <button onClick={() => setPersonalSchedules((prev) => prev.filter((x) => x._id !== s._id))}>
                     <span className="ms text-base" style={{ color: '#747684' }}>close</span>

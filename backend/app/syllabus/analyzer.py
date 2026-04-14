@@ -11,9 +11,15 @@ import json
 import logging
 import re
 import time
+import warnings
 from app.utils.text_validation import normalize_korean_field, contains_unexpected_cjk
 
 import pdfplumber
+
+# pdfminer FontBBox 경고 억제 (PDF 폰트 파싱 오류가 분석을 중단시키지 않도록)
+warnings.filterwarnings("ignore", message=".*FontBBox.*cannot be parsed.*", category=UserWarning)
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
+logging.getLogger("pdfplumber").setLevel(logging.ERROR)
 
 from app.core.config import settings
 from app.syllabus.schemas import AnalysisPayload
@@ -102,17 +108,17 @@ Return this exact JSON structure:
   "weekly_plan": [
     {{
       "week": 1,
-      "topic": "주차?쇱젣 (과목꾪쉷?쒖뿉 낆떆??몃??",
-      "subtopics": ["?몃? 쇱젣 1", "?몃? 쇱젣 2"],
+      "topic": "1주차 주제 (과목명에 맞게 작성)",
+      "subtopics": ["세부 주제 1", "세부 주제 2"],
       "difficulty": "low",
-      "keywords": ["?듭떖 ?ㅼ썙??", "?듭떖 ?ㅼ썙??", "?듭떖 ?ㅼ썙??"]
+      "keywords": ["핵심 개념 1", "핵심 개념 2", "핵심 개념 3"]
     }},
     {{
       "week": 2,
-      "topic": "주차?쇱젣",
-      "subtopics": ["?몃? 쇱젣 1"],
+      "topic": "2주차 주제",
+      "subtopics": ["세부 주제 1"],
       "difficulty": "medium",
-      "keywords": ["?ㅼ썙??", "?ㅼ썙??"]
+      "keywords": ["키워드 1", "키워드 2"]
     }}
   ],
   "evaluation": {{
@@ -127,12 +133,12 @@ Return this exact JSON structure:
     {{"type": "final",   "date": "YYYY-MM-DD"}}
   ],
   "assignments": [
-    {{"title": "쇱젣?, "due_date": "YYYY-MM-DD"}}
+    {{"title": "과제명", "due_date": "YYYY-MM-DD"}}
   ],
   "presentation": false,
   "important_notes": [
-    "묒슂 ?ы빆 1",
-    "묒슂 ?ы빆 2"
+    "중요 사항 1",
+    "중요 사항 2"
   ]
 }}
 
@@ -153,31 +159,23 @@ Rules:
 """
 
 
-# 섹션 3. AI 분석 호출 (OpenRouter)
-
-# GeminiDailyQuotaError - router.py referenced, kept for compatibility
-    """???댁긽 ?ъ슜?섏? ?딆쓬. OpenRouter?먯껜??"""
-    pass
+# 섹션 3. AI 분석 호출
 
 
 def _call_gemini_text(subject_name: str, raw_text: str) -> str:
-    """LLM?쇰줈 과목꾪쉷?쒕? 꾩꽍?쒕떎. Gemini ?ㅽ뙣 ??OpenRouter fallback ?먮룞 ?ъ슜."""
-    from app.core.llm import call_llm
+    """OpenAI gpt-4.1로 강의계획서 텍스트를 분석한다."""
+    from app.core.llm import call_openai
     prompt = _build_prompt(subject_name, raw_text)
-    result = call_llm(prompt, temperature=0.1)
-    if result.status == "fallback_used":
-        logger.info(f"Syllabus text analysis used fallback: provider={result.provider} model={result.model}")
-    return result.content
+    logger.info("Syllabus text analysis: calling OpenAI gpt-4.1 directly")
+    return call_openai(prompt, temperature=0.1)
 
 
 def _call_gemini_vision(image_path: str, content_type: str, subject_name: str) -> str:
-    """LLM Vision으로 과목계획서 이미지를 분석한다. Gemini 실패 시 OpenRouter fallback 자동 사용."""
-    from app.core.llm import call_llm_vision
+    """OpenAI gpt-4.1 Vision으로 강의계획서 이미지를 분석한다."""
+    from app.core.llm import _call_openai_vision
     prompt = _build_prompt(subject_name, "(이미지에서 텍스트를 먼저 추출(ocr)한 뒤 분석해 주세요)")
-    result = call_llm_vision(image_path, content_type, prompt, temperature=0.1)
-    if result.status == "fallback_used":
-        logger.info(f"Syllabus vision analysis used fallback: provider={result.provider} model={result.model}")
-    return result.content
+    logger.info("Syllabus vision analysis: calling OpenAI gpt-4.1 directly")
+    return _call_openai_vision(image_path, content_type, prompt, temperature=0.1)
 
 
 # 섹션 4. 응답 파싱
@@ -367,3 +365,4 @@ def analyze_syllabus(
 
     payload, status = _parse_response(ai_response, subject_name)
     payload = _sanitize_payload(payload, raw_text)
+    return payload, status, raw_text, ""

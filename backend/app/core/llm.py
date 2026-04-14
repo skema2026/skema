@@ -11,7 +11,7 @@ Fallback behaviour
 
 LLMResult attributes
   .text     / .content  — response text (aliases)
-  .model    — "gemini-2.5-flash" | "gpt-4o-mini"
+  .model    — "gemini-2.5-flash" | "gpt-4o"
   .provider — "gemini" | "openai"
   .status   — "success" | "fallback_used"
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # ── Model identifiers ─────────────────────────────────────────────────────────
 GEMINI_MODEL = "gemini-2.5-flash"
-OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_MODEL = "gpt-4.1"
 
 # Gemini hard timeout (seconds) — prevents hanging requests
 GEMINI_TIMEOUT = 30
@@ -255,7 +255,7 @@ def _call_openai_vision(
             messages=[{
                 "role": "user",
                 "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:{content_type};base64,{b64}"}},
+                    {"type": "image_url", "image_url": {"url": f"data:{content_type};base64,{b64}", "detail": "high"}},
                     {"type": "text", "text": prompt},
                 ],
             }],
