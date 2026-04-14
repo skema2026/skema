@@ -31,9 +31,11 @@ import { SettingsModal } from '@/components/settings/SettingsModal';
 import { useConflicts, useSchedules, useToggleComplete } from '@/hooks/useSchedules';
 import { useExams } from '@/hooks/useExams';
 import { useProfile } from '@/hooks/useProfile';
+import { useSyllabi, useSyllabusAnalysis, type SyllabusItem } from '@/hooks/useSyllabi';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { api } from '@/lib/api';
+import { timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { Schedule, UserProfile } from '@/types';
 
@@ -50,8 +52,16 @@ function WeeklyReport({ schedules }: { schedules: Schedule[] }) {
   const todayDow = now.getDay() === 0 ? 6 : now.getDay() - 1;
   const weekDays = ['월', '화', '수', '목', '금', '토', '일'];
 
+  // 이번 주 월요일 기준
+  const weekMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - todayDow);
   const weekStats = weekDays.map((day, i) => {
-    const daySch = schedules.filter((s) => !s.date && s.day_of_week === i);
+    const colDate = new Date(weekMonday);
+    colDate.setDate(weekMonday.getDate() + i);
+    const colStr = `${colDate.getFullYear()}-${String(colDate.getMonth()+1).padStart(2,'0')}-${String(colDate.getDate()).padStart(2,'0')}`;
+    const daySch = schedules.filter((s) => {
+      if (!s.date) return s.day_of_week === i;           // 반복 일정
+      return s.date === colStr;                           // 특정 날짜 일정
+    });
     const done = daySch.filter((s) => s.is_completed).length;
     const total = daySch.length;
     return { day, done, total, pct: total > 0 ? Math.round((done / total) * 100) : null, isToday: i === todayDow };
@@ -127,6 +137,148 @@ function WeeklyReport({ schedules }: { schedules: Schedule[] }) {
   );
 }
 
+// ── 강의계획서 패널 ───────────────────────────────────────────────────────────
+
+function SyllabusDetail({ syllabus }: { syllabus: SyllabusItem }) {
+  const { data: analysis, isLoading } = useSyllabusAnalysis(syllabus.id);
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerateStudyPlan = async () => {
+    setGenerating(true);
+    try {
+      await api.post('/ai/chat', {
+        message: `${syllabus.subject_name} 강의계획서 기반으로 시험 준비 학습 일정을 14일간 하루 2시간씩 생성해줘`,
+        messages: [],
+      });
+      toast.success('학습계획이 시간표에 추가되었습니다');
+    } catch {
+      toast.error('학습계획 생성 중 오류가 발생했습니다');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  if (isLoading) return <p style={{ fontSize: 12, color: '#747684' }}>분석 중...</p>;
+  if (!analysis) return <p style={{ fontSize: 12, color: '#747684' }}>분석 결과가 없습니다</p>;
+
+  const ev = analysis.evaluation;
+  const evalItems = ev ? [
+    { label: '중간고사', value: ev.midterm, color: '#1a4db2' },
+    { label: '기말고사', value: ev.final, color: '#dc2626' },
+    { label: '과제', value: ev.assignment, color: '#059669' },
+    { label: '출석', value: ev.attendance, color: '#d97706' },
+    { label: '발표', value: ev.presentation, color: '#7c3aed' },
+  ].filter(e => e.value) : [];
+
+  return (
+    <div className="space-y-3 mt-2">
+      {/* 평가 비율 */}
+      {evalItems.length > 0 && (
+        <div className="rounded-xl p-3" style={{ background: '#f7fafd', border: '1px solid #ebeef1' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#181c1e', marginBottom: 8 }}>평가 비율</p>
+          <div className="space-y-1.5">
+            {evalItems.map(({ label, value, color }) => (
+              <div key={label} className="flex items-center gap-2">
+                <span style={{ fontSize: 11, color: '#434653', width: 56, flexShrink: 0 }}>{label}</span>
+                <div style={{ flex: 1, height: 6, background: '#ebeef1', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${value}%`, background: color, borderRadius: 99 }} />
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color, width: 32, textAlign: 'right' }}>{value}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* 시험 일정 */}
+      {analysis.exam_schedule && analysis.exam_schedule.length > 0 && (
+        <div className="rounded-xl p-3" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>시험 일정</p>
+          {analysis.exam_schedule.map((e, i) => (
+            <p key={i} style={{ fontSize: 11, color: '#92400e' }}>
+              📝 {e.type === 'midterm' ? '중간고사' : e.type === 'final' ? '기말고사' : e.type}: {e.date}
+            </p>
+          ))}
+        </div>
+      )}
+      {/* 주차별 계획 */}
+      {analysis.weekly_plan && analysis.weekly_plan.length > 0 && (
+        <div className="rounded-xl p-3" style={{ background: '#f7fafd', border: '1px solid #ebeef1' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#181c1e', marginBottom: 6 }}>주차별 계획</p>
+          <div className="space-y-1" style={{ maxHeight: 180, overflowY: 'auto' }}>
+            {analysis.weekly_plan.map((w) => (
+              <div key={w.week} className="flex gap-2 items-start">
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--skema-primary)', flexShrink: 0, width: 36 }}>{w.week}주차</span>
+                <div>
+                  <span style={{ fontSize: 10, color: '#181c1e' }}>{w.topic}</span>
+                  {(w as { difficulty?: string }).difficulty && (
+                    <span style={{
+                      fontSize: 9, marginLeft: 4, padding: '1px 4px', borderRadius: 4,
+                      background: (w as { difficulty?: string }).difficulty === 'high' ? '#fee2e2' : (w as { difficulty?: string }).difficulty === 'medium' ? '#fef9c3' : '#dcfce7',
+                      color: (w as { difficulty?: string }).difficulty === 'high' ? '#dc2626' : (w as { difficulty?: string }).difficulty === 'medium' ? '#d97706' : '#059669',
+                    }}>{(w as { difficulty?: string }).difficulty}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* 학습계획 생성 버튼 */}
+      <button
+        onClick={handleGenerateStudyPlan}
+        disabled={generating}
+        style={{
+          width: '100%', padding: '8px 0', borderRadius: 10, border: 'none',
+          background: generating ? '#e5e7eb' : 'var(--skema-primary)', color: '#fff',
+          fontSize: 12, fontWeight: 700, cursor: generating ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {generating ? '생성 중...' : '📚 학습계획 자동 생성'}
+      </button>
+    </div>
+  );
+}
+
+function SyllabusPanel() {
+  const { data: syllabi = [], isLoading } = useSyllabi();
+  const [selected, setSelected] = useState<number | null>(null);
+
+  if (isLoading) return <p style={{ fontSize: 12, color: '#747684' }}>불러오는 중...</p>;
+
+  if (syllabi.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p style={{ fontSize: 13, color: '#747684' }}>등록된 강의계획서가 없습니다</p>
+        <p style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>온보딩에서 강의계획서를 업로드하세요</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 max-w-2xl">
+      {syllabi.map((s) => (
+        <div key={s.id} className="rounded-xl p-4" style={{ background: '#fff', border: '1px solid #ebeef1' }}>
+          <div
+            className="flex items-center justify-between cursor-pointer"
+            onClick={() => setSelected(selected === s.id ? null : s.id)}
+          >
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#181c1e' }}>{s.subject_name}</p>
+              <p style={{ fontSize: 11, color: '#747684' }}>{s.original_filename}</p>
+            </div>
+            <MaterialIcon
+              icon={selected === s.id ? 'expand_less' : 'expand_more'}
+              size={18}
+              color="var(--skema-on-surface-variant)"
+            />
+          </div>
+          {selected === s.id && <SyllabusDetail syllabus={s} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface Props {
   initialSchedules: Schedule[];
   initialProfile: UserProfile | null;
@@ -173,8 +325,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
       if (s.is_completed) return false;
       const matchDay = s.date ? s.date === todayStr : s.day_of_week === todayDow;
       if (!matchDay) return false;
-      const [sh, sm] = s.start_time.split(':').map(Number);
-      const startMin = sh * 60 + sm;
+      const startMin = timeToMinutes(s.start_time);
       const diff = startMin - nowMin;
       return diff > 0 && diff <= notifMinutes;
     });
@@ -208,8 +359,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const unachievedSchedules = todaySchedules.filter((s) => {
     if (s.is_completed) return false;
-    const [eh, em] = s.end_time.split(':').map(Number);
-    return (eh * 60 + em) < nowMin;
+    return timeToMinutes(s.end_time) < nowMin;
   });
 
   // 완료 토글 — optimistic update (useToggleComplete 훅 사용)
@@ -543,6 +693,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                 <TabsTrigger value="timetable">시간표</TabsTrigger>
                 <TabsTrigger value="exams">시험 일정</TabsTrigger>
                 <TabsTrigger value="report">주간 리포트</TabsTrigger>
+                <TabsTrigger value="syllabus">강의계획서</TabsTrigger>
               </TabsList>
               <TabsContent value="timetable">
                 <div className="flex items-center justify-between gap-2 mb-3">
@@ -593,6 +744,9 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
               </TabsContent>
               <TabsContent value="report">
                 <WeeklyReport schedules={schedules} />
+              </TabsContent>
+              <TabsContent value="syllabus">
+                <SyllabusPanel />
               </TabsContent>
             </Tabs>
           </div>

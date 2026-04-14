@@ -39,6 +39,80 @@ _DONE_STATUSES = {"success", "partial"}
 _FAILED_STATUSES = {"failed", "rate_limited", "provider_unavailable", "empty_response"}
 
 
+def _auto_create_exams(db, user_id: int, record, payload) -> None:
+    """분석 완료 후 exam_schedule / midterm_week / final_week → ExamSchedule 자동 생성."""
+    try:
+        profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+        sem_start: Optional[date] = None
+        if profile and profile.semester_start_date:
+            try:
+                sem_start = date.fromisoformat(profile.semester_start_date)
+            except ValueError:
+                pass
+
+        exam_dates_raw: list = []
+        if record.exam_dates:
+            try:
+                raw = record.exam_dates if isinstance(record.exam_dates, list) else json.loads(record.exam_dates)
+                exam_dates_raw = raw if isinstance(raw, list) else []
+            except Exception:
+                pass
+
+        # exam_schedule에 날짜가 없으면 midterm_week/final_week 기반 엔트리 추가
+        has_midterm = any(str(e.get("type", "")).lower() == "midterm" for e in exam_dates_raw)
+        has_final   = any(str(e.get("type", "")).lower() == "final"   for e in exam_dates_raw)
+        if not has_midterm and payload.midterm_week:
+            exam_dates_raw.append({"type": "midterm", "date": ""})
+        if not has_final and payload.final_week:
+            exam_dates_raw.append({"type": "final", "date": ""})
+
+        for exam in exam_dates_raw:
+            exam_type = str(exam.get("type", "")).lower()
+            exam_date_str = str(exam.get("date", "")).strip()
+
+            exam_date_obj: Optional[date] = None
+            if exam_date_str:
+                try:
+                    exam_date_obj = date.fromisoformat(exam_date_str)
+                except ValueError:
+                    pass
+
+            if not exam_date_obj and sem_start:
+                week_num: Optional[int] = None
+                if exam_type == "midterm":
+                    week_num = payload.midterm_week
+                elif exam_type == "final":
+                    week_num = payload.final_week
+                if week_num and 1 <= week_num <= 20:
+                    exam_date_obj = sem_start + timedelta(weeks=week_num - 1)
+
+            if not exam_date_obj:
+                continue
+
+            type_label = {"midterm": "중간고사", "final": "기말고사"}.get(exam_type, "시험")
+            title = f"{record.subject_name} {type_label}"
+
+            existing = db.query(ExamSchedule).filter(
+                ExamSchedule.user_id == user_id,
+                ExamSchedule.title == title,
+                ExamSchedule.exam_date == exam_date_obj,
+            ).first()
+            if existing:
+                continue
+
+            rec = ExamSchedule(
+                user_id=user_id,
+                title=title,
+                subject=record.subject_name,
+                exam_date=exam_date_obj,
+            )
+            db.add(rec)
+
+        db.commit()
+    except Exception as e:
+        logger.warning(f"_auto_create_exams failed for syllabus {record.syllabus_id}: {e}")
+
+
 def _run_analysis(syllabus_id: int, file_path: str, content_type: str, subject_name: str, user_id: int, force: bool = False):
     """업로드 후 백그라운드에서 AI 분석 실행 → SyllabusAnalysis 저장.
 
@@ -48,6 +122,7 @@ def _run_analysis(syllabus_id: int, file_path: str, content_type: str, subject_n
     from app.db.database import SessionLocal  # 백그라운드에서 별도 세션 사용
 
     db = SessionLocal()
+    record = None
     try:
         # 기존 분석 레코드 있으면 재사용
         record = db.query(SyllabusAnalysis).filter(SyllabusAnalysis.syllabus_id == syllabus_id).first()
@@ -67,7 +142,14 @@ def _run_analysis(syllabus_id: int, file_path: str, content_type: str, subject_n
             logger.info(f"Syllabus {syllabus_id}: 이미 분석 완료 (status={record.analysis_status}) — Gemini 생략")
             return
 
-        payload, status_str, raw_text, reason = analyze_syllabus(file_path, content_type, subject_name)
+        result = analyze_syllabus(file_path, content_type, subject_name)
+        if result is None:
+            logger.error(f"Syllabus {syllabus_id}: analyze_syllabus returned None")
+            record.analysis_status = "failed"
+            record.analysis_reason = "analyzer returned None"
+            db.commit()
+            return
+        payload, status_str, raw_text, reason = result
 
         record.analysis_status = status_str
         record.analysis_reason = reason or None
@@ -106,12 +188,19 @@ def _run_analysis(syllabus_id: int, file_path: str, content_type: str, subject_n
         if study_mapping:
             record.study_mapping = json.dumps(study_mapping, ensure_ascii=False)
         db.commit()
+
+        # ── 시험 일정 자동 생성 (ExamSchedule) ────────────────────────────────
+        _auto_create_exams(db, user_id, record, payload)
+
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"Background analysis error: {e}")
-        if record.id:
-            record.analysis_status = "failed"
-            db.commit()
+        logger.error(f"Background analysis error: {e}", exc_info=True)
+        try:
+            if record is not None and record.id:
+                record.analysis_status = "failed"
+                record.analysis_reason = str(e)[:200]
+                db.commit()
+        except Exception:
+            pass
     finally:
         db.close()
 
