@@ -49,7 +49,7 @@ export default function LoginPage() {
   const { setToken } = useAuthStore();
   const loginMutation = useLogin();
 
-  const [form, setForm] = useState({ username: '', password: '' });
+  const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
 
@@ -74,7 +74,7 @@ export default function LoginPage() {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!form.username.trim()) newErrors.username = '아이디를 입력해주세요';
+    if (!form.email.trim()) newErrors.email = '이메일을 입력해주세요';
     if (!form.password) newErrors.password = '비밀번호를 입력해주세요';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -199,27 +199,27 @@ export default function LoginPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Username */}
+            {/* Email */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                아이디
+                이메일
               </label>
               <input
                 type="text"
-                placeholder="아이디를 입력하세요"
-                value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                placeholder="이메일을 입력하세요"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 style={{
                   width: '100%', height: '42px', padding: '0 12px',
-                  background: '#fff', border: `1px solid ${errors.username ? '#ef4444' : '#d1d5db'}`,
+                  background: '#fff', border: `1px solid ${errors.email ? '#ef4444' : '#d1d5db'}`,
                   borderRadius: '6px', fontSize: '14px', color: '#111827', outline: 'none',
                   boxSizing: 'border-box', transition: 'border-color 0.15s',
                   fontFamily: 'inherit',
                 }}
-                onFocus={(e) => { if (!errors.username) e.currentTarget.style.borderColor = '#1a4db2'; }}
-                onBlur={(e) => { if (!errors.username) e.currentTarget.style.borderColor = '#d1d5db'; }}
+                onFocus={(e) => { if (!errors.email) e.currentTarget.style.borderColor = '#1a4db2'; }}
+                onBlur={(e) => { if (!errors.email) e.currentTarget.style.borderColor = '#d1d5db'; }}
               />
-              {errors.username && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{errors.username}</p>}
+              {errors.email && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{errors.email}</p>}
             </div>
 
             {/* Password */}

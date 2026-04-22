@@ -8,7 +8,7 @@ export function useMe() {
   return useQuery({
     queryKey: ['me'],
     queryFn: async () => {
-      const { data } = await api.get<User>('/auth/me');
+      const { data } = await api.get<User>('/users/me');
       return data;
     },
     enabled: !!token,
@@ -18,15 +18,11 @@ export function useMe() {
 
 export function useLogin() {
   return useMutation({
-    mutationFn: async ({ username, password }: { username: string; password: string }) => {
-      const formData = new URLSearchParams();
-      formData.append('username', username);
-      formData.append('password', password);
-      const { data } = await api.post<{ access_token: string; token_type: string }>(
-        '/auth/token',
-        formData,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const { data } = await api.post<{ access_token: string; token_type: string }>('/auth/login', {
+        email,
+        password,
+      });
       return data;
     },
   });
@@ -35,15 +31,13 @@ export function useLogin() {
 export function useRegister() {
   return useMutation({
     mutationFn: async ({
-      username,
       email,
       password,
     }: {
-      username: string;
       email: string;
       password: string;
     }) => {
-      const { data } = await api.post<User>('/auth/register', { username, email, password });
+      const { data } = await api.post<User>('/auth/signup', { email, password });
       return data;
     },
   });

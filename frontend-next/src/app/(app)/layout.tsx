@@ -18,7 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     api
-      .get('/auth/me')
+      .get('/users/me')
       .then(({ data }) => {
         setUser(data);
         setChecking(false);

@@ -35,7 +35,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const registerMutation = useRegister();
 
-  const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({ email: '', password: '', confirmPassword: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -45,12 +45,10 @@ export default function RegisterPage() {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!form.username.trim()) newErrors.username = '아이디를 입력해주세요';
-    else if (form.username.length < 3) newErrors.username = '아이디는 3자 이상이어야 합니다';
     if (!form.email.trim()) newErrors.email = '이메일을 입력해주세요';
     else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = '올바른 이메일 형식이 아닙니다';
     if (!form.password) newErrors.password = '비밀번호를 입력해주세요';
-    else if (form.password.length < 6) newErrors.password = '비밀번호는 6자 이상이어야 합니다';
+    else if (form.password.length < 8) newErrors.password = '비밀번호는 8자 이상이어야 합니다';
     if (form.password !== form.confirmPassword) newErrors.confirmPassword = '비밀번호가 일치하지 않습니다';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -61,19 +59,35 @@ export default function RegisterPage() {
     if (!validate()) return;
 
     registerMutation.mutate(
-      { username: form.username, email: form.email, password: form.password },
+      { email: form.email, password: form.password },
       {
         onSuccess: () => {
           toast.success('회원가입이 완료되었습니다. 로그인해주세요.');
           router.push('/login');
         },
         onError: (err: unknown) => {
-          const error = err as { response?: { data?: { detail?: string } } };
+          const error = err as {
+            response?: {
+              status?: number;
+              data?: {
+                detail?:
+                  | string
+                  | Array<{ msg?: string; loc?: Array<string | number> }>;
+              };
+            };
+          };
           const detail = error?.response?.data?.detail;
-          if (detail?.includes('username')) {
-            toast.error('이미 사용 중인 아이디입니다');
-          } else if (detail?.includes('email')) {
+          const detailText =
+            typeof detail === 'string'
+              ? detail
+              : Array.isArray(detail)
+                ? detail.map((d) => d?.msg).filter(Boolean).join('\n')
+                : '';
+
+          if (error?.response?.status === 409 || detailText.includes('email')) {
             toast.error('이미 사용 중인 이메일입니다');
+          } else if (detailText) {
+            toast.error(detailText);
           } else {
             toast.error('회원가입 중 오류가 발생했습니다');
           }
@@ -252,28 +266,6 @@ export default function RegisterPage() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Username */}
-                  <div>
-                    <label
-                      htmlFor="username"
-                      className="block text-xs font-bold uppercase tracking-wider mb-1.5"
-                      style={{ color: 'var(--skema-on-surface-variant)' }}
-                    >
-                      아이디
-                    </label>
-                    <input
-                      id="username"
-                      type="text"
-                      placeholder="아이디 (3자 이상)"
-                      value={form.username}
-                      onChange={(e) => setForm({ ...form, username: e.target.value })}
-                      className={`register-input${errors.username ? ' error' : ''}`}
-                    />
-                    {errors.username && (
-                      <p className="text-xs mt-1" style={{ color: '#ef4444' }}>{errors.username}</p>
-                    )}
-                  </div>
-
                   {/* Email */}
                   <div>
                     <label
@@ -308,7 +300,7 @@ export default function RegisterPage() {
                     <input
                       id="password"
                       type="password"
-                      placeholder="비밀번호 (6자 이상)"
+                      placeholder="비밀번호 (8자 이상)"
                       value={form.password}
                       onChange={(e) => setForm({ ...form, password: e.target.value })}
                       className={`register-input${errors.password ? ' error' : ''}`}

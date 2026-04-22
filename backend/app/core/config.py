@@ -25,6 +25,12 @@ class Settings(BaseSettings):
 
     # ── 프론트엔드 ─────────────────────────────────────────────────────────────
     FRONTEND_URL: str = "http://localhost:3000"
+    BACKEND_URL: str = "http://localhost:8000"
+
+    # ── CORS (배포) ────────────────────────────────────────────────────────────
+    # 쉼표로 구분한 브라우저 출처. 비우면 로컬 개발용 기본 출처만 사용.
+    # 예: https://your-app.vercel.app,https://www.example.com
+    CORS_ORIGINS: str = ""
 
     model_config = {"env_file": ".env"}
 

@@ -5,8 +5,8 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
-# passlib bcrypt 컨텍스트 (bcrypt 라이브러리 버전 차이를 추상화)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# 신규 해시는 pbkdf2_sha256을 사용하고, 기존 bcrypt 해시는 검증만 호환
+pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto")
 
 
 # ── 비밀번호 ──────────────────────────────────────────────────────────────────

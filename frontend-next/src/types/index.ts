@@ -37,8 +37,10 @@ export type ExamSchedule = {
 
 export type User = {
   id: number;
-  username: string;
   email: string;
+  username?: string; // legacy (UI 호환용)
+  is_active?: boolean;
+  created_at?: string;
 };
 
 export type ChatMessage = {
