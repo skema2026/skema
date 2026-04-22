@@ -14,10 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import app.db.base  # noqa: F401
 
 from app.core.config import settings
-from app.auth.router import router as auth_router
-from app.schedule.router import router as schedule_router
-from app.share.router import router as share_router
-from app.ai_chat.router import router as ai_chat_router
+from app.api.v1.router import api_router
 
 
 # ── FastAPI 앱 생성 ───────────────────────────────────────────────────────────
@@ -55,10 +52,7 @@ app.add_middleware(
 
 # ── 라우터 등록 ───────────────────────────────────────────────────────────────
 
-app.include_router(auth_router)      # /auth/*, /users/me, /profiles
-app.include_router(schedule_router)  # /schedules/*, /exam-schedules/*
-app.include_router(share_router)     # /share-tokens/*, /share/{token}
-app.include_router(ai_chat_router)   # /ai/chat, /ai-chat-logs/*
+app.include_router(api_router)
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────

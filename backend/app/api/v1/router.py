@@ -1,3 +1,13 @@
-# 이 파일은 현재 사용되지 않습니다.
-# 라우터는 app/main.py에서 각 모듈의 router를 직접 include합니다.
-# 향후 API 버전 분리가 필요하면 이 파일에 APIRouter prefix="/api/v1"을 구성하세요.
+from fastapi import APIRouter
+
+from app.auth.router import router as auth_router
+from app.schedule.router import router as schedule_router
+from app.share.router import router as share_router
+from app.ai_chat.router import router as ai_chat_router
+
+api_router = APIRouter()
+
+api_router.include_router(auth_router)      # /auth/*, /users/me, /profiles
+api_router.include_router(schedule_router)  # /schedules/*, /exam-schedules/*
+api_router.include_router(share_router)     # /share-tokens/*, /share/{token}
+api_router.include_router(ai_chat_router)   # /ai/chat, /ai-chat-logs/*

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -19,7 +19,7 @@ def get_token_by_id(db: Session, token_id: int, user_id: int) -> ShareToken | No
 
 def get_active_token(db: Session, token_str: str) -> ShareToken | None:
     """공개 공유 링크 접근용: 활성 + 미만료 토큰 조회."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return (
         db.query(ShareToken)
         .filter(

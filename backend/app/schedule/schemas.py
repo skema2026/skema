@@ -1,3 +1,4 @@
+import enum
 import re
 from datetime import date
 from typing import Optional
@@ -7,6 +8,12 @@ from pydantic import BaseModel, field_validator
 
 _COLOR_RE = re.compile(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
+
+
+class ScheduleType(str, enum.Enum):
+    CLASS = "class"
+    EVENT = "event"
+    STUDY = "study"
 
 
 def _validate_time(v: Optional[str]) -> Optional[str]:
@@ -27,7 +34,7 @@ class ScheduleCreate(BaseModel):
     end_time: str                             # "HH:MM"
     color: Optional[str] = "#6366F1"
     priority: Optional[int] = 0
-    schedule_type: Optional[str] = "class"   # class / event / study
+    schedule_type: Optional[ScheduleType] = ScheduleType.CLASS
 
     @field_validator("start_time", "end_time")
     @classmethod
@@ -56,7 +63,7 @@ class ScheduleUpdate(BaseModel):
     end_time: Optional[str] = None
     color: Optional[str] = None
     priority: Optional[int] = None
-    schedule_type: Optional[str] = None
+    schedule_type: Optional[ScheduleType] = None
     is_completed: Optional[bool] = None
 
     @field_validator("start_time", "end_time")

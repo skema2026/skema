@@ -261,7 +261,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     if (shareToken) return;
     setIsGeneratingShare(true);
     try {
-      const { data } = await api.post<{ token: string }>('/share');
+      const { data } = await api.post<{ token: string }>('/share-tokens');
       setShareToken(data.token);
     } catch {
       toast.error('공유 링크 생성 중 오류가 발생했습니다');
@@ -367,14 +367,14 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
               <DropdownMenuTrigger className="flex items-center gap-2 rounded-full transition-all outline-none">
                 <Avatar className="w-8 h-8">
                   <AvatarFallback className="text-xs font-bold" style={{ background: 'var(--skema-secondary-container)', color: 'var(--skema-primary)' }}>
-                    {user?.username?.[0]?.toUpperCase() || 'U'}
+                    {user?.email?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>
-                    <p className="font-semibold">{user?.username}</p>
+                    <p className="font-semibold">{user?.email}</p>
                     <p className="text-xs text-gray-500 font-normal">{user?.email}</p>
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>

@@ -6,7 +6,7 @@ import DashboardClient from './DashboardClient';
 export default async function DashboardPage() {
   const [schedules, profile] = await Promise.all([
     serverFetch<Schedule[]>('/schedules'),
-    serverFetch<UserProfile>('/profile'),
+    serverFetch<UserProfile>('/profiles'),
   ]);
 
   // 토큰 없음 → 로그인 페이지로
