@@ -173,6 +173,8 @@ TOOLS_SPEC = [
                 "exam_id": {"type": "integer", "description": "특정 시험 ID (미지정 시 모든 예정 시험 대상)"},
                 "target_days": {"type": "integer", "description": "학습 일정 생성 기간(일수), 기본 14"},
                 "daily_study_hours": {"type": "number", "description": "기본 하루 학습 시간(시간), 기본 2. 시험 임박 시 자동 증가"},
+                "sessions_per_week": {"type": "integer", "description": "주당 학습 횟수(1~7). 사용자가 '주 N일' 또는 '주 N회'를 언급하면 반드시 설정. 미지정 시 매일 생성"},
+                "preferred_start_time": {"type": "string", "description": "선호 시작 시간 HH:MM (예: '07:00'). 사용자가 '몇 시부터'를 언급하면 반드시 설정"},
             },
         },
     },
@@ -1364,6 +1366,8 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         exam_id = tool_input.get("exam_id")
         target_days = tool_input.get("target_days", 14)
         daily_hours = tool_input.get("daily_study_hours", 2.0)
+        sessions_per_week: int | None = tool_input.get("sessions_per_week")
+        preferred_start_time: str | None = tool_input.get("preferred_start_time")
 
         exams = db.query(ExamSchedule).filter(ExamSchedule.user_id == user_id).all()
         if exam_id:
@@ -1384,6 +1388,22 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             exam_date_obj = exam.exam_date
             days_until_exam = (exam_date_obj - today).days
             study_days = min(days_until_exam, target_days)
+
+            # ── 0. 기존 미완료·미삭제 AI 자율학습 블록 제거 ─────────────────
+            # 완료(is_completed=True)나 사용자가 직접 삭제(deleted_by_user=True)한 것은 유지
+            today_str_del = today.isoformat()
+            old_blocks = db.query(Schedule).filter(
+                Schedule.user_id == user_id,
+                Schedule.linked_exam_id == exam.id,
+                Schedule.schedule_source == "ai_generated",
+                Schedule.is_completed == False,
+                Schedule.deleted_by_user.isnot(True),
+                Schedule.date >= today_str_del,
+            ).all()
+            for blk in old_blocks:
+                db.delete(blk)
+            db.commit()
+
             if study_days <= 0:
                 continue
 
@@ -1470,9 +1490,26 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             # ── 4. 날짜별 일정 배치 ──────────────────────────────────────────
             task_idx = 0
 
+            # sessions_per_week: 실제 배치된 날짜만 카운트 (빈 시간 없어 스킵된 날 제외)
+            week_placed_counts: dict[int, int] = {}  # iso_week → 실제 배치된 날짜 수
+
+            # 선호 시작 시간 파싱
+            pref_start: int | None = None
+            if preferred_start_time:
+                try:
+                    pref_start = _t2m(preferred_start_time)
+                except Exception:
+                    pass
+
             for offset in range(study_days):
                 tdate = today + timedelta(days=offset)
                 date_str = tdate.strftime("%Y-%m-%d")
+
+                # sessions_per_week 체크: 이번 주에 이미 충분히 배치했으면 skip
+                if sessions_per_week and 1 <= sessions_per_week <= 7:
+                    iso_week = tdate.isocalendar()[1]
+                    if week_placed_counts.get(iso_week, 0) >= sessions_per_week:
+                        continue
                 dow = tdate.weekday()
                 days_left = (exam_date_obj - tdate).days
 
@@ -1501,7 +1538,8 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                 existing = _day_schedules(db, user_id, dow, date_str)
                 busy = sorted((_t2m(s.start_time), _t2m(s.end_time)) for s in existing)
                 remaining = int(day_hours * 60)
-                cursor = max(8 * 60, wake)
+                # 선호 시작 시간 또는 기상 시간 사용 (하드코딩 8시 제거)
+                cursor = pref_start if pref_start is not None else wake
                 blocks = []
 
                 for bs, be in busy:
@@ -1515,6 +1553,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                     block_len = min(sleep - cursor, remaining, 180)
                     blocks.append((cursor, cursor + block_len))
 
+                day_placed = 0
                 for sm, em in blocks:
                     # ── 중복 방지: 이미 같은 날·시간·과목 study 일정 있으면 skip ──
                     sm_str = _m2t(sm)
@@ -1587,8 +1626,14 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                         linked_exam_id=exam.id,
                         original_generated_title=raw_task_title,
                     ))
+                    day_placed += 1
                     exam_created += 1
                     created += 1
+
+                # 실제 배치된 날짜만 sessions_per_week 카운트에 반영
+                if sessions_per_week and 1 <= sessions_per_week <= 7 and day_placed > 0:
+                    iso_week = tdate.isocalendar()[1]
+                    week_placed_counts[iso_week] = week_placed_counts.get(iso_week, 0) + 1
 
             if exam_created > 0:
                 component_summary = f" ({len(exam_components)}개 준비영역 분석)" if exam_components else ""

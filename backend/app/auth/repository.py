@@ -42,13 +42,21 @@ def create_user(db: Session, email: str, hashed_password: str) -> User:
 
 
 def create_social_user(
-    db: Session, email: str, provider: str, social_id: str, hashed_password: str
+    db: Session,
+    email: str,
+    provider: str,
+    social_id: str,
+    hashed_password: str,
+    kakao_access_token: str | None = None,
+    kakao_refresh_token: str | None = None,
 ) -> User:
     user = User(
         email=email,
         hashed_password=hashed_password,
         social_provider=provider,
         social_id=social_id,
+        kakao_access_token=kakao_access_token,
+        kakao_refresh_token=kakao_refresh_token,
     )
     db.add(user)
     db.commit()
@@ -59,6 +67,17 @@ def create_social_user(
 def link_social(db: Session, user: User, provider: str, social_id: str) -> User:
     user.social_provider = provider
     user.social_id = social_id
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_kakao_tokens(
+    db: Session, user: User, access_token: str, refresh_token: str | None
+) -> User:
+    user.kakao_access_token = access_token
+    if refresh_token:
+        user.kakao_refresh_token = refresh_token
     db.commit()
     db.refresh(user)
     return user

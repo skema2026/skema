@@ -8,12 +8,16 @@ const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  preload: false,
 });
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+  display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -36,6 +40,15 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         />
+        {/* suppress Next.js dev-mode negative timestamp warning */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            var _measure = performance.measure.bind(performance);
+            performance.measure = function(name, start, end) {
+              try { return _measure(name, start, end); } catch(e) {}
+            };
+          })();
+        `}} />
       </head>
       <body className="min-h-full flex flex-col bg-[#f7fafd] text-[#181c1e]" style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}>
         <Providers>

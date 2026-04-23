@@ -23,6 +23,17 @@ export function useCreateExam() {
   });
 }
 
+export function useUpdateExam() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: Partial<ExamSchedule> & { id: number }) => {
+      const { data: res } = await api.put<ExamSchedule>(`/exam-schedules/${id}`, data);
+      return res;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['exams'] }),
+  });
+}
+
 export function useDeleteExam() {
   const qc = useQueryClient();
   return useMutation({

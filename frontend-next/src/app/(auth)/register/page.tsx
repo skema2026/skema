@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { useRegister } from '@/hooks/useAuth';
-import AuthNavbar from '@/components/layout/AuthNavbar';
-import AuthFooter from '@/components/layout/AuthFooter';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
 const GoogleIcon = () => (
@@ -15,19 +13,6 @@ const GoogleIcon = () => (
     <path d="M130.55 261.1c35.248 0 64.839-11.605 86.453-31.622l-41.196-31.913c-11.024 7.688-25.82 13.055-45.257 13.055-34.523 0-63.824-22.773-74.269-54.25l-1.531.13-40.298 31.187-.527 1.465C35.393 231.798 79.49 261.1 130.55 261.1" fill="#34A853"/>
     <path d="M56.281 156.37c-2.756-8.123-4.351-16.827-4.351-25.82 0-8.994 1.595-17.697 4.206-25.82l-.073-1.73L15.26 71.312l-1.335.635C5.077 89.644 0 109.517 0 130.55s5.077 40.905 13.925 58.602l42.356-32.782" fill="#FBBC05"/>
     <path d="M130.55 50.479c24.514 0 41.05 10.589 50.479 19.438l36.844-35.974C195.245 12.91 165.798 0 130.55 0 79.49 0 35.393 29.301 13.925 71.947l42.211 32.783c10.59-31.477 39.891-54.251 74.414-54.251" fill="#EB4335"/>
-  </svg>
-);
-
-const NaverIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-    <rect width="24" height="24" rx="4" fill="#03C75A"/>
-    <path d="M13.56 12.28L10.26 7H7v10h3.44l3.3-5.28V17H17V7h-3.44v5.28z" fill="white"/>
-  </svg>
-);
-
-const KakaoIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18">
-    <path d="M9 1C4.582 1 1 3.896 1 7.455c0 2.257 1.493 4.243 3.746 5.378l-.956 3.493c-.084.307.27.549.536.363L8.2 13.997A9.93 9.93 0 0 0 9 14c4.418 0 8-2.896 8-6.545C17 3.896 13.418 1 9 1z" fill="#3C1E1E"/>
   </svg>
 );
 
@@ -44,37 +29,30 @@ export default function RegisterPage() {
   };
 
   const validate = () => {
-    const newErrors: Record<string, string> = {};
-    if (!form.username.trim()) newErrors.username = '아이디를 입력해주세요';
-    else if (form.username.length < 3) newErrors.username = '아이디는 3자 이상이어야 합니다';
-    if (!form.email.trim()) newErrors.email = '이메일을 입력해주세요';
-    else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = '올바른 이메일 형식이 아닙니다';
-    if (!form.password) newErrors.password = '비밀번호를 입력해주세요';
-    else if (form.password.length < 6) newErrors.password = '비밀번호는 6자 이상이어야 합니다';
-    if (form.password !== form.confirmPassword) newErrors.confirmPassword = '비밀번호가 일치하지 않습니다';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const e: Record<string, string> = {};
+    if (!form.username.trim()) e.username = '아이디를 입력해주세요';
+    else if (form.username.length < 3) e.username = '아이디는 3자 이상이어야 합니다';
+    if (!form.email.trim()) e.email = '이메일을 입력해주세요';
+    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = '올바른 이메일 형식이 아닙니다';
+    if (!form.password) e.password = '비밀번호를 입력해주세요';
+    else if (form.password.length < 6) e.password = '비밀번호는 6자 이상이어야 합니다';
+    if (form.password !== form.confirmPassword) e.confirmPassword = '비밀번호가 일치하지 않습니다';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
     if (!validate()) return;
-
     registerMutation.mutate(
       { username: form.username, email: form.email, password: form.password },
       {
-        onSuccess: () => {
-          toast.success('회원가입이 완료되었습니다. 로그인해주세요.');
-          router.push('/login');
-        },
+        onSuccess: () => { toast.success('회원가입이 완료되었습니다. 로그인해주세요.'); router.push('/login'); },
         onError: (err: unknown) => {
           const error = err as { response?: { status?: number; data?: { detail?: string } } };
           const detail = error?.response?.data?.detail ?? '';
-          if (error?.response?.status === 409) {
-            toast.error(detail || '이미 사용 중인 이메일 또는 아이디입니다');
-          } else {
-            toast.error('회원가입 중 오류가 발생했습니다');
-          }
+          if (error?.response?.status === 409) toast.error(detail || '이미 사용 중인 이메일 또는 아이디입니다');
+          else toast.error('회원가입 중 오류가 발생했습니다');
         },
       }
     );
@@ -83,292 +61,282 @@ export default function RegisterPage() {
   return (
     <>
       <style>{`
-        .register-input {
-          width: 100%;
-          padding: 10px 14px;
-          border-radius: 8px;
-          outline: none;
-          border: 1.5px solid #e5e7eb;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          background: #fff;
-          color: #111827;
+        *, *::before, *::after { box-sizing: border-box; }
+
+        .rp-root {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          overflow: hidden;
+          background: #d9c9b0 url('/register-bg.jpg') center/cover no-repeat;
           font-family: inherit;
-          font-size: 14px;
-          box-sizing: border-box;
         }
-        .register-input:focus {
-          border-color: #1a4db2;
-          box-shadow: 0 0 0 3px rgba(26,77,178,0.1);
+        .rp-overlay {
+          position: absolute; inset: 0; pointer-events: none;
+          background: linear-gradient(
+            110deg,
+            rgba(215,190,140,0.52) 0%,
+            rgba(190,165,115,0.30) 45%,
+            rgba(80,100,170,0.12) 100%
+          );
         }
-        .register-input.error {
-          border-color: #ef4444;
+
+        /* ── Navbar ── */
+        .rp-nav {
+          position: relative; z-index: 20;
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 20px 48px;
+        }
+        .rp-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .rp-logo-box {
+          width: 34px; height: 34px; border-radius: 9px;
+          background: rgba(26,77,178,0.88);
+          display: flex; align-items: center; justify-content: center;
+        }
+        .rp-logo-text { font-size: 18px; font-weight: 800; color: #1a2340; letter-spacing: -0.3px; }
+        .rp-nav-btn {
+          padding: 8px 24px; border-radius: 999px; font-size: 14px; font-weight: 600;
+          color: #1a2340; text-decoration: none;
+          border: 1.5px solid rgba(255,255,255,0.65);
+          background: rgba(255,255,255,0.28);
+          backdrop-filter: blur(10px);
+          transition: background 0.2s;
+        }
+        .rp-nav-btn:hover { background: rgba(255,255,255,0.48); }
+
+        /* ── Body ── */
+        .rp-body {
+          position: relative; z-index: 1;
+          flex: 1; display: flex; align-items: center;
+          padding: 0 48px 48px;
+          gap: 40px;
+        }
+
+        /* ── Left ── */
+        .rp-left { flex: 1; }
+        .rp-left h2 {
+          font-size: clamp(2rem, 3.2vw, 2.75rem);
+          font-weight: 800; line-height: 1.2;
+          color: #1a2340; letter-spacing: -0.5px; margin: 0 0 14px;
+        }
+        .rp-left h2 em { font-style: normal; color: #1a4db2; }
+        .rp-left p {
+          font-size: 15px; line-height: 1.8; color: #2d3a55;
+          margin: 0 0 28px; max-width: 380px;
+        }
+        .rp-feat { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+        .rp-feat-icon {
+          width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+          background: rgba(255,255,255,0.50);
+          border: 1px solid rgba(255,255,255,0.6);
+          backdrop-filter: blur(6px);
+          display: flex; align-items: center; justify-content: center;
+        }
+        .rp-feat-name { font-weight: 700; font-size: 14px; color: #1a2340; margin-bottom: 2px; }
+        .rp-feat-desc { font-size: 13px; color: #3d4e6b; }
+
+        /* ── Card ── */
+        .rp-card {
+          width: 100%; max-width: 455px; flex-shrink: 0;
+          background: rgba(255,255,255,0.17);
+          backdrop-filter: blur(24px);
+          -webkit-backdrop-filter: blur(24px);
+          border: 1px solid rgba(255,255,255,0.35);
+          border-radius: 22px;
+          box-shadow:
+            0 12px 56px rgba(50,40,10,0.16),
+            inset 0 1px 0 rgba(255,255,255,0.45);
+          padding: 32px 28px 26px;
+        }
+        .rp-card-title { font-size: 22px; font-weight: 800; color: #1a2340; margin: 0 0 3px; }
+        .rp-card-sub   { font-size: 13px; color: #4a5568; margin: 0 0 20px; }
+
+        /* Social */
+        .rp-soc {
+          width: 100%; height: 44px;
+          display: flex; align-items: center; justify-content: center; gap: 9px;
+          border-radius: 11px; border: none;
+          font-size: 14px; font-weight: 600; font-family: inherit;
+          cursor: pointer; margin-bottom: 7px;
+          transition: filter .15s, transform .1s;
+        }
+        .rp-soc:hover  { filter: brightness(1.07); transform: translateY(-1px); }
+        .rp-soc:active { transform: translateY(0); }
+        .rp-google { background: rgba(255,255,255,0.84); color: #1f2937; border: 1px solid rgba(255,255,255,0.7) !important; backdrop-filter: blur(6px); }
+        .rp-naver  { background: #03C75A; color: #fff; }
+        .rp-kakao  { background: #FEE500; color: #3C1E1E; }
+
+        /* Divider */
+        .rp-div { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+        .rp-div-line { flex: 1; height: 1px; background: rgba(255,255,255,0.38); }
+        .rp-div-txt  { font-size: 12px; color: rgba(30,40,70,0.52); white-space: nowrap; }
+
+        /* Fields */
+        .rp-field {
+          display: flex; align-items: center;
+          background: rgba(255,255,255,0.22);
+          border: 1px solid rgba(255,255,255,0.38);
+          border-radius: 11px; overflow: hidden;
+          margin-bottom: 7px;
+          transition: box-shadow .2s, border-color .2s;
+        }
+        .rp-field:focus-within {
+          border-color: rgba(80,120,255,0.65);
+          box-shadow: 0 0 0 3px rgba(80,120,255,0.16);
+        }
+        .rp-field.err { border-color: rgba(220,38,38,0.55); }
+        .rp-label {
+          display: flex; align-items: center; gap: 6px;
+          padding: 0 11px; min-width: 90px; height: 46px;
+          border-right: 1px solid rgba(255,255,255,0.32);
+          background: rgba(255,255,255,0.10);
+          font-size: 13px; font-weight: 600; color: #2d3a55; flex-shrink: 0;
+        }
+        .rp-field input {
+          flex: 1; height: 46px; padding: 0 13px;
+          background: transparent; border: none; outline: none;
+          font-size: 13px; color: #1a2340; font-family: inherit;
+        }
+        .rp-field input::placeholder { color: rgba(50,65,100,0.42); }
+        .rp-err { font-size: 11px; color: #dc2626; margin: -3px 0 5px 4px; }
+
+        /* Submit */
+        .rp-submit {
+          width: 100%; height: 48px; margin-top: 8px;
+          border: none; border-radius: 11px;
+          font-size: 15px; font-weight: 700; font-family: inherit;
+          cursor: pointer; color: #fff;
+          background: linear-gradient(90deg, #3b6ef0 0%, #6b4fd6 100%);
+          box-shadow: 0 4px 20px rgba(70,100,230,0.38);
+          transition: filter .15s, transform .1s;
+        }
+        .rp-submit:hover:not(:disabled) { filter: brightness(1.09); transform: translateY(-1px); }
+        .rp-submit:active:not(:disabled) { transform: translateY(0); }
+        .rp-submit:disabled {
+          background: linear-gradient(90deg, #94aee8 0%, #a899d6 100%);
+          box-shadow: none; cursor: not-allowed;
+        }
+
+        .rp-foot { margin-top: 14px; text-align: center; font-size: 13px; color: #4a5568; }
+        .rp-foot a { color: #1a4db2; font-weight: 700; text-decoration: none; }
+        .rp-foot a:hover { text-decoration: underline; }
+
+        @media (max-width: 860px) {
+          .rp-left { display: none; }
+          .rp-body  { justify-content: center; padding: 0 16px 40px; }
+          .rp-nav   { padding: 18px 24px; }
+          .rp-card  { max-width: 100%; }
         }
       `}</style>
 
-      <div className="min-h-screen flex flex-col" style={{ background: 'var(--skema-surface)', color: 'var(--skema-on-surface)' }}>
-        <AuthNavbar mode="register" />
+      <div className="rp-root">
+        <div className="rp-overlay" />
 
-        {/* Main */}
-        <main className="flex-grow flex pt-16">
-          {/* Left Panel */}
-          <div
-            className="hidden lg:flex lg:w-1/2 flex-col justify-center px-16 py-12"
-            style={{ background: 'var(--skema-primary)', color: '#fff' }}
-          >
-            <div className="max-w-md">
-              <h2
-                className="skema-headline text-4xl font-bold mb-4 leading-tight"
-              >
-                Master your time
-                <br />
-                with AI precision.
-              </h2>
-              <p className="text-base leading-relaxed mb-10 opacity-90">
-                AI가 당신의 학습 패턴을 분석하고, 최적화된 시간표를 설계해 드립니다.
-                지금 바로 스마트한 시간 관리를 시작하세요.
-              </p>
-
-              <div className="flex flex-col gap-4 mb-10">
-                <div
-                  className="rounded-2xl p-5 flex items-start gap-4"
-                  style={{ background: 'rgba(255,255,255,0.12)' }}
-                >
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.2)' }}
-                  >
-                    <MaterialIcon icon="psychology" size={20} color="#fff" />
-                  </div>
-                  <div>
-                    <div className="font-bold mb-1">Smart Scheduling</div>
-                    <div className="text-sm opacity-80">AI가 최적의 공부 시간을 예측하고 추천합니다</div>
-                  </div>
-                </div>
-
-                <div
-                  className="rounded-2xl p-5 flex items-start gap-4"
-                  style={{ background: 'rgba(255,255,255,0.12)' }}
-                >
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.2)' }}
-                  >
-                    <MaterialIcon icon="insights" size={20} color="#fff" />
-                  </div>
-                  <div>
-                    <div className="font-bold mb-1">Time Insights</div>
-                    <div className="text-sm opacity-80">학습 효율을 분석하고 개선점을 제안합니다</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Decorative box */}
-              <div
-                className="rounded-2xl p-6 relative overflow-hidden"
-                style={{
-                  background: 'linear-gradient(135deg, #3b66cc 0%, #1a4db2 100%)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                }}
-              >
-                <div
-                  className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-20"
-                  style={{ background: 'var(--skema-secondary-container)' }}
-                />
-                <div
-                  className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full"
-                  style={{ background: 'var(--skema-tertiary-fixed)', opacity: 0.15 }}
-                />
-                <div className="relative z-10">
-                  <div
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl mb-3"
-                    style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}
-                  >
-                    <MaterialIcon icon="trending_up" size={18} color="#fff" />
-                    <span className="font-bold text-lg">85% 효율 향상</span>
-                  </div>
-                  <div className="text-sm opacity-80">SKEMA 사용자 평균 학습 효율 향상율</div>
-                </div>
-              </div>
+        <nav className="rp-nav">
+          <Link href="/" className="rp-logo">
+            <div className="rp-logo-box">
+              <MaterialIcon icon="schedule" size={18} color="#fff" />
             </div>
+            <span className="rp-logo-text">SKEMA</span>
+          </Link>
+          <Link href="/login" className="rp-nav-btn">로그인</Link>
+        </nav>
+
+        <div className="rp-body">
+          {/* Left branding */}
+          <div className="rp-left">
+            <h2>Master your time<br />with <em>AI precision.</em></h2>
+            <p>
+              AI가 당신의 학습 패턴을 분석하고,<br />
+              최적화된 시간표를 설계해 드립니다.<br />
+              지금 바로 스마트한 시간 관리를 시작하세요.
+            </p>
+            {[
+              { icon: 'psychology',    title: 'Smart Scheduling', desc: 'AI가 최적의 공부 시간을 예측하고 추천합니다' },
+              { icon: 'insights',      title: 'Time Insights',    desc: '학습 효율을 분석하고 개선점을 제안합니다' },
+              { icon: 'track_changes', title: 'Goal Tracking',    desc: '목표 달성을 위한 진척도를 추적합니다' },
+            ].map((f) => (
+              <div className="rp-feat" key={f.title}>
+                <div className="rp-feat-icon">
+                  <MaterialIcon icon={f.icon} size={20} color="#1a4db2" />
+                </div>
+                <div>
+                  <div className="rp-feat-name">{f.title}</div>
+                  <div className="rp-feat-desc">{f.desc}</div>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Right Panel */}
-          <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12">
-            <div className="w-full max-w-md">
-              <div
-                className="bg-white rounded-xl p-8 shadow-sm"
-                style={{ border: '1px solid var(--skema-container)' }}
-              >
-                <div className="mb-6">
-                  <h1
-                    className="skema-headline text-2xl font-bold mb-1"
-                    style={{ color: 'var(--skema-on-surface)' }}
-                  >
-                    계정 만들기
-                  </h1>
-                  <p className="text-sm" style={{ color: 'var(--skema-on-surface-variant)' }}>
-                    SKEMA와 함께 스마트한 시간 관리를 시작하세요
-                  </p>
-                </div>
+          {/* Glass card */}
+          <div className="rp-card">
+            <div className="rp-card-title">계정 만들기</div>
+            <div className="rp-card-sub">SKEMA와 함께 스마트한 시간 관리를 시작하세요</div>
 
-                {/* SNS 로그인 */}
-                <div className="space-y-2 mb-5">
-                  <button
-                    type="button"
-                    onClick={() => handleSocialLogin('google')}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border font-semibold text-sm transition-colors hover:bg-gray-50"
-                    style={{ background: '#fff', border: '1px solid #d1d5db', color: '#111827' }}
-                  >
-                    <GoogleIcon />
-                    Google로 시작하기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSocialLogin('naver')}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border font-semibold text-sm transition-colors hover:bg-gray-50"
-                    style={{ background: '#fff', border: '1px solid #d1d5db', color: '#111827' }}
-                  >
-                    <NaverIcon />
-                    네이버로 시작하기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSocialLogin('kakao')}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm transition-opacity hover:opacity-90"
-                    style={{ background: '#FEE500', border: '1px solid #FEE500', color: '#3C1E1E' }}
-                  >
-                    <KakaoIcon />
-                    카카오로 시작하기
-                  </button>
-                </div>
+            <button className="rp-soc rp-google" onClick={() => handleSocialLogin('google')}>
+              <GoogleIcon /> Google로 시작하기
+            </button>
+            <button className="rp-soc rp-naver" onClick={() => handleSocialLogin('naver')}>
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="4" fill="#03C75A"/>
+                <path d="M13.56 12.28L10.26 7H7v10h3.44l3.3-5.28V17H17V7h-3.44v5.28z" fill="white"/>
+              </svg>
+              네이버로 시작하기
+            </button>
+            <button className="rp-soc rp-kakao" onClick={() => handleSocialLogin('kakao')}>
+              <svg width="18" height="18" viewBox="0 0 18 18">
+                <path d="M9 1C4.582 1 1 3.896 1 7.455c0 2.257 1.493 4.243 3.746 5.378l-.956 3.493c-.084.307.27.549.536.363L8.2 13.997A9.93 9.93 0 0 0 9 14c4.418 0 8-2.896 8-6.545C17 3.896 13.418 1 9 1z" fill="#3C1E1E"/>
+              </svg>
+              카카오로 시작하기
+            </button>
 
-                {/* 구분선 */}
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="flex-1 h-px" style={{ background: 'var(--skema-container)' }} />
-                  <span className="text-xs" style={{ color: 'var(--skema-on-surface-variant)' }}>또는 이메일로 가입</span>
-                  <div className="flex-1 h-px" style={{ background: 'var(--skema-container)' }} />
-                </div>
+            <div className="rp-div">
+              <div className="rp-div-line" />
+              <span className="rp-div-txt">또는 이메일로 가입</span>
+              <div className="rp-div-line" />
+            </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Username */}
-                  <div>
-                    <label
-                      htmlFor="username"
-                      className="block text-xs font-bold uppercase tracking-wider mb-1.5"
-                      style={{ color: 'var(--skema-on-surface-variant)' }}
-                    >
-                      아이디
-                    </label>
-                    <input
-                      id="username"
-                      type="text"
-                      placeholder="아이디 (3자 이상)"
-                      value={form.username}
-                      onChange={(e) => setForm({ ...form, username: e.target.value })}
-                      className={`register-input${errors.username ? ' error' : ''}`}
-                    />
-                    {errors.username && (
-                      <p className="text-xs mt-1" style={{ color: '#ef4444' }}>{errors.username}</p>
-                    )}
-                  </div>
-
-                  {/* Email */}
-                  <div>
-                    <label
-                      htmlFor="email"
-                      className="block text-xs font-bold uppercase tracking-wider mb-1.5"
-                      style={{ color: 'var(--skema-on-surface-variant)' }}
-                    >
-                      이메일
-                    </label>
-                    <input
-                      id="email"
-                      type="email"
-                      placeholder="이메일 주소"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      className={`register-input${errors.email ? ' error' : ''}`}
-                    />
-                    {errors.email && (
-                      <p className="text-xs mt-1" style={{ color: '#ef4444' }}>{errors.email}</p>
-                    )}
-                  </div>
-
-                  {/* Password */}
-                  <div>
-                    <label
-                      htmlFor="password"
-                      className="block text-xs font-bold uppercase tracking-wider mb-1.5"
-                      style={{ color: 'var(--skema-on-surface-variant)' }}
-                    >
-                      비밀번호
-                    </label>
-                    <input
-                      id="password"
-                      type="password"
-                      placeholder="비밀번호 (6자 이상)"
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      className={`register-input${errors.password ? ' error' : ''}`}
-                    />
-                    {errors.password && (
-                      <p className="text-xs mt-1" style={{ color: '#ef4444' }}>{errors.password}</p>
-                    )}
-                  </div>
-
-                  {/* Confirm Password */}
-                  <div>
-                    <label
-                      htmlFor="confirmPassword"
-                      className="block text-xs font-bold uppercase tracking-wider mb-1.5"
-                      style={{ color: 'var(--skema-on-surface-variant)' }}
-                    >
-                      비밀번호 확인
-                    </label>
-                    <input
-                      id="confirmPassword"
-                      type="password"
-                      placeholder="비밀번호를 다시 입력하세요"
-                      value={form.confirmPassword}
-                      onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                      className={`register-input${errors.confirmPassword ? ' error' : ''}`}
-                    />
-                    {errors.confirmPassword && (
-                      <p className="text-xs mt-1" style={{ color: '#ef4444' }}>{errors.confirmPassword}</p>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={registerMutation.isPending}
-                    style={{
-                      width: '100%', height: '44px', marginTop: '8px',
-                      background: registerMutation.isPending ? '#93aee8' : '#1a4db2',
-                      color: '#fff', border: 'none', borderRadius: '8px',
-                      fontSize: '14px', fontWeight: 700,
-                      cursor: registerMutation.isPending ? 'not-allowed' : 'pointer',
-                      transition: 'background 0.15s',
-                      fontFamily: 'inherit',
-                    }}
-                    onMouseEnter={(e) => { if (!registerMutation.isPending) (e.currentTarget as HTMLButtonElement).style.background = '#2d5fc4'; }}
-                    onMouseLeave={(e) => { if (!registerMutation.isPending) (e.currentTarget as HTMLButtonElement).style.background = '#1a4db2'; }}
-                  >
-                    {registerMutation.isPending ? '처리 중...' : '회원가입'}
-                  </button>
-                </form>
-
-                <div className="mt-5 p-3 rounded-xl text-center text-sm" style={{ background: '#f9fafb', border: '1px solid #e5e7eb' }}>
-                  이미 계정이 있으신가요?{' '}
-                  <Link href="/login" className="font-bold hover:underline" style={{ color: '#1a4db2' }}>
-                    로그인하기 →
-                  </Link>
-                </div>
+            <form onSubmit={handleSubmit}>
+              <div className={`rp-field${errors.username ? ' err' : ''}`}>
+                <div className="rp-label"><MaterialIcon icon="person" size={14} color="#4a5568" />아이디</div>
+                <input type="text" placeholder="아이디 (3자 이상)" value={form.username}
+                  onChange={(e) => setForm({ ...form, username: e.target.value })} />
               </div>
+              {errors.username && <div className="rp-err">{errors.username}</div>}
+
+              <div className={`rp-field${errors.email ? ' err' : ''}`}>
+                <div className="rp-label"><MaterialIcon icon="mail" size={14} color="#4a5568" />이메일</div>
+                <input type="email" placeholder="이메일 주소" value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+              {errors.email && <div className="rp-err">{errors.email}</div>}
+
+              <div className={`rp-field${errors.password ? ' err' : ''}`}>
+                <div className="rp-label"><MaterialIcon icon="lock" size={14} color="#4a5568" />비밀번호</div>
+                <input type="password" placeholder="비밀번호 (6자 이상)" value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })} />
+              </div>
+              {errors.password && <div className="rp-err">{errors.password}</div>}
+
+              <div className={`rp-field${errors.confirmPassword ? ' err' : ''}`}>
+                <div className="rp-label"><MaterialIcon icon="lock" size={14} color="#4a5568" />비밀번호 확인</div>
+                <input type="password" placeholder="비밀번호를 다시 입력하세요" value={form.confirmPassword}
+                  onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} />
+              </div>
+              {errors.confirmPassword && <div className="rp-err">{errors.confirmPassword}</div>}
+
+              <button type="submit" className="rp-submit" disabled={registerMutation.isPending}>
+                {registerMutation.isPending ? '처리 중...' : '가입하기'}
+              </button>
+            </form>
+
+            <div className="rp-foot">
+              이미 계정이 있으신가요?{' '}
+              <Link href="/login">로그인</Link>
             </div>
           </div>
-        </main>
-
-        <AuthFooter />
+        </div>
       </div>
     </>
   );

@@ -195,15 +195,9 @@ def _build_grid_boundaries(
 
 
 def _snap_time(y: float, boundaries: List[Tuple[float, str]], snap_up: bool) -> str:
-    """
-    y픽셀 → "HH:MM" (30분 경계 스냅, 허용 오차 3px).
-
-    snap_up=False: 가장 큰 boundary.y ≤ y  (시작 시간, 내림)
-    snap_up=True:  가장 작은 boundary.y ≥ y (끝 시간, 올림)
-    """
+    """legacy floor/ceiling — next-block 보정 fallback에서만 사용."""
     if not boundaries:
         return "09:00"
-
     TOLE = 3.0
     if snap_up:
         for by, bt in boundaries:
@@ -218,6 +212,23 @@ def _snap_time(y: float, boundaries: List[Tuple[float, str]], snap_up: bool) -> 
             else:
                 break
         return result
+
+
+def _boundary_slot_idx(y: float, boundaries: List[Tuple[float, str]]) -> int:
+    """y픽셀 → nearest boundary 인덱스."""
+    return min(range(len(boundaries)), key=lambda i: abs(boundaries[i][0] - y))
+
+
+def _boundary_avg_slot_h(boundaries: List[Tuple[float, str]]) -> float:
+    if len(boundaries) < 2:
+        return 40.0
+    return float(np.mean([boundaries[i + 1][0] - boundaries[i][0] for i in range(len(boundaries) - 1)]))
+
+
+def _slots_from_height(block_h: float, avg_slot_h: float) -> int:
+    if avg_slot_h <= 0:
+        return 1
+    return max(1, int(block_h / avg_slot_h + 0.5))
 
 
 # ── 블록 클러스터링 ───────────────────────────────────────────────────────────
@@ -287,6 +298,77 @@ def _x_to_dow(cx: float, day_anchors: List[Tuple[int, int]]) -> int:
     return min(day_anchors, key=lambda a: abs(cx - a[1]))[0]
 
 
+def _slot_based_times(
+    top_y: float,
+    block_h: float,
+    boundaries: List[Tuple[float, str]],
+) -> Tuple[str, str]:
+    """
+    start = nearest boundary to top_y
+    end   = start_slot + round(block_h / avg_slot_h), 최소 1슬롯
+    """
+    if not boundaries:
+        return "09:00", "09:30"
+    avg_slot_h = _boundary_avg_slot_h(boundaries)
+    start_idx  = _boundary_slot_idx(top_y, boundaries)
+    num_slots  = _slots_from_height(block_h, avg_slot_h)
+    end_idx    = min(start_idx + num_slots, len(boundaries) - 1)
+    return boundaries[start_idx][1], boundaries[end_idx][1]
+
+
+def _apply_positional_end_times(
+    image_bytes: bytes,
+    entries_raw: list,
+    day_anchors: List[Tuple[int, int]],
+    boundaries: List[Tuple[float, str]],
+) -> None:
+    """
+    색상 기반 블록 감지(positional_parser)로 각 entry의 실제 block 높이를 구해
+    end_time을 slot 비율로 계산한다.
+
+    매칭 기준: 같은 요일 열 + top_y 근접(50px 이내).
+    실패 시 해당 entry는 건드리지 않는다.
+    """
+    try:
+        from .positional_parser import detect_grid, detect_blocks as _pos_detect
+        pos_grid = detect_grid(image_bytes)
+        pos_blocks = _pos_detect(image_bytes, pos_grid)
+        if not pos_blocks:
+            return
+    except Exception as exc:
+        logger.debug("_apply_positional_end_times: detection failed: %s", exc)
+        return
+
+    for entry in entries_raw:
+        by0 = entry["_by0"]
+        dow = entry["day_of_week"]
+
+        best = None
+        best_dist = float('inf')
+        for pb in pos_blocks:
+            if _x_to_dow(float(pb.center_x), day_anchors) != dow:
+                continue
+            dist = abs(pb.top_y - by0)
+            if dist < best_dist:
+                best_dist = dist
+                best = pb
+
+        if best is None or best_dist > 50:
+            continue
+
+        _, new_end = _slot_based_times(float(best.top_y), float(best.bottom_y - best.top_y), boundaries)
+        if new_end > entry["start_time"]:
+            old_end = entry["end_time"]
+            entry["end_time"] = new_end
+            if new_end != old_end:
+                logger.debug(
+                    "_apply_positional_end_times: %r %s end %s → %s "
+                    "(top_y=%d bottom_y=%d dist=%d)",
+                    entry["subject_name"], entry["start_time"],
+                    old_end, new_end, best.top_y, best.bottom_y, best_dist,
+                )
+
+
 def _block_to_entry(
     block: List[Tuple[int, int, int, int, str]],
     day_anchors: List[Tuple[int, int]],
@@ -300,9 +382,8 @@ def _block_to_entry(
     bx1 = max(b[2] for b in block)
     by1 = max(b[3] for b in block)
 
-    dow        = _x_to_dow((bx0 + bx1) / 2.0, day_anchors)
-    start_time = _snap_time(float(by0), boundaries, snap_up=False)
-    end_time   = _snap_time(float(by1), boundaries, snap_up=True)
+    dow = _x_to_dow((bx0 + bx1) / 2.0, day_anchors)
+    start_time, end_time = _slot_based_times(float(by0), float(by1 - by0), boundaries)
 
     def t2m(t: str) -> int:
         try:
@@ -399,9 +480,13 @@ def parse_timetable_bbox(image_bytes: bytes) -> List[dict]:
         if entry is not None:
             entries_raw.append(entry)
 
-    # ── 열(요일)별 end_time 보정 ─────────────────────────────────────────────
-    # OCR 텍스트는 블록 상단에만 있으므로 by1(텍스트 하단) != 블록 실제 하단.
-    # 같은 열에서 다음 블록의 _by0(상단 y)를 현재 블록의 end_time 기준으로 사용.
+    # ── Step A: 색상 블록 기반 end_time 보정 ─────────────────────────────────
+    # OCR 텍스트는 블록 상단에만 있으므로 by1 ≠ 실제 블록 하단.
+    # positional_parser의 색상 감지로 실제 bottom_y를 찾아 end_time을 교정한다.
+    _apply_positional_end_times(image_bytes, entries_raw, day_anchors, boundaries)
+
+    # ── Step B: 열(요일)별 next-block 보정 ───────────────────────────────────
+    # positional 감지가 실패한 블록은 다음 블록 상단 y를 end_time으로 사용한다.
     by_dow: Dict[int, list] = {}
     for e in entries_raw:
         by_dow.setdefault(e["day_of_week"], []).append(e)
@@ -411,9 +496,9 @@ def parse_timetable_bbox(image_bytes: bytes) -> List[dict]:
         for i, e in enumerate(col_entries):
             if i + 1 < len(col_entries):
                 next_by0 = col_entries[i + 1]["_by0"]
-                new_end = _snap_time(float(next_by0), boundaries, snap_up=False)
-                # 현재 start_time보다 나중이어야 유효
-                if new_end > e["start_time"]:
+                next_idx = _boundary_slot_idx(float(next_by0), boundaries)
+                new_end  = boundaries[next_idx][1]
+                if new_end > e["start_time"] and new_end > e["end_time"]:
                     e["end_time"] = new_end
                     logger.debug(
                         "end_time corrected via next-block: %r %s → %s",

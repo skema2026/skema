@@ -29,6 +29,7 @@ RUN addgroup --system --gid 1001 nodejs \
 # standalone 빌드 결과물만 복사 (용량 최소화)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 USER nextjs
 

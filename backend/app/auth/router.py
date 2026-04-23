@@ -150,11 +150,17 @@ def oauth_callback(
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_denied")
 
     try:
-        social_id, email, display_name = service.exchange_oauth_code(provider, code)
-        user = service.get_or_create_social_user(db, provider, social_id, email, display_name)
+        social_id, email, display_name, kakao_at, kakao_rt = service.exchange_oauth_code(provider, code)
+        user = service.get_or_create_social_user(
+            db, provider, social_id, email, display_name,
+            kakao_access_token=kakao_at,
+            kakao_refresh_token=kakao_rt,
+        )
         token = create_access_token(user.id)
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?token={token}")
     except ValueError as exc:
+        import traceback; traceback.print_exc()
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error={exc}")
-    except Exception:
+    except Exception as exc:
+        import traceback; traceback.print_exc()
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_failed")

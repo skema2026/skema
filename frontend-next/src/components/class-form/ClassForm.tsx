@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -12,6 +13,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useUIStore } from '@/store/uiStore';
+import { useCreateSchedule, useDeleteSchedule, useUpdateSchedule } from '@/hooks/useSchedules';
+import {
+  DAY_NAMES_FULL,
+  PRIORITY_LABELS,
+  cn,
+} from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -19,16 +27,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useUIStore } from '@/store/uiStore';
-import { useCreateSchedule, useDeleteSchedule, useUpdateSchedule } from '@/hooks/useSchedules';
-import {
-  DAY_NAMES_FULL,
-  PRIORITY_LABELS,
-  SCHEDULE_TYPE_LABELS,
-  cn,
-} from '@/lib/utils';
 import { ALL_SCHEDULE_COLORS, getAutoColor } from '@/lib/scheduleColor';
 import { Schedule } from '@/types';
+
+const SCHEDULE_TYPE_OPTIONS = [
+  { value: 'class',      label: '수업',     icon: '📚', desc: '강의·실습' },
+  { value: 'study',      label: '자율학습', icon: '✏️', desc: '복습·공부' },
+  { value: 'assignment', label: '과제',     icon: '📋', desc: '제출·마감' },
+  { value: 'activity',   label: '활동',     icon: '🏃', desc: '동아리·알바' },
+  { value: 'personal',   label: '개인',     icon: '🏠', desc: '약속·기타' },
+] as const;
 
 const defaultForm = {
   title: '',
@@ -50,11 +58,40 @@ function dateStringToDow(dateStr: string): number {
   return day === 0 ? 6 : day - 1;
 }
 
+function timesOverlap(s1: string, e1: string, s2: string, e2: string): boolean {
+  return s1 < e2 && s2 < e1;
+}
+
+function findConflict(
+  form: typeof defaultForm,
+  isRecurring: boolean,
+  schedules: Schedule[],
+  excludeId?: number,
+): Schedule | null {
+  for (const s of schedules) {
+    if (s.id === excludeId) continue;
+    if (!timesOverlap(form.start_time, form.end_time, s.start_time, s.end_time)) continue;
+
+    // 요일 겹침 여부
+    const formDow = isRecurring ? form.day_of_week : (form.date ? dateStringToDow(form.date) : form.day_of_week);
+    const sDow = s.date ? dateStringToDow(s.date) : s.day_of_week;
+
+    if (formDow !== sDow) continue;
+
+    // 특정날짜 vs 특정날짜면 날짜도 정확히 일치해야 함
+    if (!isRecurring && form.date && s.date && form.date !== s.date) continue;
+
+    return s;
+  }
+  return null;
+}
+
 export function ClassForm() {
   const { isClassFormOpen, editingSchedule, closeClassForm } = useUIStore();
   const createSchedule = useCreateSchedule();
   const updateSchedule = useUpdateSchedule();
   const deleteSchedule = useDeleteSchedule();
+  const qc = useQueryClient();
 
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -102,6 +139,16 @@ export function ClassForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+
+    const allSchedules = qc.getQueryData<Schedule[]>(['schedules']) ?? [];
+    const conflicting = findConflict(form, isRecurring, allSchedules, editingSchedule?.id);
+    if (conflicting) {
+      setErrors((prev) => ({
+        ...prev,
+        conflict: `"${conflicting.title}"과(와) 시간이 겹칩니다 (${conflicting.start_time}–${conflicting.end_time})`,
+      }));
+      return;
+    }
 
     const payload = {
       title: form.title,
@@ -182,19 +229,35 @@ export function ClassForm() {
           {/* Schedule Type */}
           <div className="space-y-1.5">
             <Label>유형</Label>
-            <Select
-              value={form.schedule_type}
-              onValueChange={(v) => setForm({ ...form, schedule_type: v as Schedule['schedule_type'] })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(SCHEDULE_TYPE_LABELS).map(([val, label]) => (
-                  <SelectItem key={val} value={val}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-3 gap-2">
+              {SCHEDULE_TYPE_OPTIONS.map(({ value, label, icon, desc }) => {
+                const selected = form.schedule_type === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      const newType = value as Schedule['schedule_type'];
+                      if (autoColorRef.current && form.title.trim()) {
+                        setForm({ ...form, schedule_type: newType, color: getAutoColor(form.title, newType) });
+                      } else {
+                        setForm({ ...form, schedule_type: newType });
+                      }
+                    }}
+                    className={cn(
+                      'flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl border-2 text-center transition-all',
+                      selected
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-gray-100 bg-white hover:border-gray-300'
+                    )}
+                  >
+                    <span style={{ fontSize: 20 }}>{icon}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: selected ? '#4338CA' : '#181c1e' }}>{label}</span>
+                    <span style={{ fontSize: 9, color: '#9ca3af', lineHeight: 1.3 }}>{desc}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* 반복 방식 토글 */}
@@ -305,24 +368,28 @@ export function ClassForm() {
           </div>
 
           {/* Color */}
-          <div className="space-y-1.5">
-            <Label>색상 {autoColorRef.current && <span className="text-xs font-normal text-gray-400">(제목 기반 자동 선택 — 클릭으로 변경)</span>}</Label>
-            <div className="flex flex-wrap gap-2">
-              {ALL_SCHEDULE_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  className={cn(
-                    'w-8 h-8 rounded-full border-2 transition-transform hover:scale-110',
-                    form.color === color ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent'
-                  )}
-                  style={{ backgroundColor: color }}
-                  onClick={() => {
-                    autoColorRef.current = false; // 수동 선택 시 자동 파생 중단
-                    setForm({ ...form, color });
-                  }}
-                />
-              ))}
+          <div className="space-y-2">
+            <Label>색상 {autoColorRef.current && <span className="text-xs font-normal text-gray-400">(제목 기반 자동 — 클릭으로 변경)</span>}</Label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 6 }}>
+              {ALL_SCHEDULE_COLORS.map((color) => {
+                const selected = form.color === color;
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => { autoColorRef.current = false; setForm({ ...form, color }); }}
+                    style={{
+                      width: '100%', aspectRatio: '1', borderRadius: 8,
+                      background: `linear-gradient(135deg, ${color} 0%, ${color}BB 100%)`,
+                      border: selected ? '2.5px solid #181c1e' : '2.5px solid transparent',
+                      boxShadow: selected ? `0 0 0 2px #fff, 0 0 0 4px ${color}` : '0 1px 3px rgba(0,0,0,0.15)',
+                      cursor: 'pointer',
+                      transform: selected ? 'scale(1.12)' : 'scale(1)',
+                      transition: 'transform 0.12s, box-shadow 0.12s',
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
 
@@ -355,6 +422,13 @@ export function ClassForm() {
                 className="w-4 h-4 rounded border-gray-300 text-indigo-600"
               />
               <Label htmlFor="is_completed" className="cursor-pointer">완료 표시</Label>
+            </div>
+          )}
+
+          {errors.conflict && (
+            <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
+              <span className="text-red-500 mt-0.5">⚠️</span>
+              <p className="text-red-600 text-xs leading-relaxed">{errors.conflict}</p>
             </div>
           )}
 

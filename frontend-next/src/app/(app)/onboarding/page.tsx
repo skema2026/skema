@@ -6,9 +6,8 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { normalizeTimeString } from '@/lib/utils';
 import { useUpdateProfile } from '@/hooks/useProfile';
-import { useUploadSyllabus, useReAnalyzeSyllabus, useAutoCreateExam, type SyllabusItem, type SyllabusAnalysis } from '@/hooks/useSyllabi';
 
-type Phase = 'college-check' | 'eta-upload' | 'eta-review' | 'syllabus-upload' | 'external-exam' | 'personal-schedule' | 'type-select' | 'chat' | 'generating' | 'done';
+type Phase = 'college-check' | 'eta-upload' | 'eta-review' | 'external-exam' | 'personal-schedule' | 'type-select' | 'sleep' | 'chat' | 'generating' | 'done';
 type Message = { role: 'ai' | 'user'; text: string };
 
 interface EtaEntry {
@@ -26,9 +25,6 @@ interface ExternalExam {
   _id: string;
   name: string;
   date: string;                        // YYYY-MM-DD
-  status: 'starting' | 'studying';
-  progress: string;                    // 현재 진도 메모
-  weak_parts: string;                  // 취약한 파트
 }
 
 interface PersonalSchedule {
@@ -185,17 +181,6 @@ function _parseExamText(raw: string): Array<{ title: string; exam_date: string; 
 export default function OnboardingPage() {
   const router = useRouter();
   const updateProfile = useUpdateProfile();
-  const uploadSyllabus = useUploadSyllabus();
-  const reAnalyzeSyllabus = useReAnalyzeSyllabus();
-  const autoCreateExam = useAutoCreateExam();
-  // 분석 상태 추적: syllabusId → status
-  const [analysisStatuses, setAnalysisStatuses] = useState<Record<number, string>>({});
-  // 분석 결과 보관: syllabusId → SyllabusAnalysis
-  const [analysisResults, setAnalysisResults] = useState<Record<number, SyllabusAnalysis>>({});
-  // 학기 시작일
-  const [semesterStartDate, setSemesterStartDate] = useState<string>('');
-  // 시험 등록 완료 추적: syllabusId → true
-  const [examRegistered, setExamRegistered] = useState<Record<number, boolean>>({});
 
   const [phase, setPhase] = useState<Phase>('college-check');
   const [isCollegeStudent, setIsCollegeStudent] = useState<boolean | null>(null);
@@ -209,25 +194,21 @@ export default function OnboardingPage() {
   const [etaImageExpanded, setEtaImageExpanded] = useState(false);
   const etaFileRef = useRef<HTMLInputElement>(null);
 
-  // syllabus upload state
-  const [syllabusSubject, setSyllabusSubject] = useState('');
-  const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
-  const [uploadedSyllabi, setUploadedSyllabi] = useState<SyllabusItem[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const syllabusInputRef = useRef<HTMLInputElement>(null);
-  // per-subject upload state (비대학생 사용)
-  const [pendingUploadSubject, setPendingUploadSubject] = useState<string | null>(null);
-  const [subjectUploadingMap, setSubjectUploadingMap] = useState<Record<string, boolean>>({});
-  const [showManualInput, setShowManualInput] = useState(false);
 
   const [selectedType, setSelectedType] = useState<string>('');
   // 비대학생 온보딩 사용
   const [externalExams, setExternalExams] = useState<ExternalExam[]>([]);
   const [personalSchedules, setPersonalSchedules] = useState<PersonalSchedule[]>([]);
   // external-exam 입력 폼 임시 상태
-  const [examDraft, setExamDraft] = useState<Omit<ExternalExam, '_id'>>({ name: '', date: '', status: 'studying', progress: '', weak_parts: '' });
+  const [examDraft, setExamDraft] = useState<Omit<ExternalExam, '_id'>>({ name: '', date: '' });
+  // 공부 블록 자동 생성 설정
+  const [studyStartDays, setStudyStartDays] = useState<number>(14);
+  const [studyDaysPerWeek, setStudyDaysPerWeek] = useState<number>(3);
+  const [studyHoursPerSession, setStudyHoursPerSession] = useState<number>(2);
   // personal-schedule 입력 폼 임시 상태
   const [scheduleDraft, setScheduleDraft] = useState<Omit<PersonalSchedule, '_id'>>({ title: '', day_of_week: 0, start_time: '', end_time: '', is_recurring: true, date: '' });
+  const [sleepStart, setSleepStart] = useState('23:00');
+  const [sleepEnd, setSleepEnd] = useState('07:00');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [stepIdx, setStepIdx] = useState(0);
@@ -242,27 +223,6 @@ export default function OnboardingPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 분석 상태 감시 — pending인 syllabus 주기적 갱신
-  useEffect(() => {
-    const pendingIds = Object.entries(analysisStatuses)
-      .filter(([, s]) => s === 'pending')
-      .map(([id]) => Number(id));
-    if (pendingIds.length === 0) return;
-
-    const timer = setInterval(async () => {
-      for (const id of pendingIds) {
-        try {
-          const { data } = await api.get<SyllabusAnalysis>(`/syllabi/${id}/analysis`);
-          if (data.analysis_status !== 'pending') {
-            setAnalysisStatuses((prev) => ({ ...prev, [id]: data.analysis_status }));
-            setAnalysisResults((prev) => ({ ...prev, [id]: data }));
-          }
-        } catch { /* 분석 결과 없음 — 재시도 */ }
-      }
-    }, 3000);
-
-    return () => clearInterval(timer);
-  }, [analysisStatuses]);
 
   // ETA 이미지 분석 (공통 로직 — upload/review 양쪽에서 호출 가능)
   const _parseEtaFile = async (file: File, goToReview = true) => {
@@ -323,7 +283,10 @@ export default function OnboardingPage() {
     };
   };
 
-  const finishOnboarding = async (finalAnswers: Record<string, string>) => {
+  const finishOnboarding = async (
+    finalAnswers: Record<string, string>,
+    directSleep?: { sleep_start: string; sleep_end: string }
+  ) => {
     setPhase('generating');
     for (let i = 0; i < GENERATING_STEPS.length; i++) {
       setGeneratingStep(i);
@@ -331,7 +294,7 @@ export default function OnboardingPage() {
     }
 
     try {
-      const sleepTimes = parseTime(finalAnswers.sleep || '');
+      const sleepTimes = directSleep ?? parseTime(finalAnswers.sleep || '');
       // 대학생은 type-select 없으므로 'student' 기본값
       const effectiveType = selectedType || 'student';
       await updateProfile.mutateAsync({
@@ -341,7 +304,6 @@ export default function OnboardingPage() {
         sleep_end: sleepTimes.sleep_end,
         goal_tasks: finalAnswers.goal_tasks || '',
         is_college_student: isCollegeStudent ?? false,
-        semester_start_date: semesterStartDate || undefined,
         onboarding_completed: true,
       });
 
@@ -357,9 +319,6 @@ export default function OnboardingPage() {
               title: exam.name,
               subject: exam.name,
               exam_date: exam.date,
-              source: 'onboarding_external_exam',
-              progress_note: exam.progress || null,
-              weak_parts: exam.weak_parts || null,
             });
             savedExamIds.push(data.id);
           } catch { /* 개별 시험 등록 실패 시 무시 */ }
@@ -374,13 +333,66 @@ export default function OnboardingPage() {
               day_of_week: sched.day_of_week,
               start_time: sched.start_time,
               end_time: sched.end_time,
-              schedule_type: 'event',
+              schedule_type: 'activity',
               schedule_source: 'user_created',
-              // 반복: date 생략(null 저장됨) / 단일: date 전송
               ...(sched.is_recurring ? {} : { date: sched.date || undefined }),
-              color: '#f59e0b',
+              color: '#A855F7',
             });
           } catch { /* 개별 일정 등록 실패 시 무시 */ }
+        }
+
+        // 시험별 공부 블록 자동 생성
+        const toDateStr = (d: Date) =>
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const durationMin = Math.round(studyHoursPerSession * 60);
+        const endMin = 19 * 60 + durationMin;
+        const end_time = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
+
+        for (let ei = 0; ei < savedExamIds.length; ei++) {
+          const exam = externalExams[ei];
+          const examId = savedExamIds[ei];
+          if (!exam || !examId) continue;
+
+          const examDateObj = new Date(exam.date + 'T00:00:00');
+          // studyStartDays=0 → 오늘부터 시험 전날까지
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const actualStartDays = studyStartDays === 0
+            ? Math.max(1, Math.ceil((examDateObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
+            : studyStartDays;
+          const candidateDays: string[] = [];
+          for (let d = actualStartDays; d >= 1; d--) {
+            const day = new Date(examDateObj);
+            day.setDate(examDateObj.getDate() - d);
+            candidateDays.push(toDateStr(day));
+          }
+
+          const chosenDays: string[] = [];
+          if (studyDaysPerWeek >= 7) {
+            chosenDays.push(...candidateDays);
+          } else {
+            for (let j = 0; j < candidateDays.length; j += 7) {
+              const week = candidateDays.slice(j, j + 7);
+              chosenDays.push(...week.slice(0, Math.min(studyDaysPerWeek, week.length)));
+            }
+          }
+
+          for (const dateStr of chosenDays) {
+            const jsDay = new Date(dateStr + 'T00:00:00').getDay();
+            const dow = jsDay === 0 ? 6 : jsDay - 1;
+            try {
+              await api.post('/schedules', {
+                title: `📖 ${exam.name} 준비`,
+                day_of_week: dow,
+                date: dateStr,
+                start_time: '19:00',
+                end_time,
+                schedule_type: 'study',
+                schedule_source: 'user_created',
+                linked_exam_id: examId,
+                color: '#059669',
+              });
+            } catch { /* ignore */ }
+          }
         }
       } else {
         // 비대학생 온보딩: chat 답변에서 시험/일정 파싱 후 등록
@@ -404,60 +416,22 @@ export default function OnboardingPage() {
         }
       }
 
-      // 학습 시간표 생성 (시험 등록 성공 시)
-      if (savedExamIds.length > 0) {
-        try {
-          await api.post('/ai/chat', {
-            message: 'generate_exam_prep_schedule \ub4f1\ub85d\ub41c \uc2dc\ud5d8 \uc77c\uc815 \uae30\ubc18\uc73c\ub85c 14\uc77c\uac04 \ud559\uc2b5 \uc2dc\uac04\ud45c\ub97c \ud558\ub8e8 3\uc2dc\uac04\uc529 \uc0dd\uc131\ud574\uc918',
-            messages: [],
-          });
-        } catch { /* ?ㅽ뙣?대룄 ?⑤낫??꾩냽 */ }
-      } else if (finalAnswers.goal_tasks && finalAnswers.goal_tasks !== '없음') {
-        try {
-          await api.post('/ai/chat', {
-            message: `${finalAnswers.goal_tasks} \ubaa9\ud45c\ub85c 7\uc77c\uac04 \ud558\ub8e8 2\uc2dc\uac04\uc529 \ud559\uc2b5 \uc77c\uc815\uc73c\ub85c \ub9cc\ub4e4\uc5b4\uc918`,
-            messages: [],
-          });
-        } catch { /* ?ㅽ뙣?대룄 ?⑤낫??꾩냽 */ }
-      }
-
       setPhase('done');
       setTimeout(() => router.push('/dashboard'), 1800);
     } catch {
       toast.error('\uc124\uc815 \uc800\uc7a5 \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4');
-      setPhase('chat');
+      setPhase('sleep');
     }
   };
 
   const handleTypeSelect = (typeId: string) => {
     setSelectedType(typeId);
-    const typeLabel = USER_TYPES.find((t) => t.id === typeId)?.label || '';
-    setPhase('chat');
-    setStepIdx(0);
-    setMessages([
-      {
-        role: 'ai',
-        text: `${typeLabel}\uc774\uc2dc\uad70\uc694! \ubc18\uac11\uc2b5\ub2c8\ub2e4 \ud83d\udc4b
-
-${MOTIVATIONS[typeId] || ''}
-
-AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc694 \ud83d\uddd3\ufe0f`,
-      },
-      { role: 'ai', text: activeSteps[0].question },
-    ]);
+    setPhase('sleep');
   };
 
   /** 대학생 온보딩: personal-schedule 완료 후 chat 진입 */
   const handleCollegeStartChat = () => {
-    setPhase('chat');
-    setStepIdx(0);
-    setMessages([
-      {
-        role: 'ai',
-        text: '\ub300\ud559\uc0dd\uc774\uc2dc\uad70\uc694! \ubc18\uac11\uc2b5\ub2c8\ub2e4 \ud83d\udc4b\n\uc774\uc81c \ud559\uc2b5 \ubaa9\ud45c\uc640 \uc218\uba74 \uc2dc\uac04\uc744 \uc54c\ub824\uc8fc\uc2dc\uba74 AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \uc644\uc131\ud574\ub4dc\ub9b4\uac8c\uc694',
-      },
-      { role: 'ai', text: CHAT_STEPS_COLLEGE[0].question },
-    ]);
+    setPhase('sleep');
   };
 
   const handleSend = async (text?: string) => {
@@ -578,13 +552,13 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
             </button>
             <div>
               <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>에타 시간표 업로드</h2>
-              <p className="text-xs" style={{ color: '#747684' }}>1단계 / 3단계</p>
+              <p className="text-xs" style={{ color: '#747684' }}>1단계 / 5단계</p>
             </div>
           </div>
 
           {/* Progress */}
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: '33%', background: '#1a4db2' }} />
+            <div className="h-full rounded-full" style={{ width: '20%', background: '#1a4db2' }} />
           </div>
 
           {/* Guide card */}
@@ -660,7 +634,7 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
                 setEtaImage(null);
                 setEtaImagePreview(null);
                 setEtaEntries([]);
-                setPhase('syllabus-upload');
+                setPhase('external-exam');
               }}
               className="flex-1 py-3 rounded-xl text-sm font-semibold border transition-colors"
               style={{ color: '#747684', borderColor: '#ebeef1', background: '#fff' }}
@@ -703,7 +677,7 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
         (e) => e.subject_name.trim() && e.start_time && e.end_time && e.start_time < e.end_time,
       );
       if (valid.length === 0) {
-        setPhase('syllabus-upload');
+        setPhase('external-exam');
         return;
       }
       setEtaSaving(true);
@@ -718,7 +692,7 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
             toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
       } finally {
         setEtaSaving(false);
-        setPhase('syllabus-upload');
+        setPhase('external-exam');
       }
     };
 
@@ -736,13 +710,13 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
             </button>
             <div>
               <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>시간표 확인 및 수정</h2>
-              <p className="text-xs" style={{ color: '#747684' }}>2단계 / 3단계 · AI 분석 결과를 확인하고 수정해주세요</p>
+              <p className="text-xs" style={{ color: '#747684' }}>2단계 / 5단계 · AI 분석 결과를 확인하고 수정해주세요</p>
             </div>
           </div>
 
           {/* Progress */}
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: '66%', background: '#1a4db2' }} />
+            <div className="h-full rounded-full" style={{ width: '40%', background: '#1a4db2' }} />
           </div>
 
           {/* Status banner */}
@@ -949,7 +923,7 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
           {/* Footer */}
           <div className="flex gap-3">
             <button
-              onClick={() => { setEtaEntries([]); setPhase('syllabus-upload'); }}
+              onClick={() => { setEtaEntries([]); setPhase('external-exam'); }}
               className="flex-1 py-3 rounded-xl text-sm font-semibold border"
               style={{ color: '#747684', borderColor: '#ebeef1', background: '#fff' }}
               disabled={etaSaving}
@@ -963,526 +937,6 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
               style={{ background: etaSaving ? '#93c5fd' : '#1a4db2' }}
             >
               {etaSaving ? '저장 중...' : `${etaEntries.filter(e => e.subject_name.trim()).length}개 확인, 다음`}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ?? 과목꾪쉷???낅줈???붾㈃ ??
-  if (phase === 'syllabus-upload') {
-    const formatSize = (bytes: number | null) => {
-      if (!bytes) return '';
-      if (bytes < 1024) return `${bytes}B`;
-      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-      return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
-    };
-
-    // 쇰ぉ꾨줈 ?낅줈?쒕맂 ?뚯씪 몃９??
-    const syllabiBySub = uploadedSyllabi.reduce<Record<string, SyllabusItem[]>>((acc, s) => {
-      if (!acc[s.subject_name]) acc[s.subject_name] = [];
-      acc[s.subject_name].push(s);
-      return acc;
-    }, {});
-
-    // eta?먯꽌 붿텧???좊땲??쇰ぉ?⑸줉
-    const etaSubjects = Array.from(new Set(etaEntries.map((e) => e.subject_name).filter(Boolean)));
-
-    // ?낅줈????꾩꽍 ?곹깭 덇린???ы띁
-    const markPending = (id: number) =>
-      setAnalysisStatuses((prev) => ({ ...prev, [id]: 'pending' }));
-
-    // 쇰ぉ??낅줈???몃뱾??
-    const handleSubjectUpload = async (subjectName: string, file: File) => {
-      setSubjectUploadingMap((prev) => ({ ...prev, [subjectName]: true }));
-      try {
-        const item = await uploadSyllabus.mutateAsync({
-          subjectName,
-          file,
-          source: 'syllabus_upload',
-        });
-        setUploadedSyllabi((prev) => [...prev, item]);
-        markPending(item.id);
-        toast.success(`${subjectName} 강의계획서 업로드 완료 · AI 분석 시작`);
-      } catch {
-        toast.error('업로드에 실패했습니다. 파일 크기(20MB 이하) 및 형식(PDF/이미지)을 확인해주세요');
-      } finally {
-        setSubjectUploadingMap((prev) => ({ ...prev, [subjectName]: false }));
-      }
-    };
-
-    // ?섎룞 ?낅젰 ?낅줈???몃뱾??
-    const handleManualUpload = async () => {
-      if (!syllabusSubject.trim() || !syllabusFile) return;
-      setIsUploading(true);
-      try {
-        const item = await uploadSyllabus.mutateAsync({
-          subjectName: syllabusSubject.trim(),
-          file: syllabusFile,
-          source: 'syllabus_upload',
-        });
-        setUploadedSyllabi((prev) => [...prev, item]);
-        markPending(item.id);
-        setSyllabusSubject('');
-        setSyllabusFile(null);
-        if (syllabusInputRef.current) syllabusInputRef.current.value = '';
-        toast.success(`${item.subject_name} 강의계획서 업로드 완료 · AI 분석 시작`);
-      } catch {
-        toast.error('업로드에 실패했습니다.');
-      } finally {
-        setIsUploading(false);
-      }
-    };
-
-    // ?щ텇???몃뱾??
-    const handleReAnalyze = async (syllabusId: number) => {
-      setAnalysisStatuses((prev) => ({ ...prev, [syllabusId]: 'pending' }));
-      try {
-        await reAnalyzeSyllabus.mutateAsync(syllabusId);
-        toast.success('다시 분석을 시작했습니다.');
-      } catch {
-        toast.error('다시 분석 요청이 실패했습니다.');
-        setAnalysisStatuses((prev) => ({ ...prev, [syllabusId]: 'failed' }));
-      }
-    };
-
-    // 꾩꽍 ?곹깭 곗? 댄룷?뚰듃
-    const AnalysisBadge = ({ syllabusId }: { syllabusId: number }) => {
-      const statusInState = analysisStatuses[syllabusId];
-      if (!statusInState) return null;
-
-      if (statusInState === 'pending') {
-        return (
-          <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>
-            <span className="w-2.5 h-2.5 border border-t-transparent rounded-full animate-spin inline-block" style={{ borderColor: '#d97706', borderTopColor: 'transparent' }} />
-            분석 중
-          </span>
-        );
-      }
-      if (statusInState === 'success' || statusInState === 'partial') {
-        return (
-          <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: '#d1fae5', color: '#065f46' }}>
-            <span className="ms text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-            분석 완료
-          </span>
-        );
-      }
-      if (statusInState === 'quota_exceeded') {
-        return (
-          <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>
-            <span className="ms text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
-            AI 일일 한도 초과 · 내일 다시 시도
-          </span>
-        );
-      }
-      if (statusInState === 'failed') {
-        return (
-          <button
-            onClick={() => handleReAnalyze(syllabusId)}
-            className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-colors"
-            style={{ background: '#fee2e2', color: '#dc2626', border: 'none', cursor: 'pointer' }}
-          >
-            <span className="ms text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>refresh</span>
-            다시 분석
-          </button>
-        );
-      }
-      return null;
-    };
-
-    // ?시험 ?먮룞 ?깅줉 ?몃뱾??
-    const handleAutoCreateExam = async (syllabusId: number) => {
-      try {
-        const result = await autoCreateExam.mutateAsync({ syllabusId, semesterStartDate: semesterStartDate || undefined });
-        setExamRegistered((prev) => ({ ...prev, [syllabusId]: true }));
-        if (result.created > 0) {
-          toast.success(`${result.created}개 시험 일정을 등록했습니다 🎉`);
-        } else if (result.exams.length > 0) {
-          toast('시험 일정이 이미 등록되어 있습니다.');
-        } else {
-          toast('시험 날짜 정보가 없습니다. 학기 시작일을 입력하면 주차 기반으로 계산됩니다.');
-        }
-      } catch {
-        toast.error('시험 등록에 실패했습니다.');
-      }
-    };
-
-    // 꾩꽍 ?꾨즺 ???꾨━??⑤꼸
-    const AnalysisPreviewPanel = ({ syllabusId }: { syllabusId: number }) => {
-      const result = analysisResults[syllabusId];
-      const status = analysisStatuses[syllabusId];
-      if (!result || (status !== 'success' && status !== 'partial')) return null;
-
-      const eval_ = result.evaluation;
-      const exams = result.exam_schedule || [];
-      const hasExamInfo = exams.length > 0 || result.midterm_week || result.final_week;
-      const alreadyRegistered = examRegistered[syllabusId];
-
-      return (
-        <div className="mt-2 rounded-xl overflow-hidden" style={{ background: '#f7fafd', border: '1px solid #ebeef1' }}>
-          {/* ?됯? 꾩쑉 */}
-          {eval_ && (
-            <div className="px-3 py-2.5" style={{ borderBottom: hasExamInfo ? '1px solid #f1f4f7' : 'none' }}>
-              <p className="text-xs font-bold mb-1.5" style={{ color: '#434653' }}>평가 구성</p>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { label: '중간', value: eval_.midterm },
-                  { label: '기말', value: eval_.final },
-                  { label: '과제', value: eval_.assignment },
-                  { label: '출석', value: eval_.attendance },
-                  { label: '발표', value: eval_.presentation },
-                ]
-                  .filter((item) => item.value != null && item.value > 0)
-                  .map((item) => (
-                    <span key={item.label} className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: '#eef1ff', color: '#1a4db2' }}>
-                      {item.label} {item.value}%
-                    </span>
-                  ))}
-              </div>
-            </div>
-          )}
-          {/* ?시험 ?일정 + ?깅줉 꾪듉 */}
-          {hasExamInfo && (
-            <div className="px-3 py-2.5">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-bold" style={{ color: '#434653' }}>시험 일정</p>
-                <button
-                  onClick={() => handleAutoCreateExam(syllabusId)}
-                  disabled={alreadyRegistered || autoCreateExam.isPending}
-                  className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg transition-colors"
-                  style={{
-                    background: alreadyRegistered ? '#d1fae5' : '#1a4db2',
-                    color: alreadyRegistered ? '#065f46' : '#fff',
-                    border: 'none',
-                    cursor: alreadyRegistered ? 'default' : 'pointer',
-                    opacity: autoCreateExam.isPending ? 0.6 : 1,
-                  }}
-                >
-                  <span className="ms text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    {alreadyRegistered ? 'check_circle' : 'add_circle'}
-                  </span>
-                  {alreadyRegistered ? '등록 완료' : '시험 등록'}
-                </button>
-              </div>
-              {exams.length > 0 ? (
-                <div className="space-y-1">
-                  {exams.map((e, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs" style={{ color: '#434653' }}>
-                      <span className="ms text-xs" style={{ color: '#1a4db2', fontVariationSettings: "'FILL' 1" }}>event</span>
-                      <span className="font-semibold">{e.type === 'midterm' ? '중간고사' : e.type === 'final' ? '기말고사' : String(e.type)}</span>
-                      <span style={{ color: '#747684' }}>{String(e.date || '')}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs" style={{ color: '#747684' }}>
-                  {result.midterm_week && `중간고사: ${result.midterm_week}주차`}
-                  {result.midterm_week && result.final_week && ' / '}
-                  {result.final_week && `기말고사: ${result.final_week}주차`}
-                  {!semesterStartDate && ' (학기 시작일 입력 시 날짜 자동 계산)'}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    // ??젣: ?ㅼ젣 DELETE API ?몄텧 + 쒖뺄 state ?숆린??
-    const handleRemoveSyllabus = async (id: number) => {
-      try {
-        await api.delete(`/syllabi/${id}`);
-        setUploadedSyllabi((prev) => prev.filter((s) => s.id !== id));
-      } catch {
-        toast.error('삭제에 실패했습니다.');
-      }
-    };
-
-    // ??숈깮 + eta 쇰ぉ ?덈뒗 경우: 쇰ぉ ?곌껐 UI
-    const useSubjectLinkedUI = isCollegeStudent && etaSubjects.length > 0;
-
-    const backTarget: Phase = isCollegeStudent ? 'eta-review' : 'college-check';
-
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: 'linear-gradient(135deg, #f7fafd 0%, #eef1ff 100%)' }}>
-        {/* ?④꺼??뚯씪 ?낅젰 ??쇰ぉ??낅줈??듭슜 */}
-        <input
-          ref={syllabusInputRef}
-          type="file"
-          className="hidden"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
-          onChange={async (e) => {
-            const f = e.target.files?.[0];
-            e.target.value = '';
-            if (!f) return;
-            if (pendingUploadSubject) {
-              await handleSubjectUpload(pendingUploadSubject, f);
-              setPendingUploadSubject(null);
-            } else {
-              setSyllabusFile(f);
-            }
-          }}
-        />
-
-        <div className="w-full max-w-lg">
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-6">
-            <button
-              onClick={() => setPhase(backTarget)}
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: '#fff', border: '1px solid #ebeef1' }}
-            >
-              <span className="ms text-lg" style={{ color: '#434653' }}>arrow_back</span>
-            </button>
-            <div>
-              <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>강의계획서 업로드</h2>
-              <p className="text-xs" style={{ color: '#747684' }}>
-                {useSubjectLinkedUI ? '3단계 / 3단계 · 선택 사항' : '선택 사항 · 나중에 추가할 수도 있어요'}
-              </p>
-            </div>
-          </div>
-
-          {/* Progress */}
-          {useSubjectLinkedUI && (
-            <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-              <div className="h-full rounded-full" style={{ width: '100%', background: '#1a4db2' }} />
-            </div>
-          )}
-
-          {/* Info banner */}
-          <div className="rounded-2xl p-4 mb-5 flex items-start gap-3" style={{ background: '#eef1ff', border: '1px solid #c3d0ff' }}>
-            <span className="ms text-2xl flex-shrink-0 mt-0.5" style={{ color: '#1a4db2', fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-            <div>
-              <p className="text-sm font-bold mb-1" style={{ color: '#1a4db2' }}>강의계획서로 AI가 더 정확하게 분석해요</p>
-              <p className="text-xs leading-relaxed" style={{ color: '#434653' }}>
-                시험 일정, 과제 분량, 주차별 내용을 분석해서 더 스마트한 학습 계획을 만들어요. PDF나 이미지를 지원합니다.
-              </p>
-            </div>
-          </div>
-
-          {/* ?숆린 ?쒖옉???낅젰 */}
-          <div className="rounded-2xl p-4 mb-4" style={{ background: '#fff', border: '1px solid #ebeef1', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="ms text-base" style={{ color: '#1a4db2', fontVariationSettings: "'FILL' 1" }}>calendar_today</span>
-              <p className="text-sm font-bold" style={{ color: '#181c1e' }}>학기 시작일</p>
-              <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: '#f1f4f7', color: '#747684' }}>선택</span>
-            </div>
-            <p className="text-xs mb-3" style={{ color: '#747684' }}>시험 주차의 실제 날짜를 자동 계산할 때 사용합니다</p>
-            <input
-              type="date"
-              value={semesterStartDate}
-              onChange={(e) => setSemesterStartDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm border-2 rounded-xl outline-none transition-colors"
-              style={{ borderColor: semesterStartDate ? '#1a4db2' : '#ebeef1', color: '#181c1e' }}
-              onFocus={(e) => e.target.style.borderColor = '#1a4db2'}
-              onBlur={(e) => e.target.style.borderColor = semesterStartDate ? '#1a4db2' : '#ebeef1'}
-            />
-          </div>
-
-          {/* ?? 쇰ぉ ?곌껐 UI (??숈깮 + eta 쇰ぉ ?덉쓣 ?? ?? */}
-          {useSubjectLinkedUI && (
-            <div className="rounded-2xl overflow-hidden mb-4" style={{ background: '#fff', border: '1px solid #ebeef1', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #f1f4f7', background: '#fafbfc' }}>
-                <p className="text-sm font-bold" style={{ color: '#181c1e' }}>등록된 과목</p>
-                <p className="text-xs" style={{ color: '#747684' }}>{etaSubjects.length}개 과목</p>
-              </div>
-
-              <div className="divide-y" style={{ borderColor: '#f1f4f7' }}>
-                {etaSubjects.map((subjectName) => {
-                  const files = syllabiBySub[subjectName] || [];
-                  const isLoading = subjectUploadingMap[subjectName] ?? false;
-
-                  return (
-                    <div key={subjectName} className="p-4">
-                      {/* 쇰ぉ?+ ?곹깭 */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="ms text-base" style={{ color: '#1a4db2', fontVariationSettings: "'FILL' 1" }}>
-                            {files.length > 0 ? 'task_alt' : 'menu_book'}
-                          </span>
-                          <span className="text-sm font-bold" style={{ color: '#181c1e' }}>{subjectName}</span>
-                        </div>
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                          background: files.length > 0 ? '#d1fae5' : '#f1f4f7',
-                          color: files.length > 0 ? '#065f46' : '#747684',
-                        }}>
-                          {files.length > 0 ? `${files.length}개 파일` : '없음'}
-                        </span>
-                      </div>
-
-                      {/* ?낅줈?쒕맂 ?뚯씪 ⑸줉 */}
-                      {files.length > 0 && (
-                        <div className="space-y-1.5 mb-2">
-                          {files.map((f) => (
-                            <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: '#f7fafd', border: '1px solid #ebeef1' }}>
-                              <span className="ms text-sm flex-shrink-0" style={{ color: '#1a4db2', fontVariationSettings: "'FILL' 1" }}>description</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold truncate" style={{ color: '#181c1e' }}>{f.original_filename}</p>
-                                <p className="text-xs" style={{ color: '#9ca3af' }}>
-                                  {formatSize(f.file_size)}{f.file_size ? ' 쨌 ' : ''}{new Date(f.uploaded_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                              </div>
-                              <AnalysisBadge syllabusId={f.id} />
-                              <button
-                                onClick={() => handleRemoveSyllabus(f.id)}
-                                className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-colors"
-                                style={{ background: '#fee2e2', color: '#dc2626' }}
-                                title="??젣"
-                              >
-                                <span className="ms text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>close</span>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* ?낅줈??꾪듉 */}
-                      <button
-                        onClick={() => {
-                          setPendingUploadSubject(subjectName);
-                          syllabusInputRef.current?.click();
-                        }}
-                        disabled={isLoading}
-                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                        style={{
-                          background: isLoading ? '#f1f4f7' : '#eef1ff',
-                          color: isLoading ? '#9ca3af' : '#1a4db2',
-                          border: 'none',
-                          cursor: isLoading ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        {isLoading ? (
-                          <>
-                            <div className="w-3 h-3 border border-t-transparent rounded-full animate-spin" style={{ borderColor: '#9ca3af', borderTopColor: 'transparent' }} />
-                            ?낅줈???..
-                          </>
-                        ) : (
-                          <>
-                            <span className="ms text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>attach_file</span>
-                            {files.length > 0 ? '파일 추가' : '파일 선택'}
-                          </>
-                        )}
-                      </button>
-
-                      {/* 꾩꽍 곌낵 ?꾨━?(?낅줈?쒕맂 ?뚯씪덈떎) */}
-                      {files.map((f) => <AnalysisPreviewPanel key={f.id} syllabusId={f.id} />)}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* 곸젒 붽? ?좉? */}
-              <div className="px-4 py-3" style={{ borderTop: '1px solid #f1f4f7' }}>
-                <button
-                  onClick={() => setShowManualInput((v) => !v)}
-                  className="flex items-center gap-1.5 text-xs font-semibold"
-                  style={{ color: '#747684', background: 'none', border: 'none', cursor: 'pointer' }}
-                >
-                  <span className="ms text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    {showManualInput ? 'expand_less' : 'expand_more'}
-                  </span>
-                  목록에 없는 과목 직접 추가
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ?? ?섎룞 ?낅젰 ??(꾨??숈깮 ?먮뒗 곸젒 붽? ?좉? ?? ?? */}
-          {(!useSubjectLinkedUI || showManualInput) && (
-            <div className="rounded-2xl p-4 mb-4" style={{ background: '#fff', border: '1px solid #ebeef1', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <p className="text-sm font-bold mb-3" style={{ color: '#181c1e' }}>
-                {useSubjectLinkedUI ? '직접 과목 입력' : '강의계획서 추가'}
-              </p>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none transition-colors"
-                  style={{ borderColor: '#ebeef1' }}
-                  onFocus={(e) => e.target.style.borderColor = '#1a4db2'}
-                  onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
-                  placeholder="과목명 (예: 자료구조, 운영체제)"
-                  value={syllabusSubject}
-                  onChange={(e) => setSyllabusSubject(e.target.value)}
-                />
-                <div
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-colors"
-                  style={{ borderColor: syllabusFile ? '#1a4db2' : '#d1d5db', background: syllabusFile ? '#eef1ff' : '#fafbfc' }}
-                  onClick={() => { setPendingUploadSubject(null); syllabusInputRef.current?.click(); }}
-                >
-                  <span className="ms text-xl flex-shrink-0" style={{ color: syllabusFile ? '#1a4db2' : '#9ca3af', fontVariationSettings: "'FILL' 1" }}>
-                    {syllabusFile ? 'description' : 'upload_file'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    {syllabusFile ? (
-                      <p className="text-sm font-semibold truncate" style={{ color: '#1a4db2' }}>{syllabusFile.name}</p>
-                    ) : (
-                      <p className="text-sm" style={{ color: '#9ca3af' }}>PDF, 이미지 파일 선택 (최대 20MB)</p>
-                    )}
-                  </div>
-                  {syllabusFile && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setSyllabusFile(null); }}
-                      style={{ color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}
-                    >×</button>
-                  )}
-                </div>
-                <button
-                  onClick={handleManualUpload}
-                  disabled={!syllabusSubject.trim() || !syllabusFile || isUploading}
-                  className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all"
-                  style={{
-                    background: (!syllabusSubject.trim() || !syllabusFile || isUploading) ? '#d1d5db' : '#1a4db2',
-                    cursor: (!syllabusSubject.trim() || !syllabusFile || isUploading) ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {isUploading ? '업로드 중...' : '+ 강의계획서 추가'}
-                </button>
-              </div>
-
-              {/* 꾨??숈깮: ?낅줈?쒕맂 ?뚯씪 ⑸줉 (쇰ぉ ?곌껐 UI?먯꽑 대뱶?먯꽌 ? */}
-              {!useSubjectLinkedUI && uploadedSyllabi.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs font-bold mb-2" style={{ color: '#747684' }}>업로드 완료 ({uploadedSyllabi.length}개)</p>
-                  {uploadedSyllabi.map((s) => (
-                    <div key={s.id}>
-                      <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: '#f7fafd', border: '1px solid #ebeef1' }}>
-                        <span className="ms text-lg flex-shrink-0" style={{ color: '#1a4db2', fontVariationSettings: "'FILL' 1" }}>description</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold truncate" style={{ color: '#181c1e' }}>{s.subject_name}</p>
-                          <p className="text-xs truncate" style={{ color: '#747684' }}>
-                            {s.original_filename}{s.file_size ? ` 쨌 ${formatSize(s.file_size)}` : ''}
-                          </p>
-                        </div>
-                        <AnalysisBadge syllabusId={s.id} />
-                        <button
-                          onClick={() => handleRemoveSyllabus(s.id)}
-                          style={{ color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, flexShrink: 0 }}
-                        >×</button>
-                      </div>
-                      <AnalysisPreviewPanel syllabusId={s.id} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className="flex gap-3">
-            <button
-              onClick={() => setPhase(isCollegeStudent ? 'external-exam' : 'type-select')}
-              className="flex-1 py-3 rounded-xl text-sm font-semibold border"
-              style={{ color: '#747684', borderColor: '#ebeef1', background: '#fff' }}
-            >
-              건너뛰기
-            </button>
-            <button
-              onClick={() => setPhase(isCollegeStudent ? 'external-exam' : 'type-select')}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-white"
-              style={{ background: '#1a4db2' }}
-            >
-              {uploadedSyllabi.length > 0 ? `${uploadedSyllabi.length}개 완료 →` : '나중에 추가하고 계속'}
             </button>
           </div>
         </div>
@@ -1545,13 +999,16 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
 
   // ?? ?몃? ?시험 ?낅젰 ?붾㈃ (??숈깮 ?꾩슜 STEP 4) ??
   if (phase === 'external-exam') {
-    const EXAM_EXAMPLES = ['토익', '정보처리기사', '수능', '공무원', '어학'];
+    const EXAM_EXAMPLES = ['중간고사', '기말고사', '토익', '정보처리기사', '자격증', '프로젝트 발표'];
+    const DAYS_OPTIONS = [0, 7, 14, 21, 30, 60] as const;
+    const DAYS_PER_WEEK_OPTIONS = [1, 2, 3, 4, 5, 6, 7] as const;
+    const fmtHours = (h: number) => h < 1 ? `${h * 60}분` : h % 1 === 0 ? `${h}시간` : `${Math.floor(h)}시간 ${(h % 1) * 60}분`;
     const canAddExam = examDraft.name.trim() && examDraft.date;
 
     const addExam = () => {
       if (!canAddExam) return;
       setExternalExams((prev) => [...prev, { ...examDraft, _id: `ex-${Date.now()}` }]);
-      setExamDraft({ name: '', date: '', status: 'studying', progress: '', weak_parts: '' });
+      setExamDraft({ name: '', date: '' });
     };
 
     return (
@@ -1559,7 +1016,7 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
         <div className="w-full max-w-lg">
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
-            <button onClick={() => setPhase('syllabus-upload')} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#fff', border: '1px solid #ebeef1' }}>
+            <button onClick={() => setPhase('eta-review')} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#fff', border: '1px solid #ebeef1' }}>
               <span className="ms text-lg" style={{ color: '#434653' }}>arrow_back</span>
             </button>
             <div>
@@ -1586,7 +1043,7 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
               ))}
             </div>
 
-            {/* ?낅젰 ?꾨뱶 */}
+            {/* 입력 폼 */}
             <div className="space-y-3">
               <input
                 className="w-full px-4 py-2.5 text-sm border-2 rounded-xl outline-none"
@@ -1606,34 +1063,6 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
                 onFocus={(e) => e.target.style.borderColor = '#1a4db2'}
                 onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
               />
-              {/* ?꾩옱 ?곹깭 */}
-              <div className="flex gap-2">
-                {(['starting', 'studying'] as const).map((s) => (
-                  <button key={s} onClick={() => setExamDraft((d) => ({ ...d, status: s }))}
-                    className="flex-1 py-2 text-xs rounded-xl font-semibold border-2 transition-colors"
-                    style={{ borderColor: examDraft.status === s ? '#1a4db2' : '#ebeef1', background: examDraft.status === s ? '#eef1ff' : '#fff', color: examDraft.status === s ? '#1a4db2' : '#747684' }}>
-                    {s === 'starting' ? '처음 시작' : '공부 중'}
-                  </button>
-                ))}
-              </div>
-              <input
-                className="w-full px-4 py-2.5 text-sm border-2 rounded-xl outline-none"
-                style={{ borderColor: '#ebeef1' }}
-                placeholder="현재 진도 (예: 3장 완료)"
-                value={examDraft.progress}
-                onChange={(e) => setExamDraft((d) => ({ ...d, progress: e.target.value }))}
-                onFocus={(e) => e.target.style.borderColor = '#1a4db2'}
-                onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
-              />
-              <input
-                className="w-full px-4 py-2.5 text-sm border-2 rounded-xl outline-none"
-                style={{ borderColor: '#ebeef1' }}
-                placeholder="취약 파트 (예: 그래프, DP)"
-                value={examDraft.weak_parts}
-                onChange={(e) => setExamDraft((d) => ({ ...d, weak_parts: e.target.value }))}
-                onFocus={(e) => e.target.style.borderColor = '#1a4db2'}
-                onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
-              />
               <button onClick={addExam} disabled={!canAddExam}
                 className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
                 style={{ background: canAddExam ? '#1a4db2' : '#d1d5db', cursor: canAddExam ? 'pointer' : 'not-allowed' }}>
@@ -1642,20 +1071,73 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
             </div>
           </div>
 
-          {/* 붽????시험 ⑸줉 */}
+          {/* 추가된 시험 목록 */}
           {externalExams.length > 0 && (
             <div className="space-y-2 mb-5">
               {externalExams.map((ex) => (
                 <div key={ex._id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: '#eef1ff', border: '1px solid #c3d0ff' }}>
                   <div>
                     <p className="text-sm font-semibold" style={{ color: '#1a4db2' }}>{ex.name}</p>
-                    <p className="text-xs" style={{ color: '#434653' }}>{ex.date} · {ex.status === 'starting' ? '처음 시작' : '공부 중'}</p>
+                    <p className="text-xs" style={{ color: '#434653' }}>{ex.date}</p>
                   </div>
                   <button onClick={() => setExternalExams((prev) => prev.filter((e) => e._id !== ex._id))}>
                     <span className="ms text-base" style={{ color: '#747684' }}>close</span>
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* 공부 블록 설정 — 시험이 하나라도 있을 때만 표시 */}
+          {externalExams.length > 0 && (
+            <div className="rounded-2xl p-5 mb-5" style={{ background: '#fff', border: '1px solid #d1fae5', boxShadow: '0 2px 12px rgba(5,150,105,0.06)' }}>
+              <p className="font-bold text-sm mb-1" style={{ color: '#065f46' }}>📖 공부 일정 자동 배치</p>
+              <p className="text-xs mb-4" style={{ color: '#747684' }}>캘린더 빈 시간에 공부 블록을 자동으로 넣어드려요</p>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold mb-2" style={{ color: '#434653' }}>몇 일 전부터</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DAYS_OPTIONS.map((d) => (
+                      <button key={d} type="button"
+                        onClick={() => setStudyStartDays(d)}
+                        className="py-2 text-xs font-semibold rounded-lg border-2 transition-colors"
+                        style={{ minWidth: 52, padding: '6px 10px', borderColor: studyStartDays === d ? '#059669' : '#ebeef1', background: studyStartDays === d ? '#d1fae5' : '#fff', color: studyStartDays === d ? '#059669' : '#747684' }}>
+                        {d === 0 ? '오늘부터' : `D-${d}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold mb-2" style={{ color: '#434653' }}>주 몇 일</p>
+                  <div className="flex gap-1.5">
+                    {DAYS_PER_WEEK_OPTIONS.map((d) => (
+                      <button key={d} type="button"
+                        onClick={() => setStudyDaysPerWeek(d)}
+                        className="flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-colors"
+                        style={{ borderColor: studyDaysPerWeek === d ? '#059669' : '#ebeef1', background: studyDaysPerWeek === d ? '#d1fae5' : '#fff', color: studyDaysPerWeek === d ? '#059669' : '#747684' }}>
+                        {d === 7 ? '매일' : `${d}일`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold mb-2" style={{ color: '#434653' }}>회당 공부 시간</p>
+                  <select
+                    value={studyHoursPerSession}
+                    onChange={(e) => setStudyHoursPerSession(Number(e.target.value))}
+                    className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
+                    style={{ borderColor: '#c3d0ff', background: '#f8f9ff', color: '#181c1e' }}
+                  >
+                    {Array.from({ length: 24 }, (_, i) => (i + 1) * 0.5).map((h) => (
+                      <option key={h} value={h}>{fmtHours(h)}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs" style={{ color: '#9ca3af', lineHeight: 1.6 }}>
+                  각 시험 {studyStartDays === 0 ? '오늘' : `D-${studyStartDays}`}부터 주 {studyDaysPerWeek === 7 ? '매일' : `${studyDaysPerWeek}일`}, 19:00 기준 빈 시간에 {fmtHours(studyHoursPerSession)}씩 자동 배치됩니다
+                </p>
+              </div>
             </div>
           )}
 
@@ -1706,6 +1188,7 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
             <div className="h-full rounded-full" style={{ width: '80%', background: '#1a4db2' }} />
+            {/* personal-schedule = 4/5 = 80% */}
           </div>
 
           <div className="rounded-2xl p-5 mb-5" style={{ background: '#fff', boxShadow: '0 4px 24px rgba(26,77,178,0.08)', border: '1px solid #ebeef1' }}>
@@ -1847,7 +1330,7 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
             <button
-              onClick={() => setPhase(isCollegeStudent ? 'syllabus-upload' : 'college-check')}
+              onClick={() => setPhase('college-check')}
               className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
               style={{ background: '#fff', border: '1px solid #ebeef1' }}
             >
@@ -1907,7 +1390,152 @@ AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \ub9cc\ub4e4\uc5b4\ub4dc\ub9b4\uac8c\uc
     );
   }
 
-  // ?? 꾪똿 ?붾㈃ ??
+  // 수면 시간 입력 화면
+  if (phase === 'sleep') {
+    const backTarget = isCollegeStudent ? 'personal-schedule' : 'type-select';
+    const handleSleepSubmit = () => {
+      finishOnboarding({}, { sleep_start: sleepStart, sleep_end: sleepEnd });
+    };
+
+    const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
+    const fmtHour = (h: number) => `${String(h).padStart(2, '0')}:00`;
+
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: 'linear-gradient(135deg, #f7fafd 0%, #eef1ff 100%)' }}>
+        <div className="w-full max-w-md">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-6">
+            <button
+              onClick={() => setPhase(backTarget)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: '#fff', border: '1px solid #ebeef1' }}
+            >
+              <span className="ms text-lg" style={{ color: '#434653' }}>arrow_back</span>
+            </button>
+            <div>
+              <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>수면 시간 설정</h2>
+              <p className="text-xs" style={{ color: '#747684' }}>{isCollegeStudent ? '5단계 / 5단계' : '마지막 단계'}</p>
+            </div>
+          </div>
+
+          {/* Progress */}
+          <div className="w-full h-1.5 rounded-full mb-8" style={{ background: '#ebeef1' }}>
+            <div className="h-full rounded-full" style={{ width: '100%', background: '#1a4db2' }} />
+          </div>
+
+          {/* Card */}
+          <div className="rounded-2xl p-6 mb-6" style={{ background: '#fff', boxShadow: '0 4px 24px rgba(26,77,178,0.08)', border: '1px solid #ebeef1' }}>
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#eef1ff' }}>
+                <span className="ms text-xl" style={{ color: '#1a4db2', fontVariationSettings: "'FILL' 1" }}>bedtime</span>
+              </div>
+              <p className="font-bold text-base" style={{ color: '#181c1e' }}>평소 수면 패턴을 알려주세요</p>
+            </div>
+
+            {/* 취침 시간 */}
+            <div className="mb-5">
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#434653' }}>
+                <span className="ms text-base align-middle mr-1" style={{ color: '#1a4db2' }}>nights_stay</span>
+                취침 시간
+              </label>
+              <select
+                value={sleepStart}
+                onChange={(e) => setSleepStart(e.target.value)}
+                className="w-full px-4 py-3 text-sm rounded-xl border-2 outline-none font-medium"
+                style={{ borderColor: '#c3d0ff', background: '#f8f9ff', color: '#181c1e' }}
+              >
+                {HOUR_OPTIONS.map((h) => (
+                  <option key={h} value={fmtHour(h)}>
+                    {h === 0 ? '자정 (00:00)' : h < 12 ? `오전 ${h}시` : h === 12 ? '정오 (12:00)' : `오후 ${h - 12}시 (${String(h).padStart(2,'0')}:00)`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 기상 시간 */}
+            <div>
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#434653' }}>
+                <span className="ms text-base align-middle mr-1" style={{ color: '#f59e0b' }}>wb_sunny</span>
+                기상 시간
+              </label>
+              <select
+                value={sleepEnd}
+                onChange={(e) => setSleepEnd(e.target.value)}
+                className="w-full px-4 py-3 text-sm rounded-xl border-2 outline-none font-medium"
+                style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#181c1e' }}
+              >
+                {HOUR_OPTIONS.map((h) => (
+                  <option key={h} value={fmtHour(h)}>
+                    {h === 0 ? '자정 (00:00)' : h < 12 ? `오전 ${h}시` : h === 12 ? '정오 (12:00)' : `오후 ${h - 12}시 (${String(h).padStart(2,'0')}:00)`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 수면 시간 요약 */}
+            {(() => {
+              const startH = parseInt(sleepStart.split(':')[0]);
+              const endH = parseInt(sleepEnd.split(':')[0]);
+              const hours = endH > startH ? endH - startH : 24 - startH + endH;
+              const isValid = hours >= 6;
+              return (
+                <div className="mt-4 px-4 py-3 rounded-xl flex items-center gap-2" style={{ background: isValid ? '#f0fdf4' : '#fff7ed', border: `1px solid ${isValid ? '#bbf7d0' : '#fed7aa'}` }}>
+                  <span className="ms text-base" style={{ color: isValid ? '#16a34a' : '#ea580c', fontVariationSettings: "'FILL' 1" }}>
+                    {isValid ? 'check_circle' : 'warning'}
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: isValid ? '#15803d' : '#c2410c' }}>
+                    {isValid ? `${hours}시간 수면 · 권장 범위예요` : `${hours}시간 수면 · 최소 6시간 이상 권장해요`}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Quick presets */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {[
+              { label: '밤 11시 · 아침 7시', start: '23:00', end: '07:00' },
+              { label: '자정 · 아침 8시', start: '00:00', end: '08:00' },
+              { label: '새벽 1시 · 아침 8시', start: '01:00', end: '08:00' },
+            ].map((p) => (
+              <button
+                key={p.label}
+                onClick={() => { setSleepStart(p.start); setSleepEnd(p.end); }}
+                className="px-3 py-1.5 text-xs rounded-full font-medium border-2 transition-all"
+                style={{
+                  borderColor: sleepStart === p.start && sleepEnd === p.end ? '#1a4db2' : '#c3d0ff',
+                  color: sleepStart === p.start && sleepEnd === p.end ? '#1a4db2' : '#434653',
+                  background: sleepStart === p.start && sleepEnd === p.end ? '#eef1ff' : '#f0f4ff',
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleSkip}
+              className="flex-1 py-3 rounded-xl text-sm font-semibold border"
+              style={{ color: '#747684', borderColor: '#ebeef1', background: '#fff' }}
+            >
+              건너뛰기
+            </button>
+            <button
+              onClick={handleSleepSubmit}
+              className="flex-1 py-3 rounded-xl text-sm font-bold text-white"
+              style={{ background: '#1a4db2' }}
+            >
+              완료 →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 채팅 화면 (레거시 — 직접 접근 시 fallback)
   const currentStep = activeSteps[stepIdx];
   const progress = (stepIdx / activeSteps.length) * 100;
 
