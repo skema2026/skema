@@ -8,10 +8,10 @@ from app.db.database import Base
 
 
 class ChatRole(str, enum.Enum):
-    """AI 채팅 역할. OpenAI/Gemini 컨벤션 준수."""
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
+    """AI 채팅 역할. DB enum(chatrole)은 대문자 저장."""
+    USER = "USER"
+    ASSISTANT = "ASSISTANT"
+    SYSTEM = "SYSTEM"
 
 
 class AIChatLog(Base):

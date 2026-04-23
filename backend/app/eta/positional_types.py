@@ -29,6 +29,10 @@ class GridModel:
     start_hour: int = 9
     start_minute: int = 30   # was 0; changed to 30 to fix systematic -30 min offset
     minutes_per_step: int = 30
+    # Direct pixel calibration for (top_y - header_bottom) / pixels_per_slot calculation
+    header_bottom: int = 0        # y-pixel where content grid starts (below day-header row)
+    pixels_per_slot: float = 0.0  # pixels per 30-minute slot; 0 means not calibrated
+    grid_origin_y: int = 0        # y-pixel corresponding to slot 0 (09:00); may be above header_bottom
 
 
 @dataclass

@@ -37,3 +37,15 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+
+
+class ReadinessSummaryRequest(BaseModel):
+    exam_title: str
+    readiness_pct: int
+    days_left: int
+    available_hrs: float
+    remaining: int
+
+
+class ReadinessSummaryResponse(BaseModel):
+    summary: str

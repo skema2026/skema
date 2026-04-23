@@ -31,7 +31,40 @@ def get_schedule_or_404(db: Session, schedule_id: int, user_id: int) -> Schedule
     return schedule
 
 
+def _check_no_conflict(
+    db: Session,
+    user_id: int,
+    start_time: str,
+    end_time: str,
+    date: str | None,
+    day_of_week: int | None,
+    exclude_id: int | None = None,
+) -> None:
+    """새 일정이 기존 일정과 시간이 겹치면 409를 발생시킨다."""
+    existing = repository.get_schedules(db, user_id)
+    for s in existing:
+        if exclude_id is not None and s.id == exclude_id:
+            continue
+        same_day = False
+        if date and s.date:
+            same_day = date == s.date
+        elif date is None and s.date is None:
+            same_day = day_of_week == s.day_of_week
+        elif date and s.date is None:
+            date_dow = datetime.strptime(date, "%Y-%m-%d").weekday()
+            same_day = date_dow == s.day_of_week
+        elif date is None and s.date:
+            date_dow = datetime.strptime(s.date, "%Y-%m-%d").weekday()
+            same_day = date_dow == day_of_week
+        if same_day and _overlap(start_time, end_time, s.start_time, s.end_time):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"'{s.title}' 일정과 시간이 겹칩니다. ({s.start_time}~{s.end_time})",
+            )
+
+
 def create_schedule(db: Session, user_id: int, data: ScheduleCreate) -> Schedule:
+    _check_no_conflict(db, user_id, data.start_time, data.end_time, data.date, data.day_of_week)
     return repository.create_schedule(db, user_id, data.model_dump())
 
 
@@ -39,6 +72,84 @@ def update_schedule(db: Session, schedule_id: int, user_id: int, data: ScheduleU
     schedule = get_schedule_or_404(db, schedule_id, user_id)
     updates = data.model_dump(exclude_unset=True)
 
+    # 반복 일정(date=None) 완료 처리: 원본을 건드리지 않고 오늘 날짜 인스턴스를 생성
+    if updates.get("is_completed") is True and schedule.date is None:
+        today = today_kst()
+        today_str = today.isoformat()
+        dow = today.weekday()
+        existing = db.query(Schedule).filter(
+            Schedule.user_id == user_id,
+            Schedule.date == today_str,
+            Schedule.title == schedule.title,
+            Schedule.start_time == schedule.start_time,
+        ).first()
+        if existing:
+            existing.is_completed = True
+            db.commit()
+            db.refresh(existing)
+            return existing
+        instance = Schedule(
+            user_id=user_id,
+            title=schedule.title,
+            day_of_week=dow,
+            date=today_str,
+            start_time=schedule.start_time,
+            end_time=schedule.end_time,
+            color=schedule.color,
+            priority=schedule.priority,
+            schedule_type=schedule.schedule_type,
+            schedule_source=schedule.schedule_source,
+            linked_exam_id=schedule.linked_exam_id,
+            is_completed=True,
+        )
+        db.add(instance)
+        db.commit()
+        db.refresh(instance)
+        return instance
+
+    # 완료 취소 처리
+    if updates.get("is_completed") is False:
+        if schedule.date is None:
+            # 원본 반복 일정의 완료 취소: 오늘 날짜 인스턴스 삭제
+            today_str = today_kst().isoformat()
+            instance = db.query(Schedule).filter(
+                Schedule.user_id == user_id,
+                Schedule.date == today_str,
+                Schedule.title == schedule.title,
+                Schedule.start_time == schedule.start_time,
+            ).first()
+            if instance:
+                db.delete(instance)
+                db.commit()
+            db.refresh(schedule)
+            return schedule
+        else:
+            # Dated 인스턴스 완료 취소: 반복 일정에서 생성된 것이면 삭제하고 원본 반환
+            try:
+                schedule_date = datetime.strptime(schedule.date, "%Y-%m-%d")
+                dow = schedule_date.weekday()
+            except ValueError:
+                dow = None
+            if dow is not None:
+                recurring = db.query(Schedule).filter(
+                    Schedule.user_id == user_id,
+                    Schedule.date.is_(None),
+                    Schedule.day_of_week == dow,
+                    Schedule.title == schedule.title,
+                    Schedule.start_time == schedule.start_time,
+                ).first()
+                if recurring:
+                    db.delete(schedule)
+                    db.commit()
+                    db.refresh(recurring)
+                    return recurring
+            # 일반 dated 일정 미완 처리
+            schedule.is_completed = False
+            db.commit()
+            db.refresh(schedule)
+            return schedule
+
+    # 일반 수정 — 시간/날짜 변경이 있을 때만 충돌 검사
     new_start = updates.get("start_time", schedule.start_time)
     new_end = updates.get("end_time", schedule.end_time)
     if new_start and new_end and new_start >= new_end:
@@ -46,6 +157,11 @@ def update_schedule(db: Session, schedule_id: int, user_id: int, data: ScheduleU
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="시작 시간은 종료 시간보다 이전이어야 합니다.",
         )
+
+    if any(k in updates for k in ("start_time", "end_time", "date", "day_of_week")):
+        new_date = updates.get("date", schedule.date)
+        new_dow = updates.get("day_of_week", schedule.day_of_week)
+        _check_no_conflict(db, user_id, new_start, new_end, new_date, new_dow, exclude_id=schedule.id)
 
     return repository.update_schedule(db, schedule, updates)
 
@@ -142,8 +258,13 @@ def get_today_schedules(db: Session, user_id: int) -> list[Schedule]:
         )
         .all()
     )
+    # dated 인스턴스가 있으면 같은 title+start_time의 반복 일정은 제외 (완료 인스턴스 우선)
     seen_ids = {s.id for s in specific}
-    merged = list(specific) + [s for s in recurring if s.id not in seen_ids]
+    specific_keys = {(s.title, s.start_time) for s in specific}
+    merged = list(specific) + [
+        s for s in recurring
+        if s.id not in seen_ids and (s.title, s.start_time) not in specific_keys
+    ]
     return sorted(merged, key=lambda s: s.start_time)
 
 

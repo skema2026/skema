@@ -10,7 +10,7 @@ export type Schedule = {
   color: string; // hex, default #6366F1
   priority: 0 | 1 | 2; // 0=normal, 1=high, 2=urgent
   is_completed: boolean;
-  schedule_type: 'class' | 'event' | 'study';
+  schedule_type: 'class' | 'study' | 'assignment' | 'activity' | 'personal' | 'event';
   // Phase 5: AI 일관성 추적 필드
   schedule_source?: 'eta_import' | 'syllabus_based' | 'ai_generated' | 'user_created';
   linked_exam_id?: number | null;

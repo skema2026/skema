@@ -40,7 +40,7 @@ OAUTH_CONFIGS = {
         "auth_url": "https://kauth.kakao.com/oauth/authorize",
         "token_url": "https://kauth.kakao.com/oauth/token",
         "userinfo_url": "https://kapi.kakao.com/v2/user/me",
-        "scope": "profile_nickname account_email",
+        "scope": "profile_nickname talk_message",
     },
 }
 
@@ -106,9 +106,10 @@ def update_profile(db: Session, user_id: int, updates: dict) -> UserProfile:
 
 # ── OAuth ─────────────────────────────────────────────────────────────────────
 
-def exchange_oauth_code(provider: str, code: str) -> tuple[str, str, str]:
+def exchange_oauth_code(provider: str, code: str) -> tuple[str, str, str, str | None, str | None]:
     """
-    Authorization code를 교환해 (social_id, email, display_name) 반환.
+    Authorization code를 교환해 (social_id, email, display_name, kakao_access_token, kakao_refresh_token) 반환.
+    Kakao 이외 공급자의 마지막 두 값은 None.
     실패 시 ValueError 발생.
     """
     cfg = OAUTH_CONFIGS[provider]
@@ -116,19 +117,28 @@ def exchange_oauth_code(provider: str, code: str) -> tuple[str, str, str]:
     client_secret = getattr(settings, cfg["client_secret_key"])
     redirect_uri = f"{settings.BACKEND_URL}/auth/{provider}/callback"
 
+    token_data_req: dict = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "client_id": client_id,
+    }
+    if client_secret:
+        token_data_req["client_secret"] = client_secret
+
+    import logging
+    logger = logging.getLogger(__name__)
+
     token_resp = http_requests.post(
         cfg["token_url"],
-        data={
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": redirect_uri,
-            "client_id": client_id,
-            "client_secret": client_secret,
-        },
+        data=token_data_req,
         headers={"Accept": "application/json"},
         timeout=10,
     )
-    access_token = token_resp.json().get("access_token")
+    logger.error("Kakao token status=%s body=%s", token_resp.status_code, token_resp.text)
+
+    token_data = token_resp.json()
+    access_token = token_data.get("access_token")
     if not access_token:
         raise ValueError("token_exchange_failed")
 
@@ -137,6 +147,9 @@ def exchange_oauth_code(provider: str, code: str) -> tuple[str, str, str]:
         headers={"Authorization": f"Bearer {access_token}"},
         timeout=10,
     ).json()
+
+    kakao_access_token: str | None = None
+    kakao_refresh_token: str | None = None
 
     if provider == "google":
         social_id = userinfo.get("id", "")
@@ -152,27 +165,40 @@ def exchange_oauth_code(provider: str, code: str) -> tuple[str, str, str]:
         kakao_account = userinfo.get("kakao_account", {})
         email = kakao_account.get("email", "")
         display_name = userinfo.get("properties", {}).get("nickname", "")
+        kakao_access_token = access_token
+        kakao_refresh_token = token_data.get("refresh_token")
     else:
         raise ValueError("unsupported_provider")
 
     if not social_id:
         raise ValueError("userinfo_failed")
 
-    return social_id, email, display_name
+    return social_id, email, display_name, kakao_access_token, kakao_refresh_token
 
 
 def get_or_create_social_user(
-    db: Session, provider: str, social_id: str, email: str, display_name: str
+    db: Session,
+    provider: str,
+    social_id: str,
+    email: str,
+    display_name: str,
+    kakao_access_token: str | None = None,
+    kakao_refresh_token: str | None = None,
 ) -> User:
-    """소셜 계정으로 유저를 찾거나 새로 생성."""
+    """소셜 계정으로 유저를 찾거나 새로 생성. Kakao는 토큰도 저장."""
     user = repository.get_user_by_social(db, provider, social_id)
     if user:
+        if kakao_access_token:
+            repository.update_kakao_tokens(db, user, kakao_access_token, kakao_refresh_token)
         return user
 
     if email:
         user = repository.get_user_by_email(db, email)
         if user:
-            return repository.link_social(db, user, provider, social_id)
+            user = repository.link_social(db, user, provider, social_id)
+            if kakao_access_token:
+                repository.update_kakao_tokens(db, user, kakao_access_token, kakao_refresh_token)
+            return user
 
     fallback_email = email or f"{provider}_{social_id}@social.skema"
     return repository.create_social_user(
@@ -181,4 +207,6 @@ def get_or_create_social_user(
         provider=provider,
         social_id=social_id,
         hashed_password=hash_password(secrets.token_hex(32)),
+        kakao_access_token=kakao_access_token,
+        kakao_refresh_token=kakao_refresh_token,
     )

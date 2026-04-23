@@ -10,6 +10,8 @@ from app.ai_chat.schemas import (
     AIChatLogResponse,
     ChatRequest,
     ChatResponse,
+    ReadinessSummaryRequest,
+    ReadinessSummaryResponse,
 )
 from app.ai_chat.service import run_ai_agent
 from app.auth.models import User
@@ -47,6 +49,27 @@ def chat(
     ])
 
     return {"reply": reply}
+
+
+# ── 준비도 경보 AI 진단 ────────────────────────────────────────────────────────
+
+@router.post("/ai/readiness-summary", response_model=ReadinessSummaryResponse)
+def readiness_summary(
+    request: ReadinessSummaryRequest,
+    current_user: User = Depends(get_current_user),
+):
+    from app.core.llm import call_llm
+    prompt = (
+        f"시험 준비 상태를 분석해서 2문장 이내로 자연스럽게 한국어로 피드백해줘. "
+        f"숫자 나열 말고 행동 가능한 조언을 포함해줘.\n\n"
+        f"시험: {request.exam_title}\n"
+        f"시험까지 남은 일수: {request.days_left}일\n"
+        f"연결 일정 수행률: {request.readiness_pct}%\n"
+        f"남은 일정: {request.remaining}개\n"
+        f"확보 가능한 공부 시간: 약 {request.available_hrs:.1f}시간"
+    )
+    result = call_llm(prompt, temperature=0.4)
+    return {"summary": result.text}
 
 
 # ── AI 채팅 로그 CRUD ─────────────────────────────────────────────────────────

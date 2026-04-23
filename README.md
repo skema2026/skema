@@ -1,51 +1,71 @@
-﻿# SKEMA — AI 기반 개인 시간표·일정 관리
+# SKEMA — AI 기반 개인 시간표·학습 관리
 
-> Scheme에서 따온 이름, SKEMA. 학생의 시간표와 학습 일정을 깔끔하게 관리하고, AI가 빠르게 만들어 줍니다.
-
-SKEMA는 이미지/문서에서 시간표·강의계획서를 읽어 구조화하고, 사용자의 일정 CRUD, 시험 일정, 공유 링크, OAuth 로그인을 지원합니다. Google Gemini 2.5 Flash의 Function Calling을 활용해 한국어 그대로의 텍스트를 보존한 채 일정을 자동 생성합니다.
+> Scheme에서 따온 이름, SKEMA. 학생의 시간표와 학습 일정을 스마트하게 관리하고, AI가 복습 계획·준비도 분석·동기부여까지 도와줍니다.
 
 ---
 
 ## 주요 기능
 
-- 일정/과목 CRUD: 과목명, 요일/시간, 장소, 메모, 우선순위, 유형(class/study/event)
-- 시험 일정: 중간·기말·퀴즈 등 별도 관리, 충돌 감지
-- 공유 링크: 읽기 전용 공유 토큰으로 시간표 공유
-- 인증: JWT 로그인 + Google/Naver/Kakao OAuth
-- 온보딩: 최초 로그인 시 기본 일정 입력 → AI가 학습 일정 자동 생성
-- 권한/보안: 공유 링크는 읽기 전용, 토큰 만료/폐기 지원
-- AI 대화: 자연어로 “다음 주 수요일 2시~4시 스터디 추가” 같이 요청하면 바로 일정 생성
+- **시간표 OCR**: 시간표 이미지를 업로드하면 AI가 자동으로 일정을 파싱·등록
+- **일정·과목 CRUD**: 과목명, 요일/시간, 장소, 메모, 우선순위, 유형(수업/자율학습/과제/활동/개인)
+- **시험 일정 관리**: 중간·기말·퀴즈 등 별도 관리, 시험 전날 복습 블록 자동 생성
+- **복습 스케줄러**: 수업 완료 시 다음 날 빈 시간에 복습 일정 자동 배치
+- **준비도 경보**: 시험 D-7/D-3 기준 연결 일정 수행률 분석 + AI 진단 피드백
+- **주간 AI 편지**: 이번 주 학습 패턴을 분석해 개인화된 편지 자동 생성
+- **카카오톡 알림**: 오늘 일정 요약을 카카오톡 메시지로 발송
+- **일정 공유**: 읽기 전용 공유 토큰으로 시간표 URL 공유
+- **충돌 감지**: 시간이 겹치는 일정 자동 감지 및 경고
+- **유형별 분석·주간 리포트**: 요일별/유형별 수행률 시각화
+- **OAuth 로그인**: Kakao OAuth + JWT 인증
 
 ---
 
 ## 기술 스택
 
-- 프런트엔드: Next.js 16, React 19, TypeScript, Tailwind CSS v4, shadcn/ui
-- 상태관리/데이터: Zustand v5, TanStack React Query v5, Axios/fetch
-- 백엔드: FastAPI (Python 3.11+), SQLAlchemy ORM, Alembic
-- 데이터베이스: MySQL
-- 인증: JWT (python-jose, passlib) + OAuth 2.0 (Google · Naver · Kakao)
-- AI: Google Gemini 2.5 Flash + Function Calling
-- 운영: Docker, Docker Compose
+| 영역 | 기술 |
+|------|------|
+| 프런트엔드 | Next.js 15, React 19, TypeScript, Tailwind CSS v4, shadcn/ui |
+| 상태관리 | Zustand v5, TanStack React Query v5 |
+| 백엔드 | FastAPI (Python 3.11+), SQLAlchemy ORM, Alembic |
+| 데이터베이스 | MySQL 8.0 |
+| 인증 | JWT (python-jose, passlib) + Kakao OAuth 2.0 |
+| AI | Google Gemini 2.5 Flash (OCR·분석) / GPT-4.1 (fallback) |
+| 알림 | APScheduler (백그라운드 주기 작업) + Kakao 메시지 API |
+| 운영 | Docker, Docker Compose |
+
+---
+
+## 브랜치 구조
+
+```
+main                  — 배포 기준 브랜치 (Docker Compose로 운영)
+dev                   — 기능 통합 브랜치 (PR 대상)
+feature/<이름>        — 기능 개발 단위 브랜치
+refactor/<이름>       — 리팩토링 브랜치
+```
+
+> PR은 `feature/*` → `dev` → `main` 순서로 머지합니다.  
+> `main` 직접 push는 지양하고, 반드시 PR 리뷰 후 머지합니다.
 
 ---
 
 ## 빠른 시작
 
-### Docker Compose
+### Docker Compose (권장)
 
 ```bash
 cp .env.example .env
-docker-compose up --build
+# .env 파일에 필요한 키 입력 후
+docker compose up -d --build
 ```
 
 - 프런트엔드: http://localhost:3000
 - 백엔드 API: http://localhost:8000
 - Swagger 문서: http://localhost:8000/docs
 
-### 로컬 실행
+### 로컬 개발
 
-백엔드
+**백엔드**
 
 ```bash
 cd backend
@@ -55,7 +75,7 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-프런트엔드
+**프런트엔드**
 
 ```bash
 cd frontend-next
@@ -68,20 +88,23 @@ npm run dev
 ## .env 필수 키
 
 ```env
-SECRET_KEY=...
+# DB
 DATABASE_URL=mysql+pymysql://user:password@localhost:3306/skema_db
 
-GEMINI_API_KEY=...
+# JWT
+SECRET_KEY=your-secret-key
 
-# OAuth 로그인 (선택)
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-NAVER_CLIENT_ID=...
-NAVER_CLIENT_SECRET=...
+# AI (둘 중 하나 이상 필요)
+GEMINI_API_KEY=...
+OPENAI_API_KEY=...
+
+# OAuth
 KAKAO_CLIENT_ID=...
 KAKAO_CLIENT_SECRET=...
 
+# URL
 FRONTEND_URL=http://localhost:3000
+BACKEND_URL=http://localhost:8000
 ```
 
 ---
@@ -96,59 +119,55 @@ capstone-design-2026-1/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── alembic.ini
-│   ├── alembic/
-│   │   └── versions/
-│   │       └── 001_initial_schema.py   # 최초 DB 스키마
+│   ├── alembic/versions/       # DB 마이그레이션 이력
 │   └── app/
-│       ├── main.py                     # FastAPI 진입점
-│       ├── ai_chat/                    # AI 채팅 모듈
-│       ├── auth/                       # 인증 모듈
-│       ├── schedule/                   # 일정/시험 모듈
-│       ├── share/                      # 공유 모듈
-│       ├── clients/                    # Gemini API 클라이언트
-│       ├── core/                       # 설정, JWT, 공통 유틸
-│       └── db/                         # DB 세션/베이스
+│       ├── main.py             # FastAPI 진입점
+│       ├── ai_chat/            # AI 채팅·준비도 진단 API
+│       ├── auth/               # JWT + OAuth 인증
+│       ├── eta/                # 시간표 OCR 파서
+│       ├── kakao/              # 카카오 OAuth·메시지 API
+│       ├── notification/       # APScheduler 알림 작업
+│       ├── schedule/           # 일정·시험 CRUD
+│       ├── share/              # 공유 토큰
+│       ├── syllabus/           # 강의계획서 업로드
+│       ├── clients/            # Gemini API 클라이언트
+│       ├── core/               # 설정, JWT, LLM 유틸
+│       └── db/                 # DB 세션·베이스
 └── frontend-next/
     ├── Dockerfile
     └── src/
         ├── app/
-        │   ├── (auth)/                 # 로그인/회원가입
-        │   ├── (app)/                  # 대시보드/온보딩
-        │   └── share/[token]/          # 공유 시간표(읽기 전용)
+        │   ├── (auth)/         # 로그인·회원가입
+        │   ├── (app)/          # 대시보드·온보딩
+        │   └── share/[token]/  # 공유 시간표(읽기 전용)
         ├── components/
-        │   ├── timetable/              # 시간표 뷰
-        │   ├── class-form/             # 과목 추가/수정
-        │   ├── ai-chat/                # AI 채팅 UI
-        │   ├── exam/                   # 시험 일정 목록
-        │   ├── settings/               # 설정 모달
-        │   └── ui/                     # shadcn/ui 공통 컴포넌트
-        ├── hooks/                      # useSchedules, useAuth, useExams, useProfile
-        ├── store/                      # authStore, uiStore (Zustand)
-        ├── lib/                        # Axios 서비스, 서버 fetch, 포맷터 등
-        └── types/                      # TS 공통 타입
+        │   ├── timetable/      # 시간표 뷰
+        │   ├── class-form/     # 과목 추가·수정 폼
+        │   ├── exam/           # 시험 일정 목록
+        │   ├── settings/       # 설정 모달
+        │   └── ui/             # shadcn/ui 공통 컴포넌트
+        ├── hooks/              # useSchedules, useExams, useProfile 등
+        ├── store/              # authStore, uiStore (Zustand)
+        ├── lib/                # Axios 클라이언트, 서버 fetch, 포맷터
+        └── types/              # 공통 TypeScript 타입
 ```
 
 ---
 
-## 주요 API (요약)
+## 주요 API
 
-- POST `/auth/register`  회원가입
-- POST `/auth/login`     로그인(JWT)
-- GET  `/auth/oauth/{provider}`  OAuth (google/naver/kakao)
-- GET/PUT `/users/me`    내 정보 조회/수정
-- GET/POST `/schedules`  일정 목록 조회/추가
-- PUT/DELETE `/schedules/{id}` 일정 수정/삭제
-- GET/POST `/exam-schedules` 시험 일정 조회/추가
-- DELETE `/exam-schedules/{id}` 시험 일정 삭제
-- GET/PUT `/profiles/me` 프로필 조회/수정
-- POST `/ai/chat`        AI 대화형 액션 전송
-- POST `/share-tokens`   공유 토큰 생성
-- GET  `/share/{token}`  공유 시간표 조회
-
----
-
-## 인코딩/문자 가이드
-
-- 한국어 텍스트는 반드시 UTF-8로 저장합니다.
-- 한국어를 한자로 자동 치환하거나, 한자·일문 혼용 표기를 사용하지 않습니다.
-- 문서에서 한자처럼 보이는 이상 문자는 기존 인코딩 깨짐(모지바케)에서 비롯된 것으로, 전부 정정했습니다.
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/auth/register` | 회원가입 |
+| POST | `/auth/login` | JWT 로그인 |
+| GET | `/auth/oauth/kakao` | Kakao OAuth |
+| GET/PUT | `/users/me` | 내 정보 조회/수정 |
+| GET/POST | `/schedules` | 일정 목록/추가 |
+| PUT/DELETE | `/schedules/{id}` | 일정 수정/삭제 |
+| GET | `/schedules/conflicts` | 시간 충돌 감지 |
+| GET/POST | `/exam-schedules` | 시험 일정 조회/추가 |
+| POST | `/eta/parse` | 시간표 이미지 OCR |
+| POST | `/ai/readiness-summary` | 시험 준비도 AI 진단 |
+| POST | `/kakao/notify/schedule-summary` | 카카오톡 일정 알림 |
+| POST | `/share` | 공유 토큰 생성 |
+| GET | `/share/{token}` | 공유 시간표 조회 |

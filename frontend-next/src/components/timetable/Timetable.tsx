@@ -27,16 +27,16 @@ import { toast } from 'sonner';
 import type { Schedule, ExamSchedule } from '@/types';
 import { useUIStore } from '@/store/uiStore';
 import { useUpdateSchedule } from '@/hooks/useSchedules';
-import { getScheduleColor } from '@/lib/scheduleColor';
+import { getScheduleColor, buildTitleColorMap, getScheduleColorKey } from '@/lib/scheduleColor';
 import { timeToMinutes, minutesToTime, dateStringToDow } from '@/lib/timetableParser';
 
 // ── Grid constants ────────────────────────────────────────────────────────────
 
 const ALL_DAYS = ['월', '화', '수', '목', '금', '토', '일'] as const;
 
-const START_HOUR  = 8;
-const END_HOUR    = 22;
-const SLOT_H      = 28;   // px per 30-min slot
+const START_HOUR  = 0;
+const END_HOUR    = 24;
+const SLOT_H      = 24;   // px per 30-min slot
 const GUTTER_W    = 44;   // time-label column width (px)
 const MIN_BLOCK_H = 18;   // minimum rendered block height (px)
 const DRAG_THRESHOLD = 5; // px — below this, treat as click not drag
@@ -98,10 +98,11 @@ interface BlockProps {
   isConflict:   boolean;
   readOnly:     boolean;
   isFaded:      boolean;   // true while this block is being dragged
+  colorMap:     Map<string, string>;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>, s: Schedule, blockTopClientY: number) => void;
 }
 
-function EventBlock({ schedule: s, isConflict, readOnly, isFaded, onPointerDown }: BlockProps) {
+function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, onPointerDown }: BlockProps) {
   const startSlot   = timeToSlot(s.start_time);
   const endSlot     = timeToSlot(s.end_time);
   const top         = startSlot * SLOT_H;
@@ -109,7 +110,7 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, onPointerDown 
   const height      = Math.max(MIN_BLOCK_H, rawH);
   const durationMin = timeToMinutes(s.end_time) - timeToMinutes(s.start_time);
   const isCompact   = durationMin < 45;
-  const color       = getScheduleColor(s);
+  const color       = colorMap.get(getScheduleColorKey(s)) ?? getScheduleColor(s);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (readOnly) return;
@@ -128,18 +129,20 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, onPointerDown 
         left:          2,
         right:         2,
         height,
-        background:    color,
-        borderRadius:  5,
-        padding:       isCompact ? '1px 4px' : '3px 6px',
+        background:    `linear-gradient(160deg, ${color} 0%, ${color}CC 100%)`,
+        borderRadius:  7,
+        borderLeft:    `3px solid rgba(255,255,255,0.45)`,
+        padding:       isCompact ? '1px 5px' : '4px 7px',
         overflow:      'hidden',
         cursor:        readOnly ? 'default' : isFaded ? 'grabbing' : 'grab',
-        opacity:       isFaded ? 0.3 : s.is_completed ? 0.5 : 1,
+        opacity:       isFaded ? 0.3 : s.is_completed ? 0.45 : 1,
         outline:       isConflict ? '2px solid #f87171' : 'none',
         outlineOffset: -2,
         userSelect:    'none',
         touchAction:   'none',
         zIndex:        isFaded ? 0 : 1,
         boxSizing:     'border-box',
+        boxShadow:     isFaded ? 'none' : '0 1px 3px rgba(0,0,0,0.18)',
         transition:    isFaded ? 'none' : 'opacity 0.1s',
       }}
     >
@@ -151,19 +154,20 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, onPointerDown 
         textOverflow:   'ellipsis',
         whiteSpace:     'nowrap',
         textDecoration: s.is_completed ? 'line-through' : 'none',
-        lineHeight:     1.2,
+        lineHeight:     1.3,
+        textShadow:     '0 1px 2px rgba(0,0,0,0.15)',
       }}>
         {s.title}
       </div>
       {!isCompact && (
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginTop: 1 }}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>
           {s.start_time}–{s.end_time}
         </div>
       )}
       {!isCompact && s.location && (
         <div style={{
           fontSize:     9,
-          color:        'rgba(255,255,255,0.7)',
+          color:        'rgba(255,255,255,0.75)',
           marginTop:    1,
           overflow:     'hidden',
           textOverflow: 'ellipsis',
@@ -177,14 +181,15 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, onPointerDown 
 }
 
 /** Ghost block — shown at the snapped drop target while dragging */
-function GhostBlock({ schedule: s, slot, durationSlots }: {
+function GhostBlock({ schedule: s, slot, durationSlots, colorMap }: {
   schedule: Schedule;
   slot: number;
   durationSlots: number;
+  colorMap: Map<string, string>;
 }) {
   const top    = slot * SLOT_H;
   const height = Math.max(MIN_BLOCK_H, durationSlots * SLOT_H - 1);
-  const color  = getScheduleColor(s);
+  const color  = colorMap.get(getScheduleColorKey(s)) ?? getScheduleColor(s);
   const durationMin = durationSlots * 30;
   const isCompact   = durationMin < 45;
 
@@ -297,6 +302,9 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
     });
   }, [schedules]);
 
+  // ── 1b. Title-based color map (no hash collisions) ──────────────────────────
+  const titleColorMap = useMemo(() => buildTitleColorMap(unique), [unique]);
+
   // ── 2. Conflict detection ───────────────────────────────────────────────────
   const conflictIds = useMemo<Set<number>>(() => {
     const ids = new Set<number>();
@@ -315,9 +323,24 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
   // ── 3. Group by dow — date-based schedules filtered to current week ─────────
   const byDow = useMemo<Record<number, Schedule[]>>(() => {
     const g: Record<number, Schedule[]> = { 0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] };
+
+    // 이번 주에 속한 dated 인스턴스의 (dow, title, start_time) 집합
+    // → 같은 슬롯의 반복 일정이 중복 표시되지 않도록 우선 처리
+    const datedSlots = new Set<string>();
     for (const s of unique) {
-      // Date-based schedule: only render in the week it belongs to
-      if (s.date && !isDateInWeek(s.date, weekStart)) continue;
+      if (s.date && isDateInWeek(s.date, weekStart)) {
+        datedSlots.add(`${effectiveDow(s)}|${s.title}|${s.start_time}`);
+      }
+    }
+
+    for (const s of unique) {
+      if (s.date) {
+        if (!isDateInWeek(s.date, weekStart)) continue;
+      } else {
+        // 반복 일정: 이번 주에 dated 완료 인스턴스가 있으면 렌더링 생략
+        const dow = effectiveDow(s);
+        if (datedSlots.has(`${dow}|${s.title}|${s.start_time}`)) continue;
+      }
       const dow = effectiveDow(s);
       if (dow >= 0 && dow <= 6) g[dow].push(s);
     }
@@ -335,11 +358,31 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
     return g;
   }, [exams, weekStart]);
 
+  // ── 4b. Pre-exam days (day before an exam) in current week ─────────────────
+  const preExamDows = useMemo<Set<number>>(() => {
+    const s = new Set<number>();
+    for (const e of exams) {
+      const [y, m, d] = e.exam_date.split('-').map(Number);
+      const preDate = new Date(y, m - 1, d - 1);
+      const preStr = localDateStr(preDate);
+      if (isDateInWeek(preStr, weekStart)) s.add(dateStringToDow(preStr));
+    }
+    return s;
+  }, [exams, weekStart]);
+
   // ── 5. Always show all 7 days ───────────────────────────────────────────────
   const visibleDays = [0, 1, 2, 3, 4, 5, 6] as const;
 
   // Keep visibleDays ref in sync (read inside pointer event handlers)
   useEffect(() => { visibleDaysRef.current = [...visibleDays]; }, [visibleDays]);
+
+  // Auto-scroll to 7:00 on mount so morning classes are visible
+  useEffect(() => {
+    if (gridRef.current) {
+      gridRef.current.scrollTop = 7 * 2 * SLOT_H;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── 6. Drag start ───────────────────────────────────────────────────────────
   const handleBlockPointerDown = useCallback((
@@ -499,33 +542,39 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
           // Compute the calendar date for this column
           const colDate = new Date(weekStart);
           colDate.setDate(weekStart.getDate() + dow);
-          const isToday = localDateStr(colDate) === localDateStr(new Date());
+          const isToday   = localDateStr(colDate) === localDateStr(new Date());
+          const hasExam   = (examByDow[dow] ?? []).length > 0;
+          const isPreExam = preExamDows.has(dow);
           const dateLabel = `${colDate.getMonth() + 1}/${colDate.getDate()}`;
+
+          const bg    = hasExam ? '#fef08a' : isPreExam ? '#fff1f2' : isToday ? '#eef1ff' : 'transparent';
+          const color = hasExam ? '#78350f' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#1a4db2' : '#747684';
+          const sub   = hasExam ? '#92400e' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#1a4db2' : '#aaa';
+
           return (
             <div key={`hdr-${dow}`} style={{
-              flex:        1,
-              textAlign:   'center',
-              padding:     '6px 0',
-              borderRadius: isToday ? 8 : 0,
-              background:  isToday ? '#eef1ff' : 'transparent',
+              flex:      1,
+              textAlign: 'center',
+              padding:   '5px 2px',
+              background: bg,
+              borderBottom: isPreExam && !hasExam ? '2px solid #fca5a5' : undefined,
             }}>
-              <div style={{
-                fontSize:   11,
-                fontWeight: 800,
-                color:      dow >= 5 ? '#e11d48' : isToday ? '#1a4db2' : '#747684',
-                lineHeight: 1.2,
-              }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color, lineHeight: 1.2 }}>
                 {ALL_DAYS[dow]}
               </div>
-              <div style={{
-                fontSize:   10,
-                fontWeight: isToday ? 700 : 400,
-                color:      dow >= 5 ? '#e11d48' : isToday ? '#1a4db2' : '#aaa',
-                lineHeight: 1.2,
-                marginTop:  1,
-              }}>
+              <div style={{ fontSize: 10, fontWeight: (hasExam || isToday || isPreExam) ? 700 : 400, color: sub, lineHeight: 1.2, marginTop: 1 }}>
                 {dateLabel}
               </div>
+              {hasExam && (
+                <div style={{ fontSize: 8, fontWeight: 700, color: '#92400e', marginTop: 2, letterSpacing: 0.3 }}>
+                  📝 시험
+                </div>
+              )}
+              {isPreExam && !hasExam && (
+                <div style={{ fontSize: 8, fontWeight: 700, color: '#DC2626', marginTop: 2, letterSpacing: 0.3 }}>
+                  ⚠️ 시험 전날
+                </div>
+              )}
             </div>
           );
         })}
@@ -537,7 +586,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
         style={{
           display:        'flex',
           overflowY:      'auto',
-          maxHeight:      600,
+          maxHeight:      640,
           scrollbarWidth: 'thin',
         }}
       >
@@ -602,6 +651,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                 isConflict={conflictIds.has(s.id)}
                 readOnly={readOnly}
                 isFaded={dragSnap?.scheduleId === s.id}
+                colorMap={titleColorMap}
                 onPointerDown={handleBlockPointerDown}
               />
             ))}
@@ -612,6 +662,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                 schedule={dragStateRef.current.schedule}
                 slot={dragSnap.slot}
                 durationSlots={dragStateRef.current.durationSlots}
+                colorMap={titleColorMap}
               />
             )}
 
@@ -626,14 +677,14 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                     left:         2,
                     right:        2,
                     height:       MIN_BLOCK_H,
-                    background:   '#dc2626',
+                    background:   '#fbbf24',
                     borderRadius: 4,
                     padding:      '2px 4px',
                     overflow:     'hidden',
                     pointerEvents: 'none',
                     zIndex:        3,
                   }}>
-                    <div style={{ fontSize: 8, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: '#78350f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       📝 {e.title}
                     </div>
                   </div>
@@ -654,7 +705,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                     left:         2,
                     right:        2,
                     height,
-                    background:   '#dc2626',
+                    background:   '#fbbf24',
                     borderRadius: 5,
                     padding:      '2px 5px',
                     overflow:     'hidden',
@@ -665,7 +716,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                   <div style={{
                     fontSize:     9,
                     fontWeight:   700,
-                    color:        '#fff',
+                    color:        '#78350f',
                     overflow:     'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace:   'nowrap',

@@ -48,8 +48,11 @@ export const PRIORITY_LABELS = {
 
 export const SCHEDULE_TYPE_LABELS = {
   class: '수업',
-  event: '이벤트',
   study: '자율학습',
+  assignment: '과제',
+  activity: '활동',
+  personal: '개인',
+  event: '이벤트',
 } as const;
 
 export function timeToMinutes(time: string): number {

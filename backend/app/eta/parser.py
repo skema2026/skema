@@ -78,9 +78,11 @@ The image is a GRID:
   • LEFT GUTTER COLUMN: time labels  →  9 / 10 / 11 / 12 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8
   • INTERIOR CELLS: colored rectangular blocks, each representing one class session
 
-EACH CLASS BLOCK contains:
-  • Top line (largest text) = subject name in Korean (e.g. 알고리즘, SW보안개론)
-  • Second line (smaller text, optional) = room/building code (e.g. 소프트306, 미디어509)
+A CLASS BLOCK is a SINGLE continuous colored rectangle.
+  • Text (subject name + room) appears only at the TOP of the block.
+  • The rest of the block below the text is the SAME color but empty — this is still part
+    of the same block. Do NOT treat the empty lower portion as a separate block.
+  • ONE colored rectangle = ONE entry. Never split one rectangle into two entries.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 1 — DETECT WEEKDAY COLUMNS
@@ -92,8 +94,7 @@ Read the column headers left-to-right:
 For each class block, determine which COLUMN it visually occupies.
 The block's horizontal CENTER determines its weekday column.
 
-If the SAME colored block appears in MULTIPLE columns
-(e.g. 알고리즘 block in both 월 and 수):
+If the SAME subject block appears in MULTIPLE columns (e.g. 알고리즘 in both 월 and 수):
 → Create ONE entry per column — do NOT merge into one entry.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -106,39 +107,94 @@ The left gutter shows integer labels: 9 10 11 12 1 2 3 4 5 6 7 8
   1  → 13:00     2 → 14:00     3 → 15:00     4 → 16:00
   5  → 17:00     6 → 18:00     7 → 19:00     8 → 20:00
 
-Between each pair of integer labels there is a DASHED LINE at the :30 mark.
-  e.g. between "10" and "11" → dashed line = 10:30
+Between each pair of integer labels there is a SHORT DASHED LINE at the :30 mark.
+  e.g. between "1" and "2" → dashed line at 13:30
+  e.g. between "2" and "3" → dashed line at 14:30
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 3 — READ EACH BLOCK'S TIME
+STEP 3 — MEASURE EACH BLOCK'S FULL HEIGHT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-For each block:
-  a) Find the TOP EDGE of the block in the grid.
-     - If it aligns with an integer label line → :00
-     - If it aligns with the dashed line (between two integers) → :30
-  b) Find the BOTTOM EDGE of the block.
-     - Same rule: integer label → :00, dashed line → :30
+THE MOST IMPORTANT RULE:
+  The end_time is determined by WHERE THE COLOR OF THE BLOCK ENDS (bottom edge of
+  the colored rectangle), NOT by where the text ends.
+  Blocks are tall rectangles. The text is only at the top. The color continues
+  all the way down to the end_time boundary.
 
-ALL times MUST end in :00 or :30.  NEVER use :15, :45, or any other value.
+PROCEDURE for each block:
+  1. Locate the TOP EDGE of the colored rectangle → start_time
+  2. Locate the BOTTOM EDGE of the colored rectangle → end_time
+     (Trace the color downward until it stops. That bottom edge is the end_time.)
+  3. Map both edges to grid lines:
+       - Edge exactly ON an integer label line → :00
+       - Edge exactly ON the dashed line (midpoint between two integers) → :30
 
-CONCRETE EXAMPLES (based on typical Everytime layouts):
-CRITICAL: Many classes start at the dashed :30 line — always check whether the block's
-top edge aligns with the integer label or the dashed line below it.
+GRID LINE TYPES:
+  • SOLID line at every integer label → :00  (e.g. the "2" line = 14:00)
+  • SHORT DASHED line halfway between integers → :30  (e.g. midpoint of "2"–"3" = 14:30)
 
-  Block top AT dashed line between 10–11, bottom AT "12" label
-    → start_time "10:30",  end_time "12:00"
+ALL times MUST end in :00 or :30.  NEVER output :15, :45, or any other minute value.
 
-  Block top AT "10" label, bottom AT "12" label
-    → start_time "10:00",  end_time "12:00"
+HOW TO COUNT BLOCK HEIGHT:
+  • 1 full integer-gap = 60 min  (e.g. top at "1", bottom at "2" → 13:00–14:00)
+  • 1.5 integer-gaps = 90 min    (e.g. top at "1", bottom at dashed "2.5" → 13:00–14:30)
+  • 2 full integer-gaps = 120 min (e.g. top at "1", bottom at "3" → 13:00–15:00)
+  • 4 full integer-gaps = 240 min (e.g. top at "1", bottom at "5" → 13:00–17:00)
 
-  Block top AT "1" label (=13:00), bottom AT dashed line between 2–3 (=14:30)
-    → start_time "13:00",  end_time "14:30"
+⚠ FOUR CRITICAL MISTAKES TO AVOID:
 
-  Block top AT dashed line between 1–2 (=13:30), bottom AT "4" label (=16:00)
-    → start_time "13:30",  end_time "16:00"
+  MISTAKE 1 — Stopping at text instead of color bottom:
+    ✗ WRONG: Block color goes from "1" down to dashed "2:30" line, but you stop at "2"
+             because the text only fills the top → end_time "14:00"
+    ✓ RIGHT: Trace the color all the way to where it ends (dashed line) → end_time "14:30"
 
-  Block top AT "6" label (=18:00), bottom AT dashed line between 8–(end) (=20:30)
-    → start_time "18:00",  end_time "20:30"
+  MISTAKE 2 — Splitting one tall block into two:
+    ✗ WRONG: Block from "1" to "5" (4 hours) → you output TWO entries: "13:00–14:00" + "14:00–17:00"
+    ✓ RIGHT: ONE colored rectangle = ONE entry → "13:00–17:00"
+
+  MISTAKE 3 — Snapping :30 to :00:
+    ✗ WRONG: Block bottom is at the dashed line between "2" and "3" → you output "14:00" or "15:00"
+    ✓ RIGHT: Dashed midpoint line between "2" and "3" → end_time "14:30"
+
+  MISTAKE 4 — Treating a :30 start_time as :00 (especially with no block above for reference):
+    Context: When a block is the FIRST block in a column (nothing above it), the LLM tends to
+    snap the start_time to the nearest integer (:00) even if the block actually starts at the
+    dashed :30 line. This is the single most common error on morning blocks (9:30–12:00 range).
+
+    ✗ WRONG: Block top sits on the dashed line between "10" and "11", no block above →
+             you output start_time "10:00"  (mistaking the dashed line for the "10" solid line)
+    ✓ RIGHT: The "10" solid line = 10:00. The block top is BELOW "10" and at the midpoint
+             between "10" and "11" → start_time "10:30"
+
+    HOW TO DISTINGUISH solid vs dashed line:
+      • Solid line  → full-width, thick, aligned exactly with the gutter integer label
+      • Dashed line → short, thin, no label, sits HALFWAY between two integer labels
+      If the block's TOP EDGE is at a dashed line → start_time MUST end in :30
+      If the block's TOP EDGE is at a solid line → start_time MUST end in :00
+
+    VERIFICATION for isolated AM blocks (no adjacent block above):
+      1. Find the solid integer line IMMEDIATELY above the block's top edge.
+      2. Estimate the visual gap between that solid line and the block's top.
+      3. If the gap is roughly HALF of one full integer-gap → start_time is :30.
+      4. If the gap is nearly zero (block starts right at the solid line) → start_time is :00.
+
+CONCRETE EXAMPLES:
+  Block: top at "1" label, bottom at dashed line between 2–3
+    → start_time "13:00",  end_time "14:30"   (90 min, 1.5 gaps)
+
+  Block: top at dashed line between 1–2, bottom at "4" label
+    → start_time "13:30",  end_time "16:00"   (150 min, 2.5 gaps)
+
+  Block: top at "1" label, bottom at "5" label
+    → start_time "13:00",  end_time "17:00"   (240 min, 4 gaps)
+
+  Block: top at dashed between 10–11, bottom at "12" label
+    → start_time "10:30",  end_time "12:00"   (90 min)
+
+  TWO separate blocks in the same column:
+    Block A: top at "1", bottom at dashed between 2–3
+    Block B: top at dashed between 2–3, bottom at "4"
+    → Entry A: start_time "13:00", end_time "14:30"
+    → Entry B: start_time "14:30", end_time "16:00"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 4 — EXTRACT SUBJECT NAME AND LOCATION

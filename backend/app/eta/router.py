@@ -247,7 +247,14 @@ def save_eta_schedules(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """ParsedEntry 목록을 Schedule DB에 저장한다."""
+    """ParsedEntry 목록을 Schedule DB에 저장한다. 기존 eta_import 수업을 모두 교체한다."""
+    # 기존 eta_import 수업 전체 삭제 → 재업로드 시 중복 누적 방지
+    deleted = db.query(Schedule).filter(
+        Schedule.user_id == current_user.id,
+        Schedule.schedule_source == "eta_import",
+    ).delete(synchronize_session=False)
+    logger.info("save_eta_schedules: deleted %d existing eta_import rows for user %d", deleted, current_user.id)
+
     saved = 0
     skipped = 0
     for entry in body.entries:
@@ -261,18 +268,6 @@ def save_eta_schedules(
             skipped += 1
             continue
         if not (0 <= entry.day_of_week <= 6):
-            skipped += 1
-            continue
-        # 중복 방지: 동일(user, title, dow, date=null, start, end) 이미 존재하면 skip
-        _dup = db.query(Schedule).filter(
-            Schedule.user_id == current_user.id,
-            Schedule.title == entry.subject_name.strip(),
-            Schedule.day_of_week == entry.day_of_week,
-            Schedule.date.is_(None),
-            Schedule.start_time == entry.start_time,
-            Schedule.end_time == entry.end_time,
-        ).first()
-        if _dup:
             skipped += 1
             continue
         sch = Schedule(
