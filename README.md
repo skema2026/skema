@@ -53,17 +53,96 @@ refactor/<이름>       — 리팩토링 브랜치
 
 ### Docker Compose (권장)
 
+**사전 준비**
+
+- Docker Desktop 설치 및 실행 확인
+- `.env` 파일 설정 (아래 [.env 필수 키](#env-필수-키) 참고)
+
 ```bash
 cp .env.example .env
-# .env 파일에 필요한 키 입력 후
-docker compose up -d --build
+# .env 파일에 필요한 키 입력
 ```
 
-- 프런트엔드: http://localhost:3000
-- 백엔드 API: http://localhost:8000
-- Swagger 문서: http://localhost:8000/docs
+---
 
-### 로컬 개발
+#### 프로덕션 모드 (`docker-compose.yml`)
+
+MySQL + 백엔드 + 프런트엔드를 모두 컨테이너로 실행합니다.
+
+```bash
+# 빌드 후 백그라운드 실행
+docker compose up -d --build
+
+# 특정 서비스만 재빌드
+docker compose up -d --build backend
+
+# 실행 중인 컨테이너 확인
+docker compose ps
+
+# 전체 로그 스트리밍
+docker compose logs -f
+
+# 특정 서비스 로그만 보기
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# 중지 (컨테이너만 제거, 볼륨 유지)
+docker compose down
+
+# 중지 + 볼륨까지 삭제 (DB 초기화 시)
+docker compose down -v
+```
+
+접속 주소:
+
+| 서비스 | URL |
+|--------|-----|
+| 프런트엔드 | http://localhost:3000 |
+| 백엔드 API | http://localhost:8000 |
+| Swagger 문서 | http://localhost:8000/docs |
+
+---
+
+#### 개발 모드 (`docker-compose.dev.yml`)
+
+코드 변경 시 자동 재시작(hot-reload)이 활성화됩니다. DB는 별도 실행 필요 (로컬 MySQL 또는 프로덕션 compose의 `db` 서비스 사용).
+
+```bash
+# 개발 서버 실행 (hot-reload 포함)
+docker compose -f docker-compose.dev.yml up --build
+
+# 백그라운드 실행
+docker compose -f docker-compose.dev.yml up -d --build
+
+# 중지
+docker compose -f docker-compose.dev.yml down
+```
+
+> 개발 모드에서는 DB 서비스가 포함되지 않습니다.  
+> 로컬 MySQL을 사용하거나, 프로덕션 compose로 DB만 먼저 실행하세요:
+> ```bash
+> docker compose up -d db   # DB 컨테이너만 먼저 실행
+> docker compose -f docker-compose.dev.yml up --build
+> ```
+
+---
+
+#### 컨테이너 내부 명령 실행
+
+```bash
+# 백엔드 컨테이너 셸 접속
+docker compose exec backend bash
+
+# DB 마이그레이션 수동 실행
+docker compose exec backend alembic upgrade head
+
+# 프런트엔드 컨테이너 셸 접속
+docker compose exec frontend sh
+```
+
+---
+
+### 로컬 개발 (Docker 없이)
 
 **백엔드**
 
