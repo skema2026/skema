@@ -43,8 +43,8 @@ def get_current_user(
     if user is None:
         raise credentials_exc
 
-    # 비활성 계정은 인증 차단
-    if not user.is_active:
+    # 비활성 계정은 인증 차단 (None은 활성으로 간주 — 레거시 계정 호환)
+    if user.is_active is False:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="비활성화된 계정입니다. 관리자에게 문의하세요.",

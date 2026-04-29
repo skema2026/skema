@@ -98,10 +98,8 @@ def job_weekly_report():
                 s for s in schedules
                 if s.date and last_mon.isoformat() <= s.date <= last_sun.isoformat()
             ]
-            # 반복 일정도 포함 (date=null → 지난주 7일 모두 해당)
+            # 반복 일정도 포함 (date=null → 요일 기반, 지난주에 한 번 등장으로 카운트)
             recurring = [s for s in schedules if not s.date]
-            last_week_all = last_week_sch + recurring * 7 // max(len(recurring), 1) if recurring else last_week_sch
-            # 단순화: date 없는 반복 일정은 지난주 전체에 한 번 등장으로 카운트
             all_last = last_week_sch + recurring
             done_last = [s for s in all_last if s.is_completed]
             total_last = len(all_last)
@@ -175,8 +173,8 @@ def job_reminders():
         today_str = now.strftime("%Y-%m-%d")
         today_dow = now.weekday()  # 0=Mon
         now_min = now.hour * 60 + now.minute
-        window_start = now_min + 20   # 20~40분 후 시작하는 일정
-        window_end = now_min + 40
+        window_start = (now_min + 20) % 1440   # 20~40분 후 시작하는 일정 (자정 순환 처리)
+        window_end = (now_min + 40) % 1440
 
         users = db.query(User).filter(User.is_active == True).all()  # noqa: E712
         for user in users:
@@ -194,8 +192,13 @@ def job_reminders():
                 start_min = _hhmm_to_min(s.start_time)
                 end_min = _hhmm_to_min(s.end_time)
 
-                # 시작 전 알림 (20~40분 후 시작)
-                if window_start <= start_min <= window_end and not s.is_completed:
+                # 시작 전 알림 (20~40분 후 시작, 자정 순환 고려)
+                in_window = (
+                    window_start <= start_min <= window_end
+                    if window_start <= window_end
+                    else start_min >= window_start or start_min <= window_end
+                )
+                if in_window and not s.is_completed:
                     diff = start_min - now_min
                     _push(
                         db, user.id, "reminder",
