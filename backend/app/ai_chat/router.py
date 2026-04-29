@@ -109,7 +109,7 @@ def delete_log(
     repository.delete_log(db, log)
 
 
-@router.delete("/oai-chat-logs", status_code=status.HTTP_200_OK)
+@router.delete("/ai-chat-logs", status_code=status.HTTP_200_OK)
 def delete_all_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
