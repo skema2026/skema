@@ -43,8 +43,17 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const error = params.get('error');
-    if (error) { toast.error('소셜 로그인에 실패했습니다'); return; }
-    if (token) { setToken(token); toast.success('로그인 되었습니다'); router.push('/dashboard'); }
+    if (error) {
+      toast.error('소셜 로그인에 실패했습니다');
+      window.history.replaceState({}, '', '/login');
+      return;
+    }
+    if (token) {
+      setToken(token);
+      toast.success('로그인 되었습니다');
+      window.history.replaceState({}, '', '/login');
+      router.push('/dashboard');
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
