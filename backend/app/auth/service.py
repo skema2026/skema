@@ -258,23 +258,16 @@ def get_or_create_social_user(
     social_id: str,
     email: str,
     display_name: str,
-    kakao_access_token: str | None = None,
-    kakao_refresh_token: str | None = None,
 ) -> User:
-    """소셜 계정으로 유저를 찾거나 새로 생성. Kakao는 토큰도 저장."""
+    """소셜 계정으로 유저를 찾거나 새로 생성."""
     user = repository.get_user_by_social(db, provider, social_id)
     if user:
-        if kakao_access_token:
-            repository.update_kakao_tokens(db, user, kakao_access_token, kakao_refresh_token)
         return user
 
     if email:
         user = repository.get_user_by_email(db, email)
         if user:
-            user = repository.link_social(db, user, provider, social_id)
-            if kakao_access_token:
-                repository.update_kakao_tokens(db, user, kakao_access_token, kakao_refresh_token)
-            return user
+            return repository.link_social(db, user, provider, social_id)
 
     fallback_email = email or f"{provider}_{social_id}@social.skema"
     return repository.create_social_user(
@@ -283,6 +276,4 @@ def get_or_create_social_user(
         provider=provider,
         social_id=social_id,
         hashed_password=hash_password(secrets.token_hex(32)),
-        kakao_access_token=kakao_access_token,
-        kakao_refresh_token=kakao_refresh_token,
     )
