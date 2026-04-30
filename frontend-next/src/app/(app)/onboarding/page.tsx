@@ -273,21 +273,20 @@ export default function OnboardingPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await api.post('/eta/parse-image-v2', formData, {
+      const res = await api.post('/eta/parse-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-            const v2 = Array.isArray(res.data) ? res.data as Array<{ title: string; day: string; startTime: string; endTime: string; location?: string; bbox?: [number,number,number,number]; }> : [];
-      const dayMap: Record<string, number> = { MONDAY:0, TUESDAY:1, WEDNESDAY:2, THURSDAY:3, FRIDAY:4, SATURDAY:5, SUNDAY:6 };
+      const v1 = Array.isArray(res.data) ? res.data as Array<{ subject_name: string; day_of_week: number; start_time: string; end_time: string; raw_text?: string; source?: string; requires_review?: boolean; }> : [];
       const dayKo = ['월요일','화요일','수요일','목요일','금요일','토요일','일요일'];
-      const entries: EtaEntry[] = v2.map((e, i) => ({
+      const entries: EtaEntry[] = v1.map((e, i) => ({
         _id: `eta-${Date.now()}-${i}`,
-        subject_name: (e.title && e.title !== '수업') ? e.title : '',
-        day_of_week: dayMap[e.day] ?? 0,
-        start_time: normalizeTimeString(e.startTime) || e.startTime,
-        end_time: normalizeTimeString(e.endTime) || e.endTime,
-        location: e.location ?? '',
-        raw_text: `${dayKo[dayMap[e.day] ?? 0]} ${e.startTime}~${e.endTime}`,
-        source: 'eta_image_v2',
+        subject_name: e.subject_name || '',
+        day_of_week: e.day_of_week,
+        start_time: normalizeTimeString(e.start_time) || e.start_time,
+        end_time: normalizeTimeString(e.end_time) || e.end_time,
+        location: '',
+        raw_text: e.raw_text || `${dayKo[e.day_of_week] ?? ''} ${e.start_time}~${e.end_time}`,
+        source: 'eta_image',
       }));
       setEtaEntries(entries);
       if (entries.length === 0) {
