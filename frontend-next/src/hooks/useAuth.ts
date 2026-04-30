@@ -33,11 +33,13 @@ export function useRegister() {
     mutationFn: async ({
       email,
       password,
+      username,
     }: {
       email: string;
       password: string;
+      username?: string;
     }) => {
-      const { data } = await api.post<User>('/auth/signup', { email, password });
+      const { data } = await api.post<User>('/auth/signup', { email, password, username });
       return data;
     },
   });
