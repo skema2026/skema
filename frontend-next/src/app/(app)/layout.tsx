@@ -35,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.replace('/login');
       })
       .finally(() => {
-        setChec4king(false);
+        setChecking(false);
       });
   }, [_hasHydrated, token, router, setUser, logout]);
 
