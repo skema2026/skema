@@ -1,4 +1,4 @@
-"""add login logs
+"""add login_logs table and username unique constraint
 
 Revision ID: 007
 Revises: 006
@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column("success", sa.Boolean(), nullable=False, server_default=sa.text("0")),
         sa.Column("failure_reason", sa.String(length=100), nullable=True),
         sa.Column("ip_address", sa.String(length=64), nullable=True),
-        sa.Column("user_agent", sa.Text(), nullable=True),
+        sa.Column("user_agent", sa.String(length=512), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
@@ -36,8 +36,12 @@ def upgrade() -> None:
     op.create_index("ix_login_logs_user_id", "login_logs", ["user_id"], unique=False)
     op.create_index("ix_login_logs_created_at", "login_logs", ["created_at"], unique=False)
 
+    op.create_index("ix_users_username", "users", ["username"], unique=True)
+
 
 def downgrade() -> None:
+    op.drop_index("ix_users_username", table_name="users")
+
     op.drop_index("ix_login_logs_created_at", table_name="login_logs")
     op.drop_index("ix_login_logs_user_id", table_name="login_logs")
     op.drop_index("ix_login_logs_id", table_name="login_logs")
