@@ -1,4 +1,5 @@
 import secrets
+from typing import Optional
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status

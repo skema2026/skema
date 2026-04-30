@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { token, _hasHydrated, setUser, logout } = useAuthStore();
-  const [checking, setChecking] = useState(true);
+  const [checking, setChec4king] = useState(true);
   const isInitialized = useRef(false);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.replace('/login');
       })
       .finally(() => {
-        setChecking(false);
+        setChec4king(false);
       });
   }, [_hasHydrated, token, router, setUser, logout]);
 

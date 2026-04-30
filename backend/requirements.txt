@@ -21,8 +21,4 @@ Pillow>=10.0.0
 
 # Scheduler (알림 주기 실행)
 apscheduler>=3.10.0
-
 pdfplumber>=0.10.0
-
-# OCR (Google Cloud Vision — bbox 기반 시간표 파싱, requests로 REST 호출)
-
