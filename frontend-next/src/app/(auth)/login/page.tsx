@@ -72,7 +72,7 @@ export default function LoginPage() {
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!validate()) return;
-    loginMutation.mutate(form, {
+    loginMutation.mutate({ email: form.username, password: form.password }, {
       onSuccess: (data) => { setToken(data.access_token); toast.success('로그인 되었습니다'); router.push('/dashboard'); },
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };
