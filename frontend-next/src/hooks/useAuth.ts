@@ -18,9 +18,9 @@ export function useMe() {
 
 export function useLogin() {
   return useMutation({
-    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+    mutationFn: async ({ email, username, password }: { email?: string; username?: string; password: string }) => {
       const { data } = await api.post<{ access_token: string; token_type: string }>('/auth/login', {
-        email,
+        email: username ?? email ?? '',
         password,
       });
       return data;
