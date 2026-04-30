@@ -1,21 +1,17 @@
 """
-LLM helper — Gemini primary, OpenAI automatic fallback.
+LLM helper — OpenAI only.
 
 Entry points
   call_llm(prompt, temperature)        → LLMResult  (text / model)
   call_llm_vision(image_path, ...)     → LLMResult  (text / model)
 
-Fallback behaviour
-  1. call_gemini()  — tried first; any error triggers fallback
-  2. call_openai()  — used when Gemini fails for any reason
-
 LLMResult attributes
   .text     / .content  — response text (aliases)
-  .model    — "gemini-2.5-flash" | "gpt-4o"
-  .provider — "gemini" | "openai"
-  .status   — "success" | "fallback_used"
+  .model    — "gpt-4.1"
+  .provider — "openai"
+  .status   — "success"
 
-Raises LLMError (or a subclass) only when BOTH providers fail.
+Raises LLMError (or a subclass) on failure.
 """
 import logging
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
@@ -279,52 +275,12 @@ def _call_openai_vision(
 # ── Public interface ──────────────────────────────────────────────────────────
 
 def call_llm(prompt: str, temperature: float = 0.2) -> LLMResult:
-    """
-    Main text entry point.
-
-    1. Tries Gemini — any error (timeout, quota, auth, network) triggers fallback
-    2. Falls back to OpenAI
-    3. Raises LLMError if both fail
-
-    Returns LLMResult with:
-      .text / .content  — response text
-      .model            — exact model used
-      .provider         — "gemini" | "openai"
-      .status           — "success" | "fallback_used"
-    """
-    # ── 1. Try Gemini ──────────────────────────────────────────────────────
+    """OpenAI 텍스트 모델 직접 호출."""
     try:
-        logger.info(f"LLM: calling Gemini ({GEMINI_MODEL})")
-        text = call_gemini(prompt, temperature)
-        logger.info("LLM: Gemini success")
-        return LLMResult(
-            content=text,
-            status="success",
-            provider="gemini",
-            model=GEMINI_MODEL,
-        )
-    except LLMRateLimitedError as exc:
-        logger.warning(f"LLM: Gemini rate-limited — falling back to OpenAI: {exc}")
-    except LLMEmptyResponseError as exc:
-        logger.warning(f"LLM: Gemini empty response — falling back to OpenAI: {exc}")
-    except LLMProviderUnavailableError as exc:
-        logger.warning(f"LLM: Gemini unavailable — falling back to OpenAI: {exc}")
-    except LLMError as exc:
-        logger.warning(f"LLM: Gemini error — falling back to OpenAI: {exc}")
-    except Exception as exc:
-        logger.warning(f"LLM: Gemini unexpected error — falling back to OpenAI: {exc}")
-
-    # ── 2. Fallback: OpenAI ────────────────────────────────────────────────
-    try:
-        logger.info(f"LLM: calling OpenAI fallback ({OPENAI_MODEL})")
+        logger.info(f"LLM: calling OpenAI ({OPENAI_MODEL})")
         text = call_openai(prompt, temperature)
-        logger.info("LLM: OpenAI fallback success")
-        return LLMResult(
-            content=text,
-            status="fallback_used",
-            provider="openai",
-            model=OPENAI_MODEL,
-        )
+        logger.info("LLM: OpenAI success")
+        return LLMResult(content=text, status="success", provider="openai", model=OPENAI_MODEL)
     except LLMRateLimitedError as exc:
         logger.error(f"LLM: OpenAI rate-limited: {exc}")
         raise
@@ -348,48 +304,12 @@ def call_llm_vision(
     prompt: str,
     temperature: float = 0.1,
 ) -> LLMResult:
-    """
-    Main vision entry point.
-
-    1. Tries Gemini Vision — any error triggers fallback
-    2. Falls back to OpenAI Vision
-    3. Raises LLMError if both fail
-
-    Returns LLMResult (same shape as call_llm).
-    """
-    # ── 1. Try Gemini Vision ───────────────────────────────────────────────
+    """OpenAI Vision 모델 직접 호출."""
     try:
-        logger.info(f"LLM Vision: calling Gemini ({GEMINI_MODEL})")
-        text = _call_gemini_vision(image_path, content_type, prompt, temperature)
-        logger.info("LLM Vision: Gemini success")
-        return LLMResult(
-            content=text,
-            status="success",
-            provider="gemini",
-            model=GEMINI_MODEL,
-        )
-    except LLMRateLimitedError as exc:
-        logger.warning(f"LLM Vision: Gemini rate-limited — falling back to OpenAI: {exc}")
-    except LLMEmptyResponseError as exc:
-        logger.warning(f"LLM Vision: Gemini empty response — falling back to OpenAI: {exc}")
-    except LLMProviderUnavailableError as exc:
-        logger.warning(f"LLM Vision: Gemini unavailable — falling back to OpenAI: {exc}")
-    except LLMError as exc:
-        logger.warning(f"LLM Vision: Gemini error — falling back to OpenAI: {exc}")
-    except Exception as exc:
-        logger.warning(f"LLM Vision: Gemini unexpected error — falling back to OpenAI: {exc}")
-
-    # ── 2. Fallback: OpenAI Vision ─────────────────────────────────────────
-    try:
-        logger.info(f"LLM Vision: calling OpenAI fallback ({OPENAI_MODEL})")
+        logger.info(f"LLM Vision: calling OpenAI ({OPENAI_MODEL})")
         text = _call_openai_vision(image_path, content_type, prompt, temperature)
-        logger.info("LLM Vision: OpenAI fallback success")
-        return LLMResult(
-            content=text,
-            status="fallback_used",
-            provider="openai",
-            model=OPENAI_MODEL,
-        )
+        logger.info("LLM Vision: OpenAI success")
+        return LLMResult(content=text, status="success", provider="openai", model=OPENAI_MODEL)
     except LLMRateLimitedError as exc:
         logger.error(f"LLM Vision: OpenAI rate-limited: {exc}")
         raise
