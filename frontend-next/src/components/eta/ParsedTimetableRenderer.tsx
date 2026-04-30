@@ -1,6 +1,5 @@
-﻿'use client';
+'use client';
 
-import React from 'react';
 import type { NormalizedETAEntry } from '@/types';
 
 // Fixed mapping Mon=0 .. Sun=6
@@ -24,12 +23,6 @@ function timeToMinutes(t: string): number {
   return h * 60 + mm;
 }
 
-function minutesToTime(mins: number): string {
-  if (mins < 0) return '00:00';
-  const h = Math.floor(mins / 60), m = mins % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
 export function ParsedTimetableRenderer({ data }: { data: NormalizedETAEntry[] }) {
   // Group by day index
   const byDay = Array.from({ length: 7 }, () => [] as NormalizedETAEntry[]);
@@ -41,7 +34,7 @@ export function ParsedTimetableRenderer({ data }: { data: NormalizedETAEntry[] }
       <div style={{ display: 'flex', borderBottom: '1px solid #ebeef1' }}>
         <div style={{ width: GUTTER_W, flexShrink: 0 }} />
         {['월','화','수','목','금','토','일'].map((label, idx) => (
-          <div key={idx} style={{ flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12, fontWeight: 700, color: idx >= 5 ? '#e11d48' : '#747684' }}>
+          <div key={idx} style={{ flex: 1, textAlign: 'center', padding: '8px 0', fontSize: 12, fontWeight: 700, color: idx >= 5 ? '#e11d48' : '#3f4b61' }}>
             {label}
           </div>
         ))}

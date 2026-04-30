@@ -50,22 +50,26 @@
 
 :root {
   /* SKEMA Design Tokens */
-  --skema-primary: #1a4db2;
-  --skema-primary-hover: #3b66cc;
-  --skema-primary-shadow: rgba(26, 77, 178, 0.22);
-  --skema-surface: #f7fafd;
-  --skema-surface-low: #f1f4f7;
-  --skema-container: #ebeef1;
-  --skema-container-high: #e5e8eb;
-  --skema-on-surface: #181c1e;
-  --skema-on-surface-variant: #434653;
-  --skema-secondary-container: #c3d0ff;
-  --skema-tertiary-fixed: #ffdcc6;
-  --skema-outline: #c3c6d5;
-  --skema-outline-strong: #747684;
+  --skema-primary: #2563eb;
+  --skema-primary-hover: #1d4ed8;
+  --skema-primary-soft: #eaf1ff;
+  --skema-primary-shadow: rgba(37, 99, 235, 0.2);
+  --skema-accent-pink: #0ea5e9;
+  --skema-accent-mint: #087f5b;
+  --skema-accent-sun: #9a5b00;
+  --skema-surface: #f6f8fc;
+  --skema-surface-low: #eef6ff;
+  --skema-container: #d8e2ef;
+  --skema-container-high: #c7d2e2;
+  --skema-on-surface: #0f172a;
+  --skema-on-surface-variant: #3f4b61;
+  --skema-secondary-container: #e8f3ff;
+  --skema-tertiary-fixed: #fff0a8;
+  --skema-outline: #b8c5d6;
+  --skema-outline-strong: #6f5f4c;
   --font-headline: var(--font-manrope), Manrope, sans-serif;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: #f6f8fc;
+  --foreground: #0f172a;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -138,9 +142,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
   }
 }
 
@@ -148,21 +154,108 @@
 .skema-headline {
   font-family: var(--font-headline);
 }
-.ms {
-  font-family: 'Material Symbols Outlined';
-  font-weight: normal;
-  font-style: normal;
-  font-size: 24px;
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-block;
-  white-space: nowrap;
-  direction: ltr;
-  -webkit-font-smoothing: antialiased;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+
+::selection {
+  background: rgba(37, 99, 235, 0.18);
+  color: var(--skema-on-surface);
 }
 
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(26, 77, 178, 0.22);
+  outline-offset: 2px;
+}
+
+button {
+  font-family: inherit;
+}
+
+.skema-soft-shadow {
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.08);
+}
+
+.skema-onboarding-screen {
+  background:
+      linear-gradient(135deg, rgba(246,248,252,0.96), rgba(232,243,255,0.94)),
+      radial-gradient(circle at 15% 12%, rgba(14,165,233,0.18), transparent 30%),
+      linear-gradient(90deg, rgba(37,99,235,0.07) 1px, transparent 1px),
+      linear-gradient(rgba(14,165,233,0.06) 1px, transparent 1px),
+      url('/register-bg.jpg') center/cover no-repeat;
+  background-size: auto, auto, 32px 32px, 32px 32px, cover;
+}
+
+.skema-cute-page {
+  background:
+    linear-gradient(135deg, rgba(246,248,252,0.98), rgba(232,243,255,0.95)),
+    radial-gradient(circle at 18% 8%, rgba(14,165,233,0.18), transparent 28%),
+    radial-gradient(circle at 82% 0%, rgba(37,99,235,0.16), transparent 24%),
+    linear-gradient(90deg, rgba(37,99,235,0.06) 1px, transparent 1px),
+    linear-gradient(rgba(14,165,233,0.05) 1px, transparent 1px);
+  background-size: auto, auto, auto, 32px 32px, 32px 32px;
+}
+
+.skema-card {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  box-shadow: 0 16px 44px rgba(15, 23, 42, 0.08);
+}
+
+.skema-sticker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(23, 32, 51, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.skema-onboarding-screen input,
+.skema-onboarding-screen select,
+.skema-onboarding-screen textarea {
+  min-height: 40px;
+}
+
+@media (max-width: 640px) {
+  .skema-onboarding-screen {
+    justify-content: flex-start;
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

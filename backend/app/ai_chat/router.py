@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.ai_chat import repository
-from app.ai_chat.models import AIChatLog, ChatRole
+from app.ai_chat.models import ChatRole
 from app.ai_chat.schemas import (
     AIChatLogCreate,
     AIChatLogResponse,

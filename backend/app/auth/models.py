@@ -1,6 +1,4 @@
-import enum
-
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -33,8 +31,11 @@ class User(Base):
         uselist=False, cascade="all, delete-orphan",
     )
     schedules = relationship("Schedule", back_populates="user", cascade="all, delete-orphan")
+    exam_schedules = relationship("ExamSchedule", back_populates="user", cascade="all, delete-orphan")
+    events = relationship("Event", back_populates="user", cascade="all, delete-orphan")
     share_tokens = relationship("ShareToken", back_populates="user", cascade="all, delete-orphan")
     ai_chat_logs = relationship("AIChatLog", back_populates="user", cascade="all, delete-orphan")
+    login_logs = relationship("LoginLog", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserProfile(Base):
@@ -67,3 +68,20 @@ class UserProfile(Base):
     )
 
     user = relationship("User", back_populates="profile")
+
+
+class LoginLog(Base):
+    """로그인 시도 기록. 비밀번호는 저장하지 않습니다."""
+    __tablename__ = "login_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    login_identifier = Column(String(255), nullable=False)
+    login_method = Column(String(20), nullable=False)  # "email" | "username"
+    success = Column(Boolean, nullable=False, default=False, server_default="0")
+    failure_reason = Column(String(100), nullable=True)
+    ip_address = Column(String(64), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="login_logs")

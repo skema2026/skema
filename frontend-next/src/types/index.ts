@@ -1,8 +1,10 @@
+export type RecurringDay = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+
 export type Schedule = {
   id: number;
   user_id: number;
   title: string;
-  day_of_week: number; // 0=Mon, 6=Sun
+  recurring_day: RecurringDay;
   date?: string; // YYYY-MM-DD, null = recurring weekly
   start_time: string; // HH:MM
   end_time: string; // HH:MM
@@ -46,10 +48,38 @@ export type ExamSchedule = {
 
 export type User = {
   id: number;
+  username?: string | null;
   email: string;
-  username?: string; // legacy (UI 호환용)
-  is_active?: boolean;
-  created_at?: string;
+  is_active?: boolean | null;
+  is_admin?: boolean;
+  created_at?: string | null;
+};
+
+export type LoginLog = {
+  id: number;
+  user_id: number | null;
+  login_identifier: string;
+  login_method: 'email' | 'username';
+  success: boolean;
+  failure_reason?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  created_at: string;
+  user?: {
+    id: number;
+    username?: string | null;
+    email: string;
+  } | null;
+};
+
+export type AdminUser = {
+  id: number;
+  username?: string | null;
+  email: string;
+  is_active?: boolean | null;
+  social_provider?: string | null;
+  social_id?: string | null;
+  created_at?: string | null;
 };
 
 export type ChatMessage = {

@@ -19,6 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import app.db.base  # noqa: F401
 
 from app.auth.router import router as auth_router
+from app.admin.router import router as admin_router
 from app.schedule.router import router as schedule_router
 from app.share.router import router as share_router
 from app.ai_chat.router import router as ai_chat_router
@@ -62,6 +63,11 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     errors = exc.errors()
+    if any("email" in error.get("loc", ()) for error in errors):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "올바른 이메일 형식이 아닙니다."},
+        )
     if len(errors) == 1:
         detail = errors[0].get("msg", str(exc))
     else:
@@ -99,6 +105,7 @@ app.add_middleware(
 # ── 라우터 등록 ───────────────────────────────────────────────────────────────
 
 app.include_router(auth_router)         # /auth/*, /users/me, /profiles
+app.include_router(admin_router)        # /admin/*
 app.include_router(schedule_router)     # /schedules/*, /exam-schedules/*
 app.include_router(share_router)        # /share-tokens/*, /share/{token}
 app.include_router(ai_chat_router)      # /ai/chat, /ai-chat-logs/*

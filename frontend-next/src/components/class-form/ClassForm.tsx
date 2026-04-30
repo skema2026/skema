@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -28,7 +28,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ALL_SCHEDULE_COLORS, getAutoColor } from '@/lib/scheduleColor';
-import { Schedule } from '@/types';
+import { dateStringToRecurringDay, recurringDayToIndex, indexToRecurringDay } from '@/lib/recurringDay';
+import { RecurringDay, Schedule } from '@/types';
 
 const SCHEDULE_TYPE_OPTIONS = [
   { value: 'class',      label: '수업',     icon: '📚', desc: '강의·실습' },
@@ -41,7 +42,7 @@ const SCHEDULE_TYPE_OPTIONS = [
 const defaultForm = {
   title: '',
   schedule_type: 'class' as Schedule['schedule_type'],
-  day_of_week: 0,
+  recurring_day: 'MON' as RecurringDay,
   date: '',
   start_time: '09:00',
   end_time: '10:00',
@@ -51,13 +52,6 @@ const defaultForm = {
   is_completed: false,
 };
 
-/** YYYY-MM-DD 문자열 → day_of_week (0=월…6=일, 로컬 시간 기준) */
-function dateStringToDow(dateStr: string): number {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const day = new Date(y, m - 1, d).getDay(); // 0=Sun
-  return day === 0 ? 6 : day - 1;
-}
-
 function timesOverlap(s1: string, e1: string, s2: string, e2: string): boolean {
   return s1 < e2 && s2 < e1;
 }
@@ -65,6 +59,7 @@ function timesOverlap(s1: string, e1: string, s2: string, e2: string): boolean {
 function findConflict(
   form: typeof defaultForm,
   isRecurring: boolean,
+  selectedDays: RecurringDay[],
   schedules: Schedule[],
   excludeId?: number,
 ): Schedule | null {
@@ -72,11 +67,12 @@ function findConflict(
     if (s.id === excludeId) continue;
     if (!timesOverlap(form.start_time, form.end_time, s.start_time, s.end_time)) continue;
 
-    // 요일 겹침 여부
-    const formDow = isRecurring ? form.day_of_week : (form.date ? dateStringToDow(form.date) : form.day_of_week);
-    const sDow = s.date ? dateStringToDow(s.date) : s.day_of_week;
+    const formDays = isRecurring
+      ? selectedDays
+      : [form.date ? dateStringToRecurringDay(form.date) : form.recurring_day];
+    const scheduleDay = s.date ? dateStringToRecurringDay(s.date) : s.recurring_day;
 
-    if (formDow !== sDow) continue;
+    if (!formDays.includes(scheduleDay)) continue;
 
     // 특정날짜 vs 특정날짜면 날짜도 정확히 일치해야 함
     if (!isRecurring && form.date && s.date && form.date !== s.date) continue;
@@ -94,21 +90,23 @@ export function ClassForm() {
   const qc = useQueryClient();
 
   const [form, setForm] = useState(defaultForm);
+  const [selectedDays, setSelectedDays] = useState<RecurringDay[]>([defaultForm.recurring_day]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   // true = color was not manually overridden by the user; auto-follows title hash
-  const autoColorRef = useRef(true);
+  const [isAutoColor, setIsAutoColor] = useState(true);
   // true = 매주 반복(요일 기반), false = 특정 날짜 1회
   const [isRecurring, setIsRecurring] = useState(true);
 
   useEffect(() => {
     if (editingSchedule) {
-      autoColorRef.current = false; // editing: keep stored color as-is
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsAutoColor(false); // editing: keep stored color as-is
       const hasDate = !!editingSchedule.date;
       setIsRecurring(!hasDate);
       setForm({
         title: editingSchedule.title,
         schedule_type: editingSchedule.schedule_type,
-        day_of_week: editingSchedule.day_of_week,
+        recurring_day: editingSchedule.recurring_day,
         date: editingSchedule.date || '',
         start_time: editingSchedule.start_time,
         end_time: editingSchedule.end_time,
@@ -117,10 +115,12 @@ export function ClassForm() {
         priority: editingSchedule.priority,
         is_completed: editingSchedule.is_completed,
       });
+      setSelectedDays([editingSchedule.recurring_day]);
     } else {
-      autoColorRef.current = true; // new schedule: auto-derive from title
+      setIsAutoColor(true); // new schedule: auto-derive from title
       setIsRecurring(true);
       setForm(defaultForm);
+      setSelectedDays([defaultForm.recurring_day]);
     }
     setErrors({});
   }, [editingSchedule, isClassFormOpen]);
@@ -128,6 +128,7 @@ export function ClassForm() {
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!form.title.trim()) newErrors.title = '제목을 입력해주세요';
+    if (isRecurring && selectedDays.length === 0) newErrors.days = '요일을 최소 1개 이상 선택해주세요';
     if (!isRecurring && !form.date) newErrors.date = '날짜를 선택해주세요';
     if (!form.start_time) newErrors.start_time = '시작 시간을 입력해주세요';
     if (!form.end_time) newErrors.end_time = '종료 시간을 입력해주세요';
@@ -141,7 +142,7 @@ export function ClassForm() {
     if (!validate()) return;
 
     const allSchedules = qc.getQueryData<Schedule[]>(['schedules']) ?? [];
-    const conflicting = findConflict(form, isRecurring, allSchedules, editingSchedule?.id);
+    const conflicting = findConflict(form, isRecurring, selectedDays, allSchedules, editingSchedule?.id);
     if (conflicting) {
       setErrors((prev) => ({
         ...prev,
@@ -153,7 +154,8 @@ export function ClassForm() {
     const payload = {
       title: form.title,
       schedule_type: form.schedule_type,
-      day_of_week: form.day_of_week,
+      recurring_day: isRecurring ? selectedDays[0] : form.recurring_day,
+      days: isRecurring ? selectedDays : undefined,
       date: isRecurring ? undefined : (form.date || undefined),
       start_time: form.start_time,
       end_time: form.end_time,
@@ -176,8 +178,8 @@ export function ClassForm() {
       );
     } else {
       createSchedule.mutate(payload, {
-        onSuccess: () => {
-          toast.success('일정이 추가되었습니다');
+        onSuccess: (created) => {
+          toast.success(created.length > 1 ? `일정 ${created.length}개가 추가되었습니다` : '일정이 추가되었습니다');
           closeClassForm();
         },
         onError: () => toast.error('추가 중 오류가 발생했습니다'),
@@ -200,7 +202,7 @@ export function ClassForm() {
 
   return (
     <Dialog open={isClassFormOpen} onOpenChange={(open) => !open && closeClassForm()}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto border-[#d8e2ef] bg-[#ffffff]">
         <DialogHeader>
           <DialogTitle>{editingSchedule ? '일정 수정' : '일정 추가'}</DialogTitle>
         </DialogHeader>
@@ -215,8 +217,8 @@ export function ClassForm() {
               onChange={(e) => {
                 const title = e.target.value;
                 // 새 일정이고 색상을 수동으로 바꾸지 않았으면 제목에서 자동 파생
-                if (autoColorRef.current) {
-                  setForm({ ...form, title, color: title.trim() ? getAutoColor(title, form.schedule_type) : defaultForm.color });
+                if (isAutoColor) {
+                  setForm({ ...form, title, color: title.trim() ? getAutoColor(title) : defaultForm.color });
                 } else {
                   setForm({ ...form, title });
                 }
@@ -238,14 +240,14 @@ export function ClassForm() {
                     type="button"
                     onClick={() => {
                       const newType = value as Schedule['schedule_type'];
-                      if (autoColorRef.current && form.title.trim()) {
-                        setForm({ ...form, schedule_type: newType, color: getAutoColor(form.title, newType) });
+                      if (isAutoColor && form.title.trim()) {
+                        setForm({ ...form, schedule_type: newType, color: getAutoColor(form.title) });
                       } else {
                         setForm({ ...form, schedule_type: newType });
                       }
                     }}
                     className={cn(
-                      'flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl border-2 text-center transition-all',
+                      'flex flex-col items-center gap-1 py-2.5 px-1 rounded-lg border-2 text-center transition-all',
                       selected
                         ? 'border-indigo-500 bg-indigo-50'
                         : 'border-gray-100 bg-white hover:border-gray-300'
@@ -253,7 +255,7 @@ export function ClassForm() {
                   >
                     <span style={{ fontSize: 20 }}>{icon}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: selected ? '#4338CA' : '#181c1e' }}>{label}</span>
-                    <span style={{ fontSize: 9, color: '#9ca3af', lineHeight: 1.3 }}>{desc}</span>
+                    <span style={{ fontSize: 9, color: '#64748b', lineHeight: 1.3 }}>{desc}</span>
                   </button>
                 );
               })}
@@ -266,7 +268,11 @@ export function ClassForm() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => { setIsRecurring(true); setForm((f) => ({ ...f, date: '' })); }}
+                onClick={() => {
+                  setIsRecurring(true);
+                  setSelectedDays((days) => days.length ? days : [form.recurring_day]);
+                  setForm((f) => ({ ...f, date: '' }));
+                }}
                 className={cn(
                   'flex-1 py-1.5 rounded-lg text-sm font-semibold border transition-colors',
                   isRecurring
@@ -295,19 +301,39 @@ export function ClassForm() {
           {isRecurring ? (
             <div className="space-y-1.5">
               <Label>요일</Label>
-              <Select
-                value={String(form.day_of_week)}
-                onValueChange={(v) => setForm({ ...form, day_of_week: Number(v) })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DAY_NAMES_FULL.map((day, idx) => (
-                    <SelectItem key={idx} value={String(idx)}>{day}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-7 gap-1.5">
+                {DAY_NAMES_FULL.map((day, idx) => {
+                  const recurringDay = indexToRecurringDay(idx);
+                  const selected = selectedDays.includes(recurringDay);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => {
+                        setSelectedDays((days) => {
+                          const next = selected
+                            ? days.filter((day) => day !== recurringDay)
+                            : [...days, recurringDay].sort((a, b) => recurringDayToIndex(a) - recurringDayToIndex(b));
+                          if (next.length > 0) {
+                            setForm((f) => ({ ...f, recurring_day: next[0] }));
+                          }
+                          return next;
+                        });
+                      }}
+                      className={cn(
+                        'h-10 rounded-lg border text-sm font-semibold transition-all',
+                        selected
+                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                          : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300 hover:text-indigo-600'
+                      )}
+                    >
+                      {day.slice(0, 1)}
+                    </button>
+                  );
+                })}
+              </div>
+              {errors.days && <p className="text-red-500 text-xs">{errors.days}</p>}
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -318,14 +344,14 @@ export function ClassForm() {
                 value={form.date}
                 onChange={(e) => {
                   const dateVal = e.target.value;
-                  const dow = dateVal ? dateStringToDow(dateVal) : form.day_of_week;
-                  setForm((f) => ({ ...f, date: dateVal, day_of_week: dow }));
+                  const recurringDay = dateVal ? dateStringToRecurringDay(dateVal) : form.recurring_day;
+                  setForm((f) => ({ ...f, date: dateVal, recurring_day: recurringDay }));
                 }}
                 className={errors.date ? 'border-red-500' : ''}
               />
               {errors.date && <p className="text-red-500 text-xs">{errors.date}</p>}
               {form.date && (
-                <p className="text-xs text-gray-500">요일: {DAY_NAMES_FULL[form.day_of_week]} (자동 계산)</p>
+                <p className="text-xs text-gray-500">요일: {DAY_NAMES_FULL[recurringDayToIndex(form.recurring_day)]} (자동 계산)</p>
               )}
             </div>
           )}
@@ -369,7 +395,7 @@ export function ClassForm() {
 
           {/* Color */}
           <div className="space-y-2">
-            <Label>색상 {autoColorRef.current && <span className="text-xs font-normal text-gray-400">(제목 기반 자동 — 클릭으로 변경)</span>}</Label>
+            <Label>색상 {isAutoColor && <span className="text-xs font-normal text-gray-400">(제목 기반 자동 — 클릭으로 변경)</span>}</Label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 6 }}>
               {ALL_SCHEDULE_COLORS.map((color) => {
                 const selected = form.color === color;
@@ -377,7 +403,7 @@ export function ClassForm() {
                   <button
                     key={color}
                     type="button"
-                    onClick={() => { autoColorRef.current = false; setForm({ ...form, color }); }}
+                    onClick={() => { setIsAutoColor(false); setForm({ ...form, color }); }}
                     style={{
                       width: '100%', aspectRatio: '1', borderRadius: 8,
                       background: `linear-gradient(135deg, ${color} 0%, ${color}BB 100%)`,

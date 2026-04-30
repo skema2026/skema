@@ -19,6 +19,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isInitialized.current = true;
 
     if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setChecking(false);
       router.replace('/login');
       return;
     }
@@ -39,10 +41,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+      <div className="skema-cute-page min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-gray-500 dark:text-gray-400">로딩 중...</p>
+          <div className="h-11 w-11 animate-spin rounded-full border-4 border-[#e8f3ff] border-t-[#2563eb]" />
+          <p className="text-sm font-bold text-[#3f4b61]">SKEMA를 준비하고 있습니다</p>
         </div>
       </div>
     );

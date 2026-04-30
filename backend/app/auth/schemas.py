@@ -1,23 +1,44 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+from email_validator import EmailNotValidError, validate_email
+from pydantic import BaseModel, field_validator
 
 
 # ── 회원가입 / 로그인 ──────────────────────────────────────────────────────────
 
 class SignupRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     username: Optional[str] = None
 
-    def model_post_init(self, __context) -> None:  # type: ignore[override]
-        if len(self.password) < 6:
+    @field_validator("email")
+    @classmethod
+    def validate_signup_email(cls, value: str) -> str:
+        try:
+            result = validate_email(value.strip(), check_deliverability=True)
+        except EmailNotValidError as exc:
+            raise ValueError("올바른 이메일 형식이 아닙니다.") from exc
+        return result.normalized
+
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if len(value) < 6:
             raise ValueError("비밀번호는 6자 이상이어야 합니다.")
+        return value
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -33,6 +54,7 @@ class UserResponse(BaseModel):
     username: Optional[str] = None
     email: str
     is_active: Optional[bool] = True
+    is_admin: bool = False
 
     model_config = {"from_attributes": True}
 

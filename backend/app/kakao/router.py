@@ -40,25 +40,25 @@ def send_schedule_summary(
     from app.schedule.models import Schedule
 
     today = date.today()
-    day_of_week = today.weekday()  # 0=월, 6=일
+    from app.schedule.models import INT_TO_DAY
+    today_day = INT_TO_DAY.get(today.weekday(), "MON")
 
     schedules = (
         db.query(Schedule)
         .filter(
             Schedule.user_id == current_user.id,
-            (Schedule.date == today.isoformat()) | (Schedule.day_of_week == day_of_week),
+            Schedule.recurring_day == today_day,
         )
         .order_by(Schedule.start_time)
         .all()
     )
 
     if not schedules:
-        text = f"📅 {today.strftime('%Y년 %m월 %d일')} 오늘 일정이 없습니다. 여유로운 하루 보내세요!"
+        text = f"📅 {today.strftime('%Y년 %m월 %d일')} 오늘 수업이 없습니다. 여유로운 하루 보내세요!"
     else:
-        lines = [f"📅 {today.strftime('%Y년 %m월 %d일')} 오늘 일정 ({len(schedules)}개)\n"]
+        lines = [f"📅 {today.strftime('%Y년 %m월 %d일')} 오늘 수업 ({len(schedules)}개)\n"]
         for s in schedules:
-            done = "✅" if s.is_completed else "⬜"
-            lines.append(f"{done} {s.start_time}–{s.end_time} {s.title}")
+            lines.append(f"📚 {s.start_time}–{s.end_time} {s.course_name}")
         text = "\n".join(lines)
 
     result = service.send_kakao_memo(db, current_user, text)

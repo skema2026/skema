@@ -114,7 +114,7 @@ export function getScheduleColor(schedule: Schedule): string {
 /**
  * ClassForm에서 새 일정 생성 시 자동 색상 계산.
  */
-export function getAutoColor(title: string, _scheduleType?: Schedule['schedule_type']): string {
+export function getAutoColor(title: string): string {
   const trimmed = title.trim();
   if (!trimmed) return DIVERSE_PALETTE[0];
   return hashToPalette(trimmed, DIVERSE_PALETTE);

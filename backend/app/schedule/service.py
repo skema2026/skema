@@ -1,24 +1,19 @@
-from datetime import date, datetime, timedelta
-from typing import List
-
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.timezone import today_kst
 from app.schedule import repository
-from app.schedule.repository import _NOT_DELETED
-from app.schedule.models import ExamSchedule, Schedule
+from app.schedule.models import DayOfWeek, Event, ExamSchedule, Schedule
 from app.schedule.schemas import (
-    ConflictItem,
+    EventCreate,
+    EventUpdate,
     ExamScheduleCreate,
     ExamScheduleUpdate,
     ScheduleCreate,
-    ScheduleResponse,
     ScheduleUpdate,
 )
 
 
-# ── Schedule ──────────────────────────────────────────────────────────────────
+# ── Schedule (수업 시간표) ────────────────────────────────────────────────────
 
 def list_schedules(db: Session, user_id: int) -> list[Schedule]:
     return repository.get_schedules(db, user_id)
@@ -27,8 +22,16 @@ def list_schedules(db: Session, user_id: int) -> list[Schedule]:
 def get_schedule_or_404(db: Session, schedule_id: int, user_id: int) -> Schedule:
     schedule = repository.get_schedule(db, schedule_id, user_id)
     if not schedule:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="시간표를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="수업을 찾을 수 없습니다.")
     return schedule
+
+
+def _overlap(s1: str, e1: str, s2: str, e2: str) -> bool:
+    """두 시간 범위가 겹치는지 확인."""
+    def t2m(t: str) -> int:
+        h, m = t.split(":")
+        return int(h) * 60 + int(m)
+    return t2m(s1) < t2m(e2) and t2m(s2) < t2m(e1)
 
 
 def _check_no_conflict(
@@ -36,132 +39,55 @@ def _check_no_conflict(
     user_id: int,
     start_time: str,
     end_time: str,
-    date: str | None,
-    day_of_week: int | None,
+    recurring_day: str,
     exclude_id: int | None = None,
 ) -> None:
-    """새 일정이 기존 일정과 시간이 겹치면 409를 발생시킨다."""
+    """같은 요일에 시간이 겹치는 수업이 있으면 409."""
     existing = repository.get_schedules(db, user_id)
     for s in existing:
         if exclude_id is not None and s.id == exclude_id:
             continue
-        same_day = False
-        if date and s.date:
-            same_day = date == s.date
-        elif date is None and s.date is None:
-            same_day = day_of_week == s.day_of_week
-        elif date and s.date is None:
-            date_dow = datetime.strptime(date, "%Y-%m-%d").weekday()
-            same_day = date_dow == s.day_of_week
-        elif date is None and s.date:
-            date_dow = datetime.strptime(s.date, "%Y-%m-%d").weekday()
-            same_day = date_dow == day_of_week
-        if same_day and _overlap(start_time, end_time, s.start_time, s.end_time):
+        if s.recurring_day.value == recurring_day and _overlap(start_time, end_time, s.start_time, s.end_time):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"'{s.title}' 일정과 시간이 겹칩니다. ({s.start_time}~{s.end_time})",
+                detail=f"'{s.course_name}' 수업과 시간이 겹칩니다. ({s.recurring_day.value} {s.start_time}~{s.end_time})",
             )
 
 
-def create_schedule(db: Session, user_id: int, data: ScheduleCreate) -> Schedule:
-    _check_no_conflict(db, user_id, data.start_time, data.end_time, data.date, data.day_of_week)
-    return repository.create_schedule(db, user_id, data.model_dump())
+def create_schedule(db: Session, user_id: int, data: ScheduleCreate) -> list[Schedule]:
+    """
+    수업을 생성한다. days에 포함된 각 요일마다 하나씩 생성.
+    """
+    created = []
+    base = data.model_dump(exclude={"days", "day_of_week", "title", "color"})
+
+    for day in data.days:
+        _check_no_conflict(db, user_id, data.start_time, data.end_time, day)
+        row_data = {**base, "recurring_day": DayOfWeek(day)}
+        created.append(repository.create_schedule(db, user_id, row_data))
+
+    return created
 
 
 def update_schedule(db: Session, schedule_id: int, user_id: int, data: ScheduleUpdate) -> Schedule:
     schedule = get_schedule_or_404(db, schedule_id, user_id)
-    updates = data.model_dump(exclude_unset=True)
+    updates = data.model_dump(exclude_unset=True, exclude={"title", "day_of_week", "color"})
 
-    # 반복 일정(date=None) 완료 처리: 원본을 건드리지 않고 오늘 날짜 인스턴스를 생성
-    if updates.get("is_completed") is True and schedule.date is None:
-        today = today_kst()
-        today_str = today.isoformat()
-        dow = today.weekday()
-        existing = db.query(Schedule).filter(
-            Schedule.user_id == user_id,
-            Schedule.date == today_str,
-            Schedule.title == schedule.title,
-            Schedule.start_time == schedule.start_time,
-        ).first()
-        if existing:
-            existing.is_completed = True
-            db.commit()
-            db.refresh(existing)
-            return existing
-        instance = Schedule(
-            user_id=user_id,
-            title=schedule.title,
-            day_of_week=dow,
-            date=today_str,
-            start_time=schedule.start_time,
-            end_time=schedule.end_time,
-            color=schedule.color,
-            priority=schedule.priority,
-            schedule_type=schedule.schedule_type,
-            schedule_source=schedule.schedule_source,
-            linked_exam_id=schedule.linked_exam_id,
-            is_completed=True,
-        )
-        db.add(instance)
-        db.commit()
-        db.refresh(instance)
-        return instance
+    # recurring_day 문자열 → enum 변환
+    if "recurring_day" in updates and updates["recurring_day"] is not None:
+        updates["recurring_day"] = DayOfWeek(updates["recurring_day"])
 
-    # 완료 취소 처리
-    if updates.get("is_completed") is False:
-        if schedule.date is None:
-            # 원본 반복 일정의 완료 취소: 오늘 날짜 인스턴스 삭제
-            today_str = today_kst().isoformat()
-            instance = db.query(Schedule).filter(
-                Schedule.user_id == user_id,
-                Schedule.date == today_str,
-                Schedule.title == schedule.title,
-                Schedule.start_time == schedule.start_time,
-            ).first()
-            if instance:
-                db.delete(instance)
-                db.commit()
-            db.refresh(schedule)
-            return schedule
-        else:
-            # Dated 인스턴스 완료 취소: 반복 일정에서 생성된 것이면 삭제하고 원본 반환
-            try:
-                schedule_date = datetime.strptime(schedule.date, "%Y-%m-%d")
-                dow = schedule_date.weekday()
-            except ValueError:
-                dow = None
-            if dow is not None:
-                recurring = db.query(Schedule).filter(
-                    Schedule.user_id == user_id,
-                    Schedule.date.is_(None),
-                    Schedule.day_of_week == dow,
-                    Schedule.title == schedule.title,
-                    Schedule.start_time == schedule.start_time,
-                ).first()
-                if recurring:
-                    db.delete(schedule)
-                    db.commit()
-                    db.refresh(recurring)
-                    return recurring
-            # 일반 dated 일정 미완 처리
-            schedule.is_completed = False
-            db.commit()
-            db.refresh(schedule)
-            return schedule
-
-    # 일반 수정 — 시간/날짜 변경이 있을 때만 충돌 검사
+    # 시간/요일 변경 시 충돌 검사
     new_start = updates.get("start_time", schedule.start_time)
     new_end = updates.get("end_time", schedule.end_time)
-    if new_start and new_end and new_start >= new_end:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="시작 시간은 종료 시간보다 이전이어야 합니다.",
-        )
+    new_day = updates.get("recurring_day", schedule.recurring_day)
+    if isinstance(new_day, DayOfWeek):
+        new_day_str = new_day.value
+    else:
+        new_day_str = new_day
 
-    if any(k in updates for k in ("start_time", "end_time", "date", "day_of_week")):
-        new_date = updates.get("date", schedule.date)
-        new_dow = updates.get("day_of_week", schedule.day_of_week)
-        _check_no_conflict(db, user_id, new_start, new_end, new_date, new_dow, exclude_id=schedule.id)
+    if any(k in updates for k in ("start_time", "end_time", "recurring_day")):
+        _check_no_conflict(db, user_id, new_start, new_end, new_day_str, exclude_id=schedule.id)
 
     return repository.update_schedule(db, schedule, updates)
 
@@ -171,38 +97,7 @@ def delete_schedule(db: Session, schedule_id: int, user_id: int) -> None:
     repository.delete_schedule(db, schedule)
 
 
-def complete_schedule(db: Session, schedule_id: int, user_id: int) -> Schedule:
-    """일정을 완료 처리한다. 이후 AI 재계획에서 재생성되지 않는다."""
-    schedule = get_schedule_or_404(db, schedule_id, user_id)
-    schedule.is_completed = True
-    db.commit()
-    db.refresh(schedule)
-    return schedule
-
-
-def postpone_schedule(db: Session, schedule_id: int, user_id: int, days: int = 1) -> Schedule:
-    """
-    특정 날짜 일정을 days일 뒤로 연기한다.
-    반복 일정(date=None)은 연기할 수 없다.
-    user_override=True 로 마킹해 AI 재계획 시 덮어쓰지 않도록 한다.
-    """
-    schedule = get_schedule_or_404(db, schedule_id, user_id)
-    if not schedule.date:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="반복 일정은 연기할 수 없습니다. 특정 날짜 일정만 연기 가능합니다.",
-        )
-    old_date = datetime.strptime(schedule.date, "%Y-%m-%d").date()
-    new_date = old_date + timedelta(days=days)
-    schedule.date = new_date.strftime("%Y-%m-%d")
-    schedule.day_of_week = new_date.weekday()
-    schedule.user_override = True
-    db.commit()
-    db.refresh(schedule)
-    return schedule
-
-
-# ── ExamSchedule ──────────────────────────────────────────────────────────────
+# ── ExamSchedule ─────────────────────────────────────────────────────────────
 
 def list_exams(db: Session, user_id: int) -> list[ExamSchedule]:
     return repository.get_exams(db, user_id)
@@ -230,103 +125,29 @@ def delete_exam(db: Session, exam_id: int, user_id: int) -> None:
     repository.delete_exam(db, exam)
 
 
-# ── 오늘 할 일 ────────────────────────────────────────────────────────────────
+# ── Event ────────────────────────────────────────────────────────────────────
 
-def get_today_schedules(db: Session, user_id: int) -> list[Schedule]:
-    """
-    오늘 날짜에 해당하는 모든 일정을 반환한다.
-    - 특정 날짜 일정: date == today
-    - 반복 일정: date IS NULL AND day_of_week == today.weekday()
-    시작 시간 오름차순 정렬.
-    """
-    today = today_kst()          # UTC가 아닌 KST 기준 오늘 날짜
-    today_str = today.isoformat()
-    dow = today.weekday()
-
-    specific = (
-        db.query(Schedule)
-        .filter(Schedule.user_id == user_id, Schedule.date == today_str, _NOT_DELETED)
-        .all()
-    )
-    recurring = (
-        db.query(Schedule)
-        .filter(
-            Schedule.user_id == user_id,
-            Schedule.day_of_week == dow,
-            Schedule.date.is_(None),
-            _NOT_DELETED,
-        )
-        .all()
-    )
-    # dated 인스턴스가 있으면 같은 title+start_time의 반복 일정은 제외 (완료 인스턴스 우선)
-    seen_ids = {s.id for s in specific}
-    specific_keys = {(s.title, s.start_time) for s in specific}
-    merged = list(specific) + [
-        s for s in recurring
-        if s.id not in seen_ids and (s.title, s.start_time) not in specific_keys
-    ]
-    return sorted(merged, key=lambda s: s.start_time)
+def list_events(db: Session, user_id: int) -> list[Event]:
+    return repository.get_events(db, user_id)
 
 
-# ── 충돌 감지 ─────────────────────────────────────────────────────────────────
-
-def _t2m(t: str) -> int:
-    """HH:MM → 분 단위 정수."""
-    h, m = t.split(":")
-    return int(h) * 60 + int(m)
-
-
-def _overlap(s1: str, e1: str, s2: str, e2: str) -> bool:
-    return _t2m(s1) < _t2m(e2) and _t2m(s2) < _t2m(e1)
+def get_event_or_404(db: Session, event_id: int, user_id: int) -> Event:
+    event = repository.get_event(db, event_id, user_id)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="이벤트를 찾을 수 없습니다.")
+    return event
 
 
-def detect_conflicts(db: Session, user_id: int) -> list[ConflictItem]:
-    """
-    유저의 모든 일정에서 시간이 겹치는 쌍을 찾아 반환한다.
-    같은 요일의 반복 일정끼리 / 특정 날짜 일정끼리 비교.
-    """
-    schedules = repository.get_schedules(db, user_id)
-    conflicts: list[ConflictItem] = []
-    seen: set[tuple[int, int]] = set()
+def create_event(db: Session, user_id: int, data: EventCreate) -> Event:
+    return repository.create_event(db, user_id, data.model_dump())
 
-    for i, a in enumerate(schedules):
-        for b in schedules[i + 1:]:
-            pair = (min(a.id, b.id), max(a.id, b.id))
-            if pair in seen:
-                continue
 
-            same_day = False
-            day_label = ""
+def update_event(db: Session, event_id: int, user_id: int, data: EventUpdate) -> Event:
+    event = get_event_or_404(db, event_id, user_id)
+    updates = data.model_dump(exclude_unset=True)
+    return repository.update_event(db, event, updates)
 
-            # 둘 다 특정 날짜
-            if a.date and b.date:
-                if a.date == b.date:
-                    same_day = True
-                    day_label = a.date
-            # 둘 다 반복
-            elif a.date is None and b.date is None:
-                if a.day_of_week == b.day_of_week:
-                    same_day = True
-                    day_names = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
-                    day_label = f"매주 {day_names[a.day_of_week]}"
-            # 한쪽은 특정 날짜, 한쪽은 반복
-            elif a.date and b.date is None:
-                date_dow = datetime.strptime(a.date, "%Y-%m-%d").weekday()
-                if date_dow == b.day_of_week:
-                    same_day = True
-                    day_label = a.date
-            elif b.date and a.date is None:
-                date_dow = datetime.strptime(b.date, "%Y-%m-%d").weekday()
-                if date_dow == a.day_of_week:
-                    same_day = True
-                    day_label = b.date
 
-            if same_day and _overlap(a.start_time, a.end_time, b.start_time, b.end_time):
-                seen.add(pair)
-                conflicts.append(ConflictItem(
-                    schedule_a=ScheduleResponse.model_validate(a),
-                    schedule_b=ScheduleResponse.model_validate(b),
-                    day_label=day_label,
-                ))
-
-    return conflicts
+def delete_event(db: Session, event_id: int, user_id: int) -> None:
+    event = get_event_or_404(db, event_id, user_id)
+    repository.delete_event(db, event)

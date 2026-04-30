@@ -9,10 +9,8 @@
 """
 import json
 import logging
-import re
-import time
 import warnings
-from app.utils.text_validation import normalize_korean_field, contains_unexpected_cjk
+from app.utils.text_validation import normalize_korean_field
 
 import pdfplumber
 

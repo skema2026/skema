@@ -1,7 +1,7 @@
 import secrets
-from typing import Optional
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -18,10 +18,20 @@ from app.auth.schemas import (
 )
 from app.auth.service import OAUTH_CONFIGS
 from app.core.config import settings
-from app.core.deps import get_current_user, get_db
+from app.core.deps import get_current_user, get_db, is_admin_email
 from app.core.security import create_access_token
 
 router = APIRouter(tags=["auth"])
+
+
+def _serialize_current_user(user: User) -> dict:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "is_active": user.is_active,
+        "is_admin": is_admin_email(user.email),
+    }
 
 
 # ── 회원가입 / 로그인 ──────────────────────────────────────────────────────────
@@ -39,33 +49,46 @@ def register(data: SignupRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/auth/login", response_model=TokenResponse)
-def login(data: LoginRequest, db: Session = Depends(get_db)):
+def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """이메일 + 비밀번호 검증 후 Bearer JWT를 발급합니다. (JSON body)"""
-    token = service.login(db, data.email, data.password)
+    token = service.login(
+        db,
+        data.email,
+        data.password,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
     return {"access_token": token, "token_type": "bearer"}
 
 
 @router.post("/auth/token", response_model=TokenResponse)
 def login_form(
+    request: Request,
     username: str = Form(...),   # OAuth2 convention: 'username' field = email
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
     """OAuth2 호환 로그인 (form-data, username 필드에 이메일 입력)."""
-    token = service.login(db, username, password)
+    token = service.login(
+        db,
+        username,
+        password,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
     return {"access_token": token, "token_type": "bearer"}
 
 
 @router.get("/users/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     """현재 인증된 사용자 정보를 반환합니다."""
-    return current_user
+    return _serialize_current_user(current_user)
 
 
 @router.get("/auth/me", response_model=UserResponse)
 def get_me_alias(current_user: User = Depends(get_current_user)):
     """현재 인증된 사용자 정보를 반환합니다 (/users/me 별칭)."""
-    return current_user
+    return _serialize_current_user(current_user)
 
 
 # ── 프로필 ────────────────────────────────────────────────────────────────────
@@ -129,17 +152,31 @@ def oauth_authorize(provider: str):
         "response_type": "code",
         "scope": cfg["scope"],
     }
+    state = ""
     if provider == "naver":
-        params["state"] = secrets.token_hex(8)
+        state = secrets.token_urlsafe(16)
+        params["state"] = state
 
-    query = "&".join(f"{k}={v}" for k, v in params.items() if v)
-    return RedirectResponse(url=f"{cfg['auth_url']}?{query}")
+    query = urlencode({k: v for k, v in params.items() if v})
+    response = RedirectResponse(url=f"{cfg['auth_url']}?{query}")
+    if state:
+        response.set_cookie(
+            key=f"oauth_state_{provider}",
+            value=state,
+            httponly=True,
+            samesite="lax",
+            secure=settings.BACKEND_URL.startswith("https://"),
+            max_age=600,
+        )
+    return response
 
 
 @router.get("/auth/{provider}/callback")
 def oauth_callback(
     provider: str,
+    request: Request,
     code: str = "",
+    state: str = "",
     error: str = "",
     db: Session = Depends(get_db),
 ):
@@ -147,20 +184,35 @@ def oauth_callback(
         raise HTTPException(status_code=404, detail="지원하지 않는 OAuth 공급자입니다.")
 
     if error or not code:
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_denied")
+        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_denied")
+        response.delete_cookie(key=f"oauth_state_{provider}")
+        return response
+
+    if provider == "naver":
+        expected_state = request.cookies.get("oauth_state_naver", "")
+        if not state or not expected_state or not secrets.compare_digest(state, expected_state):
+            response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
+            response.delete_cookie(key="oauth_state_naver")
+            return response
 
     try:
-        social_id, email, display_name, kakao_at, kakao_rt = service.exchange_oauth_code(provider, code)
+        social_id, email, display_name, kakao_at, kakao_rt = service.exchange_oauth_code(provider, code, state)
         user = service.get_or_create_social_user(
             db, provider, social_id, email, display_name,
             kakao_access_token=kakao_at,
             kakao_refresh_token=kakao_rt,
         )
         token = create_access_token(user.id)
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?token={token}")
+        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?token={token}")
+        response.delete_cookie(key=f"oauth_state_{provider}")
+        return response
     except ValueError as exc:
         import traceback; traceback.print_exc()
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error={exc}")
+        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error={exc}")
+        response.delete_cookie(key=f"oauth_state_{provider}")
+        return response
     except Exception as exc:
         import traceback; traceback.print_exc()
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_failed")
+        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_failed")
+        response.delete_cookie(key=f"oauth_state_{provider}")
+        return response

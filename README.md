@@ -178,13 +178,19 @@ GEMINI_API_KEY=...
 OPENAI_API_KEY=...
 
 # OAuth
+NAVER_CLIENT_ID=...
+NAVER_CLIENT_SECRET=...
 KAKAO_CLIENT_ID=...
 KAKAO_CLIENT_SECRET=...
 
 # URL
 FRONTEND_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:8000
 BACKEND_URL=http://localhost:8000
 ```
+
+네이버 개발자센터의 Callback URL은 `BACKEND_URL` 뒤에 `/auth/naver/callback`을 붙인 값과 정확히 일치해야 합니다.
+예: `http://localhost:8000/auth/naver/callback`
 
 ---
 

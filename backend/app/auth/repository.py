@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.auth.models import User, UserProfile
+from app.auth.models import LoginLog, User, UserProfile
 
 
 # ── User ──────────────────────────────────────────────────────────────────────
@@ -19,10 +19,20 @@ def get_user_by_username(db: Session, username: str) -> User | None:
 
 def get_user_by_username_or_email(db: Session, identifier: str) -> User | None:
     """username 또는 email 둘 다로 조회 (로그인 시 사용)."""
+    users = get_users_by_username_or_email(db, identifier)
+    return users[0] if users else None
+
+
+def get_users_by_username_or_email(db: Session, identifier: str) -> list[User]:
+    """로그인 후보 유저 목록. 이메일 형태면 이메일만, 아니면 username만 조회."""
+    identifier = identifier.strip()
+    if "@" in identifier:
+        return db.query(User).filter(User.email == identifier).all()
     return (
         db.query(User)
-        .filter((User.username == identifier) | (User.email == identifier))
-        .first()
+        .filter(User.username == identifier)
+        .order_by(User.id.desc())
+        .all()
     )
 
 
@@ -83,11 +93,67 @@ def update_kakao_tokens(
     return user
 
 
+def create_login_log(
+    db: Session,
+    *,
+    user_id: int | None,
+    login_identifier: str,
+    login_method: str,
+    success: bool,
+    failure_reason: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> LoginLog:
+    log = LoginLog(
+        user_id=user_id,
+        login_identifier=login_identifier[:255],
+        login_method=login_method,
+        success=success,
+        failure_reason=failure_reason,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
+
+def list_login_logs(db: Session, limit: int = 100, offset: int = 0) -> list[LoginLog]:
+    return (
+        db.query(LoginLog)
+        .outerjoin(User)
+        .order_by(LoginLog.created_at.desc(), LoginLog.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+
+def list_users(db: Session, limit: int = 100, offset: int = 0) -> list[User]:
+    return (
+        db.query(User)
+        .order_by(User.created_at.desc(), User.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+
 def deactivate_user(db: Session, user: User) -> User:
     user.is_active = False
     db.commit()
     db.refresh(user)
     return user
+
+
+def delete_user(db: Session, user: User) -> None:
+    db.query(LoginLog).filter(LoginLog.user_id == user.id).update(
+        {LoginLog.user_id: None},
+        synchronize_session=False,
+    )
+    db.delete(user)
+    db.commit()
 
 
 # ── UserProfile ───────────────────────────────────────────────────────────────

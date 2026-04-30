@@ -2,7 +2,6 @@ import json
 import logging
 import re
 import threading
-import time
 from datetime import date, datetime, timedelta
 
 from openai import OpenAI

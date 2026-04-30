@@ -1,5 +1,5 @@
-import re
 import secrets
+import logging
 
 import requests as http_requests
 from fastapi import HTTPException, status
@@ -14,6 +14,8 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+
+logger = logging.getLogger(__name__)
 
 # ── OAuth provider config ─────────────────────────────────────────────────────
 
@@ -54,6 +56,11 @@ def signup(db: Session, data: SignupRequest) -> User:
             status_code=status.HTTP_409_CONFLICT,
             detail="이미 사용 중인 이메일입니다.",
         )
+    if data.username and repository.get_user_by_username(db, data.username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 사용 중인 아이디입니다.",
+        )
     user = User(
         email=data.email,
         username=data.username,
@@ -66,27 +73,94 @@ def signup(db: Session, data: SignupRequest) -> User:
     return user
 
 
-def login(db: Session, email: str, password: str) -> str:
+def _record_login_attempt(
+    db: Session,
+    *,
+    user_id: int | None,
+    identifier: str,
+    method: str,
+    success: bool,
+    failure_reason: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> None:
+    try:
+        repository.create_login_log(
+            db,
+            user_id=user_id,
+            login_identifier=identifier,
+            login_method=method,
+            success=success,
+            failure_reason=failure_reason,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("failed to write login log")
+
+
+def login(
+    db: Session,
+    email: str,
+    password: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> str:
     """
     username 또는 이메일 + 비밀번호 검증 후 JWT 발급.
     비활성 계정도 여기서 차단.
     """
-    user = repository.get_user_by_username_or_email(db, email)
+    identifier = email.strip()
+    method = "email" if "@" in identifier else "username"
+    candidates = repository.get_users_by_username_or_email(db, identifier)
+    user = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.hashed_password and verify_password(password, candidate.hashed_password)
+        ),
+        None,
+    )
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="이메일 또는 비밀번호가 올바르지 않습니다.",
+        _record_login_attempt(
+            db,
+            user_id=candidates[0].id if len(candidates) == 1 else None,
+            identifier=identifier,
+            method=method,
+            success=False,
+            failure_reason="invalid_credentials",
+            ip_address=ip_address,
+            user_agent=user_agent,
         )
-    if not user.hashed_password or not verify_password(password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="이메일 또는 비밀번호가 올바르지 않습니다.",
         )
     if user.is_active is False:  # None treated as active (legacy rows)
+        _record_login_attempt(
+            db,
+            user_id=user.id,
+            identifier=identifier,
+            method=method,
+            success=False,
+            failure_reason="inactive_user",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="비활성화된 계정입니다.",
         )
+    _record_login_attempt(
+        db,
+        user_id=user.id,
+        identifier=identifier,
+        method=method,
+        success=True,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
     return create_access_token(user.id)
 
 
@@ -106,7 +180,7 @@ def update_profile(db: Session, user_id: int, updates: dict) -> UserProfile:
 
 # ── OAuth ─────────────────────────────────────────────────────────────────────
 
-def exchange_oauth_code(provider: str, code: str) -> tuple[str, str, str, str | None, str | None]:
+def exchange_oauth_code(provider: str, code: str, state: str = "") -> tuple[str, str, str, str | None, str | None]:
     """
     Authorization code를 교환해 (social_id, email, display_name, kakao_access_token, kakao_refresh_token) 반환.
     Kakao 이외 공급자의 마지막 두 값은 None.
@@ -123,6 +197,8 @@ def exchange_oauth_code(provider: str, code: str) -> tuple[str, str, str, str | 
         "redirect_uri": redirect_uri,
         "client_id": client_id,
     }
+    if provider == "naver" and state:
+        token_data_req["state"] = state
     if client_secret:
         token_data_req["client_secret"] = client_secret
 
@@ -135,7 +211,7 @@ def exchange_oauth_code(provider: str, code: str) -> tuple[str, str, str, str | 
         headers={"Accept": "application/json"},
         timeout=10,
     )
-    logger.error("Kakao token status=%s body=%s", token_resp.status_code, token_resp.text)
+    logger.info("OAuth token provider=%s status=%s", provider, token_resp.status_code)
 
     token_data = token_resp.json()
     access_token = token_data.get("access_token")

@@ -1,5 +1,11 @@
 import axios from 'axios';
 
+const clearBrowserAuth = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('auth-storage');
+  document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
+};
+
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
 });
@@ -20,8 +26,8 @@ api.interceptors.response.use(
         error.config?.url?.includes('/auth/token') ||
         error.config?.url?.includes('/auth/login');
       if (!isAuthEndpoint) {
-        localStorage.removeItem('token');
-        window.location.href = '/login';
+        clearBrowserAuth();
+        window.location.replace('/login');
       }
     }
     return Promise.reject(error);

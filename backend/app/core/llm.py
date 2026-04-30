@@ -18,7 +18,6 @@ LLMResult attributes
 Raises LLMError (or a subclass) only when BOTH providers fail.
 """
 import logging
-import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from dataclasses import dataclass, field
 from typing import Any, Optional

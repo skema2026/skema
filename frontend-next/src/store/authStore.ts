@@ -2,6 +2,23 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from '@/types';
 
+const clearTokenCookie = () => {
+  if (typeof document === 'undefined') return;
+  document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
+};
+
+const setTokenCookie = (token: string) => {
+  if (typeof document === 'undefined') return;
+  document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
+};
+
+const clearStoredAuth = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('token');
+  localStorage.removeItem('auth-storage');
+  clearTokenCookie();
+};
+
 interface AuthState {
   user: User | null;
   token: string | null;
@@ -21,19 +38,19 @@ export const useAuthStore = create<AuthState>()(
       setHasHydrated: (v) => set({ _hasHydrated: v }),
       setUser: (user) => set({ user }),
       setToken: (token) => {
-        set({ token });
+        set({ user: null, token });
         if (token) {
-          localStorage.setItem('token', token);
-          document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('token', token);
+          }
+          setTokenCookie(token);
         } else {
-          localStorage.removeItem('token');
-          document.cookie = 'token=; path=/; max-age=0';
+          clearStoredAuth();
         }
       },
       logout: () => {
         set({ user: null, token: null });
-        localStorage.removeItem('token');
-        document.cookie = 'token=; path=/; max-age=0';
+        clearStoredAuth();
       },
     }),
     {

@@ -58,6 +58,8 @@ services:
       # CORS — 쉼표로 구분, 브라우저에서 접근하는 프론트 URL 포함
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      # Admin — 쉼표로 구분된 관리자 이메일 목록
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       # OAuth redirect_uri 생성에 사용 (OAuth 앱 설정의 callback URL과 일치해야 함)
       BACKEND_URL: ${BACKEND_URL:-http://localhost:8000}
     ports:

@@ -14,7 +14,7 @@
  *   - Horizontal snap: nearest column     → Math.floor(relX / colWidth)
  *   - Duration is preserved across the whole drag.
  *   - Ghost block shows the snapped target position; original block fades.
- *   - On drop: PATCH /schedules/{id} with new day_of_week + start_time + end_time.
+ *   - On drop: PATCH /schedules/{id} with new recurring_day + start_time + end_time.
  *   - Date-based schedules (s.date ≠ null): horizontal movement locked.
  *
  * Timezone fix:
@@ -29,10 +29,12 @@ import { useUIStore } from '@/store/uiStore';
 import { useUpdateSchedule } from '@/hooks/useSchedules';
 import { getScheduleColor, buildTitleColorMap, getScheduleColorKey } from '@/lib/scheduleColor';
 import { timeToMinutes, minutesToTime, dateStringToDow } from '@/lib/timetableParser';
+import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 
 // ── Grid constants ────────────────────────────────────────────────────────────
 
 const ALL_DAYS = ['월', '화', '수', '목', '금', '토', '일'] as const;
+const VISIBLE_DAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
 const START_HOUR  = 0;
 const END_HOUR    = 24;
@@ -64,12 +66,12 @@ function clamp(v: number, lo: number, hi: number): number {
 }
 
 /**
- * Resolve effective day_of_week for a schedule.
+ * Resolve effective weekday index for a schedule.
  * For date-based schedules, compute from date string in LOCAL time.
  */
 function effectiveDow(s: Schedule): number {
   if (s.date) return dateStringToDow(s.date);
-  return s.day_of_week;
+  return recurringDayToIndex(s.recurring_day);
 }
 
 // ── Drag state types ──────────────────────────────────────────────────────────
@@ -370,18 +372,13 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
     return s;
   }, [exams, weekStart]);
 
-  // ── 5. Always show all 7 days ───────────────────────────────────────────────
-  const visibleDays = [0, 1, 2, 3, 4, 5, 6] as const;
-
-  // Keep visibleDays ref in sync (read inside pointer event handlers)
-  useEffect(() => { visibleDaysRef.current = [...visibleDays]; }, [visibleDays]);
+  const visibleDays = VISIBLE_DAYS;
 
   // Auto-scroll to 7:00 on mount so morning classes are visible
   useEffect(() => {
     if (gridRef.current) {
       gridRef.current.scrollTop = 7 * 2 * SLOT_H;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── 6. Drag start ───────────────────────────────────────────────────────────
@@ -453,7 +450,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
       updateDragSnap({ scheduleId: drag.schedule.id, slot: snapSlot, dowIdx: snapDowIdx });
     };
 
-    const handleUp = (_e: PointerEvent) => {
+    const handleUp = () => {
       const drag = dragStateRef.current;
       const snap = dragSnapRef.current;
 
@@ -476,7 +473,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
         if (!unchanged) {
           updateScheduleRef.current({
             id:           drag.schedule.id,
-            day_of_week:  newDow,
+            recurring_day: indexToRecurringDay(newDow),
             start_time:   newStart,
             end_time:     newEnd,
           });
@@ -509,11 +506,11 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
 
   return (
     <div style={{
-      borderRadius: 14,
-      border:       '1px solid #ebeef1',
-      background:   '#fff',
+      borderRadius: 8,
+      border:       '1px solid #d8e2ef',
+      background:   '#ffffff',
       overflow:     'hidden',
-      boxShadow:    '0 2px 8px rgba(24,28,30,0.06)',
+      boxShadow:    '0 14px 36px rgba(23,32,51,0.08)',
       // Prevent text selection while dragging
       userSelect:   dragSnap ? 'none' : undefined,
     }}>
@@ -536,7 +533,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
       )}
 
       {/* ── Day header (weekday + date) ── */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #ebeef1' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid #d8e2ef', background: '#f8fbff' }}>
         <div style={{ width: GUTTER_W, flexShrink: 0 }} />
         {visibleDays.map((dow) => {
           // Compute the calendar date for this column
@@ -548,8 +545,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
           const dateLabel = `${colDate.getMonth() + 1}/${colDate.getDate()}`;
 
           const bg    = hasExam ? '#fef08a' : isPreExam ? '#fff1f2' : isToday ? '#eef1ff' : 'transparent';
-          const color = hasExam ? '#78350f' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#1a4db2' : '#747684';
-          const sub   = hasExam ? '#92400e' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#1a4db2' : '#aaa';
+          const color = hasExam ? '#78350f' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#2563eb' : '#3f4b61';
+          const sub   = hasExam ? '#92400e' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#2563eb' : '#aaa';
 
           return (
             <div key={`hdr-${dow}`} style={{

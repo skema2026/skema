@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,12 @@ import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 
 const OCCUPATIONS = ['학생', '직장인', '프리랜서', '기타'];
 
+type ProfileForm = {
+  occupation: string;
+  sleep_start: string;
+  sleep_end: string;
+};
+
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
@@ -26,38 +32,35 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
 
-  const [profileForm, setProfileForm] = useState({
-    occupation: '',
-    sleep_start: '23:00',
-    sleep_end: '07:00',
-  });
+  const [profileDraft, setProfileDraft] = useState<ProfileForm | null>(null);
+  const profileForm: ProfileForm = profileDraft ?? {
+    occupation: profile?.occupation || '',
+    sleep_start: profile?.sleep_start || '23:00',
+    sleep_end: profile?.sleep_end || '07:00',
+  };
 
-  const [notifEnabled, setNotifEnabled] = useState(true);
-  const [notifMinutes, setNotifMinutes] = useState(30);
+  const [notifEnabled, setNotifEnabled] = useState(() => (
+    typeof window === 'undefined' ? true : localStorage.getItem('skema_notif_enabled') !== 'false'
+  ));
+  const [notifMinutes, setNotifMinutes] = useState(() => (
+    typeof window === 'undefined' ? 30 : parseInt(localStorage.getItem('skema_notif_minutes') || '30', 10)
+  ));
 
-  // Sync profile data when loaded
-  useEffect(() => {
-    if (profile) {
-      setProfileForm({
-        occupation: profile.occupation || '',
-        sleep_start: profile.sleep_start || '23:00',
-        sleep_end: profile.sleep_end || '07:00',
-      });
+  const isCustomOccupation = !!profileForm.occupation && !OCCUPATIONS.includes(profileForm.occupation);
+  const updateProfileDraft = (next: ProfileForm) => setProfileDraft(next);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setProfileDraft(null);
+      onClose();
     }
-  }, [profile]);
-
-  // Load notification settings from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setNotifEnabled(localStorage.getItem('skema_notif_enabled') !== 'false');
-      setNotifMinutes(parseInt(localStorage.getItem('skema_notif_minutes') || '30', 10));
-    }
-  }, [open]);
+  };
 
   const handleSaveProfile = () => {
     updateProfile.mutate(profileForm, {
       onSuccess: () => {
         toast.success('프로필이 저장되었습니다');
+        setProfileDraft(null);
         onClose();
       },
       onError: () => toast.error('저장 중 오류가 발생했습니다'),
@@ -72,8 +75,8 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-md border-[#d8e2ef] bg-[#ffffff]">
         <DialogHeader>
           <DialogTitle>설정</DialogTitle>
         </DialogHeader>
@@ -91,9 +94,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                   <button
                     key={occ}
                     type="button"
-                    onClick={() => setProfileForm({ ...profileForm, occupation: occ })}
+                    onClick={() => updateProfileDraft({ ...profileForm, occupation: occ })}
                     className={`py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-                      profileForm.occupation === occ
+                      (occ === '기타' ? profileForm.occupation === '기타' || isCustomOccupation : profileForm.occupation === occ)
                         ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
                         : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300'
                     }`}
@@ -102,11 +105,11 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                   </button>
                 ))}
               </div>
-              {profileForm.occupation === '기타' && (
+              {(profileForm.occupation === '기타' || isCustomOccupation) && (
                 <Input
                   placeholder="직접 입력"
-                  value=""
-                  onChange={(e) => setProfileForm({ ...profileForm, occupation: e.target.value })}
+                  value={profileForm.occupation === '기타' ? '' : profileForm.occupation}
+                  onChange={(e) => updateProfileDraft({ ...profileForm, occupation: e.target.value })}
                 />
               )}
             </div>
@@ -117,7 +120,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                   id="s-sleep-start"
                   type="time"
                   value={profileForm.sleep_start}
-                  onChange={(e) => setProfileForm({ ...profileForm, sleep_start: e.target.value })}
+                  onChange={(e) => updateProfileDraft({ ...profileForm, sleep_start: e.target.value })}
                 />
               </div>
               <div className="space-y-1.5">
@@ -126,7 +129,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                   id="s-sleep-end"
                   type="time"
                   value={profileForm.sleep_end}
-                  onChange={(e) => setProfileForm({ ...profileForm, sleep_end: e.target.value })}
+                  onChange={(e) => updateProfileDraft({ ...profileForm, sleep_end: e.target.value })}
                 />
               </div>
             </div>

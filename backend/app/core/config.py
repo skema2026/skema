@@ -28,12 +28,14 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     # 쉼표로 구분된 허용 Origin 목록 (비어있으면 FRONTEND_URL 단독 사용)
     CORS_ORIGINS: str = ""
+    # 쉼표로 구분된 관리자 이메일 목록
+    ADMIN_EMAILS: str = ""
 
     # ── 백엔드 공개 URL (OAuth redirect_uri 등) ───────────────────────────────
     # 로컬: http://localhost:8000  / 배포: https://api.yourdomain.com
     BACKEND_URL: str = "http://localhost:8000"
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()

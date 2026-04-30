@@ -1,7 +1,7 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple, Literal, Optional, TypedDict
+from typing import List, Tuple, Literal, TypedDict
 
 WeekdayName = Literal[
     "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"
@@ -52,4 +52,3 @@ class NormalizedEntry(TypedDict):
     endTime: str    # "HH:MM"
     location: str
     bbox: Tuple[int, int, int, int]
-

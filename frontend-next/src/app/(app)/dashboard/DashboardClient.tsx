@@ -33,16 +33,17 @@ import { useProfile } from '@/hooks/useProfile';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
 import { api } from '@/lib/api';
+import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 import { timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { Schedule, UserProfile, ExamSchedule } from '@/types';
 
 const DAILY_QUOTES = {
-  exam_prep: '오늘 하루도 목표를 향해 한 걸음씩. 합격은 반드시 옵니다 💪',
-  civil_service: '꾸준함이 실력입니다. 오늘의 공부가 내일의 합격을 만듭니다 🔥',
-  student: '지금 이 순간의 노력이 미래를 바꿉니다. 화이팅! 📚',
-  worker: '성장하는 당신은 이미 앞서가고 있습니다 🌱',
-  default: 'SKEMA와 함께 오늘도 계획대로 실천해보세요 ✨',
+  exam_prep: '오늘 하루도 목표를 향해 한 걸음씩. 합격은 반드시 옵니다.',
+  civil_service: '꾸준함이 실력입니다. 오늘의 공부가 내일의 합격을 만듭니다.',
+  student: '지금 이 순간의 노력이 미래를 바꿉니다. 오늘 계획부터 실행해보세요.',
+  worker: '성장하는 당신은 이미 앞서가고 있습니다.',
+  default: 'SKEMA와 함께 오늘도 계획대로 실천해보세요.',
 };
 
 // ── 준비도 경보 시스템 ────────────────────────────────────────────────────────
@@ -77,14 +78,14 @@ function ExamReadinessPanel({ exams, schedules }: { exams: ExamSchedule[]; sched
 
   if (upcoming.length === 0) return (
     <div>
-      <p style={{ fontSize: 11, fontWeight: 700, color: '#747684', marginBottom: 6, letterSpacing: '0.5px' }}>준비도 경보</p>
-      <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', padding: '12px 0' }}>등록된 시험이 없습니다</p>
+      <p style={{ fontSize: 11, fontWeight: 700, color: '#3f4b61', marginBottom: 6, letterSpacing: '0.5px' }}>준비도 경보</p>
+      <p style={{ fontSize: 11, color: '#64748b', textAlign: 'center', padding: '12px 0' }}>등록된 시험이 없습니다</p>
     </div>
   );
 
   return (
     <div>
-      <p style={{ fontSize: 11, fontWeight: 700, color: '#747684', marginBottom: 8, letterSpacing: '0.5px' }}>준비도 경보</p>
+      <p style={{ fontSize: 11, fontWeight: 700, color: '#3f4b61', marginBottom: 8, letterSpacing: '0.5px' }}>준비도 경보</p>
       <div className="space-y-2">
         {upcoming.map(exam => {
           const [y, m, d] = exam.exam_date.split('-').map(Number);
@@ -103,7 +104,7 @@ function ExamReadinessPanel({ exams, schedules }: { exams: ExamSchedule[]; sched
             const day = new Date(today); day.setDate(day.getDate() + i);
             const dow = day.getDay() === 0 ? 6 : day.getDay() - 1;
             const busyHrs = schedules
-              .filter(s => !s.date && s.day_of_week === dow)
+              .filter(s => !s.date && recurringDayToIndex(s.recurring_day) === dow)
               .reduce((sum, s) => sum + calcMins(s) / 60, 0);
             availableHrs += Math.max(0, 24 - SLEEP_HRS - busyHrs);
           }
@@ -112,7 +113,7 @@ function ExamReadinessPanel({ exams, schedules }: { exams: ExamSchedule[]; sched
           const level = daysLeft <= 3 && readinessPct < 50 ? 'danger'
             : daysLeft <= 7 && readinessPct < 70 ? 'warn' : 'ok';
           const col = level === 'danger' ? '#DC2626' : level === 'warn' ? '#F97316' : '#059669';
-          const bg  = level === 'danger' ? '#fef2f2' : level === 'warn' ? '#fff7ed' : '#f0fdf4';
+          const bg  = level === 'danger' ? '#fef2f2' : level === 'warn' ? '#f6f8fc' : '#f0fdf4';
 
           return (
             <div key={exam.id} style={{ padding: '10px 12px', borderRadius: 10, background: bg, border: `1px solid ${col}30` }}>
@@ -124,7 +125,7 @@ function ExamReadinessPanel({ exams, schedules }: { exams: ExamSchedule[]; sched
                 <>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: col + '15', textAlign: 'center' }}>
-                      <p style={{ fontSize: 9, color: '#747684' }}>수행률</p>
+                      <p style={{ fontSize: 9, color: '#3f4b61' }}>수행률</p>
                       <p style={{ fontSize: 11, fontWeight: 800, color: col }}>{readinessPct}%</p>
                     </div>
                     <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: '#dbeafe', textAlign: 'center' }}>
@@ -132,7 +133,7 @@ function ExamReadinessPanel({ exams, schedules }: { exams: ExamSchedule[]; sched
                       <p style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8' }}>{remaining}개</p>
                     </div>
                     <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(0,0,0,0.04)', textAlign: 'center' }}>
-                      <p style={{ fontSize: 9, color: '#747684' }}>확보 가능</p>
+                      <p style={{ fontSize: 9, color: '#3f4b61' }}>확보 가능</p>
                       <p style={{ fontSize: 11, fontWeight: 800, color: '#181c1e' }}>{availableHrs}h</p>
                     </div>
                   </div>
@@ -158,7 +159,7 @@ function ExamReadinessPanel({ exams, schedules }: { exams: ExamSchedule[]; sched
                   )}
                 </>
               ) : (
-                <p style={{ fontSize: 10, color: '#9ca3af' }}>AI 공부 계획 생성 후 경보가 활성화됩니다</p>
+                <p style={{ fontSize: 10, color: '#64748b' }}>AI 공부 계획 생성 후 경보가 활성화됩니다</p>
               )}
             </div>
           );
@@ -179,9 +180,7 @@ function ForgettingCurvePanel({ schedules }: { schedules: Schedule[] }) {
   const completedClasses = schedules.filter(s => s.schedule_type === 'class' && s.is_completed);
   const completedClassCount = completedClasses.length;
 
-  // 오늘 완료된 수업 → 내일 복습 예정 표시용
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+  // 오늘 완료된 수업 복습 예정 표시용
   const reviewsTomorrow = completedClasses
     .filter(s => (s.date || todayStr) === todayStr)
     .map(s => ({ label: s.title.replace(/^[📚📖🔁]\s*/, ''), color: s.color || '#8B5CF6' }));
@@ -191,7 +190,7 @@ function ForgettingCurvePanel({ schedules }: { schedules: Schedule[] }) {
     const jsDay = new Date(dateStr + 'T00:00:00').getDay();
     const dow = jsDay === 0 ? 6 : jsDay - 1;
     const daySchedules = schedules.filter(s =>
-      s.date === dateStr || (!s.date && s.day_of_week === dow)
+      s.date === dateStr || (!s.date && recurringDayToIndex(s.recurring_day) === dow)
     );
     const occupied: [number, number][] = daySchedules
       .filter(s => s.start_time && s.end_time)
@@ -248,7 +247,7 @@ function ForgettingCurvePanel({ schedules }: { schedules: Schedule[] }) {
           title: `🔁 ${cls.title} 복습`,
           schedule_type: 'study',
           date: dateStr,
-          day_of_week: dow,
+          recurring_day: indexToRecurringDay(dow),
           start_time,
           end_time,
           color: cls.color,
@@ -287,10 +286,10 @@ function ForgettingCurvePanel({ schedules }: { schedules: Schedule[] }) {
 
   return (
     <div>
-      <p style={{ fontSize: 11, fontWeight: 700, color: '#747684', marginBottom: 8, letterSpacing: '0.5px' }}>복습 스케줄러</p>
+      <p style={{ fontSize: 11, fontWeight: 700, color: '#3f4b61', marginBottom: 8, letterSpacing: '0.5px' }}>복습 스케줄러</p>
 
       {reviewsTomorrow.length === 0 ? (
-        <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', padding: '6px 0 8px' }}>오늘 완료된 수업 없음</p>
+        <p style={{ fontSize: 11, color: '#64748b', textAlign: 'center', padding: '6px 0 8px' }}>오늘 완료된 수업 없음</p>
       ) : (
         <div style={{ padding: '10px 12px', borderRadius: 10, background: '#f5f3ff', border: '1px solid #ddd6fe', marginBottom: 8 }}>
           <p style={{ fontSize: 10, color: '#5b21b6', marginBottom: 6, fontWeight: 600 }}>내일 복습 예정</p>
@@ -311,7 +310,7 @@ function ForgettingCurvePanel({ schedules }: { schedules: Schedule[] }) {
         style={{
           width: '100%', padding: '7px 0', borderRadius: 8,
           background: generating ? '#e5e7eb' : '#ede9fe',
-          color: generating ? '#9ca3af' : '#5b21b6',
+          color: generating ? '#64748b' : '#5b21b6',
           fontWeight: 700, fontSize: 11,
           border: '1px solid #c4b5fd',
           cursor: generating ? 'not-allowed' : 'pointer',
@@ -321,7 +320,7 @@ function ForgettingCurvePanel({ schedules }: { schedules: Schedule[] }) {
       >
         {generating ? '생성 중...' : '복습 일정 생성'}
       </button>
-      <p style={{ fontSize: 9, color: '#9ca3af', textAlign: 'center', marginTop: 4 }}>수업 완료 시 다음 날 빈 시간 1시간 자동 배치</p>
+      <p style={{ fontSize: 9, color: '#64748b', textAlign: 'center', marginTop: 4 }}>수업 완료 시 다음 날 빈 시간 1시간 자동 배치</p>
     </div>
   );
 }
@@ -353,7 +352,7 @@ function WeeklyAIFeedbackPanel({ schedules, currentWeekStart }: { schedules: Sch
         const gd = new Date(y, m - 1, d).getDay();
         return (gd === 0 ? 6 : gd - 1) === dow;
       }
-      return s.day_of_week === dow;
+      return recurringDayToIndex(s.recurring_day) === dow;
     });
     return { name, done: daySch.filter(s => s.is_completed).length, total: daySch.length };
   }).filter(d => d.total > 0);
@@ -388,21 +387,21 @@ function WeeklyAIFeedbackPanel({ schedules, currentWeekStart }: { schedules: Sch
 
   return (
     <div>
-      <p style={{ fontSize: 11, fontWeight: 700, color: '#747684', marginBottom: 8, letterSpacing: '0.5px' }}>주간 AI 편지</p>
+      <p style={{ fontSize: 11, fontWeight: 700, color: '#3f4b61', marginBottom: 8, letterSpacing: '0.5px' }}>주간 AI 편지</p>
       <div style={{ padding: '12px', borderRadius: 10, background: '#faf9ff', border: '1px solid #e0d9ff', minHeight: 72 }}>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #c4b5fd', borderTopColor: '#7c3aed', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-            <p style={{ fontSize: 11, color: '#747684' }}>편지 작성 중...</p>
+            <p style={{ fontSize: 11, color: '#3f4b61' }}>편지 작성 중...</p>
           </div>
         ) : feedback ? (
           <>
-            <p style={{ fontSize: 9, color: '#9ca3af', marginBottom: 6 }}>To. 이번 주의 나 · {dateLabel}</p>
+            <p style={{ fontSize: 9, color: '#64748b', marginBottom: 6 }}>To. 이번 주의 나 · {dateLabel}</p>
             <p style={{ fontSize: 12, color: '#3730a3', lineHeight: 1.7 }}>{feedback}</p>
             <p style={{ fontSize: 9, color: '#c4b5fd', marginTop: 6, textAlign: 'right' }}>— AI SKEMA</p>
           </>
         ) : (
-          <p style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6 }}>이번 주 일정을 완료하면<br />AI 편지가 자동 작성됩니다.</p>
+          <p style={{ fontSize: 11, color: '#64748b', lineHeight: 1.6 }}>이번 주 일정을 완료하면<br />AI 편지가 자동 작성됩니다.</p>
         )}
       </div>
     </div>
@@ -448,7 +447,7 @@ function KakaoNotifyButton() {
         width: '100%',
         padding: '9px 0',
         borderRadius: 10,
-        background: status === 'ok' ? '#16A34A' : status === 'not_connected' ? '#9ca3af' : '#FEE500',
+        background: status === 'ok' ? '#16A34A' : status === 'not_connected' ? '#64748b' : '#FEE500',
         color: status === 'ok' || status === 'not_connected' ? '#fff' : '#3C1E1E',
         fontWeight: 700,
         fontSize: 12,
@@ -611,7 +610,7 @@ function TypeAnalysis({ schedules, weekStart }: { schedules: Schedule[]; weekSta
     <div className="space-y-3">
       <div className="rounded-xl p-4" style={{ background: '#fff', border: '1px solid #ebeef1' }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: '#181c1e', marginBottom: 4 }}>이번 주 유형별 분석</p>
-        <p style={{ fontSize: 11, color: '#747684', marginBottom: 16 }}>
+        <p style={{ fontSize: 11, color: '#3f4b61', marginBottom: 16 }}>
           총 {thisWeek.length}개 일정 · {Math.floor(totalMinsAll / 60)}시간 {totalMinsAll % 60}분
         </p>
         {/* 원형 분포 */}
@@ -642,7 +641,7 @@ function TypeAnalysis({ schedules, weekStart }: { schedules: Schedule[]; weekSta
                     <span style={{ fontSize: 13 }}>{icon}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#181c1e' }}>{label}</span>
                     {count > 0 && (
-                      <span style={{ fontSize: 10, color: '#747684' }}>· {count}개 · {timeStr}</span>
+                      <span style={{ fontSize: 10, color: '#3f4b61' }}>· {count}개 · {timeStr}</span>
                     )}
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: count > 0 ? color : '#d1d5db' }}>
@@ -679,7 +678,7 @@ function WeeklyReport({ schedules }: { schedules: Schedule[] }) {
     colDate.setDate(weekMonday.getDate() + i);
     const colStr = `${colDate.getFullYear()}-${String(colDate.getMonth()+1).padStart(2,'0')}-${String(colDate.getDate()).padStart(2,'0')}`;
     const daySch = schedules.filter((s) => {
-      if (!s.date) return s.day_of_week === i;           // 반복 일정
+      if (!s.date) return recurringDayToIndex(s.recurring_day) === i; // 반복 일정
       return s.date === colStr;                           // 특정 날짜 일정
     });
     const done = daySch.filter((s) => s.is_completed).length;
@@ -687,8 +686,6 @@ function WeeklyReport({ schedules }: { schedules: Schedule[] }) {
     return { day, done, total, pct: total > 0 ? Math.round((done / total) * 100) : null, isToday: i === todayDow };
   });
 
-  const totalDone = schedules.filter((s) => s.is_completed).length;
-  const totalAll = schedules.length;
   const TYPE_META = [
     { type: 'class',      label: '수업',     color: '#4F46E5' },
     { type: 'study',      label: '자율학습', color: '#10b981' },
@@ -708,9 +705,9 @@ function WeeklyReport({ schedules }: { schedules: Schedule[] }) {
       <div className="rounded-xl p-4" style={{ background: '#fff', border: '1px solid #ebeef1' }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: '#181c1e', marginBottom: 16 }}>요일별 수행률</p>
         <div className="flex items-end gap-2" style={{ height: 80 }}>
-          {weekStats.map(({ day, done, total, pct, isToday }) => (
+          {weekStats.map(({ day, pct, isToday }) => (
             <div key={day} className="flex-1 flex flex-col items-center gap-1">
-              <span style={{ fontSize: 10, color: '#747684' }}>{pct !== null ? `${pct}%` : '-'}</span>
+              <span style={{ fontSize: 10, color: '#3f4b61' }}>{pct !== null ? `${pct}%` : '-'}</span>
               <div style={{ width: '100%', height: 50, background: '#f1f4f7', borderRadius: 6, overflow: 'hidden', display: 'flex', alignItems: 'flex-end' }}>
                 {pct !== null && (
                   <div style={{
@@ -720,7 +717,7 @@ function WeeklyReport({ schedules }: { schedules: Schedule[] }) {
                   }} />
                 )}
               </div>
-              <span style={{ fontSize: 11, fontWeight: isToday ? 800 : 400, color: isToday ? 'var(--skema-primary)' : '#747684' }}>{day}</span>
+              <span style={{ fontSize: 11, fontWeight: isToday ? 800 : 400, color: isToday ? 'var(--skema-primary)' : '#3f4b61' }}>{day}</span>
             </div>
           ))}
         </div>
@@ -735,7 +732,7 @@ function WeeklyReport({ schedules }: { schedules: Schedule[] }) {
               <div key={type}>
                 <div className="flex justify-between mb-1">
                   <span style={{ fontSize: 12, color: '#181c1e' }}>{label}</span>
-                  <span style={{ fontSize: 12, color: '#747684' }}>{done}/{total}</span>
+                  <span style={{ fontSize: 12, color: '#3f4b61' }}>{done}/{total}</span>
                 </div>
                 <div style={{ height: 6, borderRadius: 99, background: '#f1f4f7' }}>
                   <div style={{ height: '100%', width: `${total > 0 ? (done / total) * 100 : 0}%`, background: color, borderRadius: 99, transition: 'width 0.5s' }} />
@@ -781,7 +778,11 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const toggleType = (t: ScheduleTypeFilter) =>
     setActiveTypes(prev => {
       const next = new Set(prev);
-      next.has(t) ? next.delete(t) : next.add(t);
+      if (next.has(t)) {
+        next.delete(t);
+      } else {
+        next.add(t);
+      }
       return next;
     });
   const filteredSchedules = schedules.filter(s =>
@@ -808,7 +809,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const upcoming = schedules.find((s) => {
       if (s.is_completed) return false;
-      const matchDay = s.date ? s.date === todayStr : s.day_of_week === todayDow;
+      const matchDay = s.date ? s.date === todayStr : recurringDayToIndex(s.recurring_day) === todayDow;
       if (!matchDay) return false;
       const startMin = timeToMinutes(s.start_time);
       const diff = startMin - nowMin;
@@ -853,7 +854,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
         title: `📝 ${exam.title} 전날 복습`,
         schedule_type: 'study',
         date: preExamStr,
-        day_of_week: dow,
+        recurring_day: indexToRecurringDay(dow),
         start_time: '20:00',
         end_time: '22:00',
         color: '#DC2626',
@@ -867,8 +868,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
         localStorage.setItem(lsKey, '1'); // 충돌 등 실패 시 재시도 방지
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exams]);
+  }, [exams, queryClient]);
 
   // 시험 전날 경보 토스트
   useEffect(() => {
@@ -890,7 +890,6 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
         { duration: 15000 },
       );
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exams]);
 
   // 오늘 할 일
@@ -901,7 +900,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   // 서버의 get_today_schedules와 동일한 중복 제거:
   // 반복 일정 + 오늘 날짜 일정을 합치되, 같은 title+start_time의 dated 인스턴스가 있으면 반복 일정은 제외
   const todaySpecific = schedules.filter((s) => s.date === todayStr);
-  const todayRecurring = schedules.filter((s) => !s.date && s.day_of_week === todayDow);
+  const todayRecurring = schedules.filter((s) => !s.date && recurringDayToIndex(s.recurring_day) === todayDow);
   const todaySpecificKeys = new Set(todaySpecific.map((s) => `${s.title}|${s.start_time}`));
   const todaySchedules = [
     ...todaySpecific,
@@ -926,17 +925,33 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const weekDone  = weekSchedules.filter((s) => s.is_completed).length;
   const weekPct   = weekTotal > 0 ? Math.round((weekDone / weekTotal) * 100) : null;
 
-  // 헤더 뱃지용 (오늘 기준)
-  const total = schedules.length;
-  const done  = schedules.filter((s) => s.is_completed).length;
-  const pct   = todayPct;
-
   // 미달성 일정 (오늘 + 이미 지난 시간 + 미완료)
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const unachievedSchedules = todaySchedules.filter((s) => {
     if (s.is_completed) return false;
     return timeToMinutes(s.end_time) < nowMin;
   });
+  const remainingToday = todaySchedules.filter((s) => !s.is_completed);
+  const nextSchedule = remainingToday.find((s) => timeToMinutes(s.start_time) >= nowMin) ?? remainingToday[0] ?? null;
+  const upcomingExam = exams
+    .filter((e) => {
+      const [y, m, d] = e.exam_date.split('-').map(Number);
+      const examDate = new Date(y, m - 1, d);
+      examDate.setHours(23, 59, 59, 999);
+      return examDate >= now;
+    })
+    .sort((a, b) => a.exam_date.localeCompare(b.exam_date))[0] ?? null;
+  const daysUntilExam = upcomingExam
+    ? Math.ceil((new Date(`${upcomingExam.exam_date}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000)
+    : null;
+  const todayLabel = new Intl.DateTimeFormat('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  }).format(now);
+  const weekEndDate = new Date(weekStart);
+  weekEndDate.setDate(weekStart.getDate() + 6);
+  const weekLabel = `${weekStart.getMonth() + 1}.${weekStart.getDate()} - ${weekEndDate.getMonth() + 1}.${weekEndDate.getDate()}`;
 
   // 완료 토글 — optimistic update (useToggleComplete 훅 사용)
   const handleToggleComplete = (s: Schedule) => {
@@ -972,8 +987,9 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
 
   const handleLogout = () => {
     logout();
-    router.push('/login');
+    queryClient.clear();
     toast.success('로그아웃 되었습니다');
+    window.location.replace('/login');
   };
 
   const handleShare = async () => {
@@ -1006,8 +1022,176 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
       <style>{`
         .hide-mobile { display: none; }
         @media (min-width: 640px) { .hide-mobile { display: inline; } }
+        .skema-dashboard-shell {
+          background:
+            linear-gradient(135deg, rgba(246,248,252,.98), rgba(232,243,255,.94)),
+            linear-gradient(90deg, rgba(37,99,235,.08) 1px, transparent 1px),
+            linear-gradient(rgba(14,165,233,.07) 1px, transparent 1px);
+          background-size: auto, 28px 28px, 28px 28px;
+        }
+        .skema-dashboard-header {
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+        }
+        .skema-dashboard-main [data-slot="tabs-list"] {
+          max-width: 100%;
+          overflow-x: auto;
+          justify-content: flex-start;
+          background: #f8fbff;
+          border: 1px solid #d8e2ef;
+          box-shadow: 0 8px 20px rgba(23,32,51,.05);
+        }
+        .skema-dashboard-main [data-slot="tabs-trigger"] {
+          min-width: fit-content;
+          color: #3f4b61;
+          font-weight: 700;
+        }
+        .skema-dashboard-main [data-slot="tabs-trigger"][data-active] {
+          background: #2563eb;
+          color: white;
+        }
+        .skema-dash-scroll {
+          min-height: 0;
+          overflow: auto;
+          padding: 18px;
+        }
+        .skema-command-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.45fr) minmax(320px, .85fr);
+          gap: 14px;
+          margin-bottom: 14px;
+        }
+        .skema-panel {
+          background: rgba(255,255,255,.96);
+          border: 1px solid #d8e2ef;
+          border-radius: 8px;
+          box-shadow: 0 12px 32px rgba(23,32,51,.07);
+        }
+        .skema-focus-panel {
+          padding: 20px;
+          background:
+            linear-gradient(135deg, rgba(255,255,255,.97), rgba(247,250,255,.97)),
+            linear-gradient(90deg, rgba(37,99,235,.06) 1px, transparent 1px),
+            linear-gradient(rgba(37,99,235,.05) 1px, transparent 1px);
+          background-size: auto, 24px 24px, 24px 24px;
+        }
+        .skema-kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .skema-kpi {
+          padding: 14px;
+          border-radius: 8px;
+          border: 1px solid #d8e2ef;
+          background: #f8fbff;
+        }
+        .skema-work-grid {
+          display: grid;
+          grid-template-columns: 310px minmax(0, 1fr) 330px;
+          gap: 14px;
+          align-items: start;
+        }
+        .skema-section-title {
+          color: #0f172a;
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: .01em;
+        }
+        .skema-muted {
+          color: #516078;
+          font-size: 12px;
+          line-height: 1.6;
+        }
+        .skema-icon-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          border: 1px solid #d8e2ef;
+          background: #fff;
+          color: #334155;
+          cursor: pointer;
+        }
+        .skema-primary-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          min-height: 36px;
+          padding: 0 14px;
+          border: 0;
+          border-radius: 8px;
+          background: #2563eb;
+          color: #fff;
+          font-size: 13px;
+          font-weight: 800;
+          box-shadow: 0 8px 18px rgba(37,99,235,.2);
+          cursor: pointer;
+        }
+        .skema-secondary-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          min-height: 36px;
+          padding: 0 12px;
+          border: 1px solid #c7d2e2;
+          border-radius: 8px;
+          background: #fff;
+          color: #334155;
+          font-size: 13px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .skema-task-row {
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          padding: 10px;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          background: #fffdf9;
+          cursor: pointer;
+        }
+        .skema-task-row + .skema-task-row {
+          margin-top: 8px;
+        }
+        .skema-dashboard-main [data-slot="tabs"] {
+          gap: 10px;
+        }
+        @media (max-width: 640px) {
+          .skema-dashboard-header {
+            height: auto !important;
+            min-height: 58px;
+            gap: 10px;
+            padding: 10px 12px !important;
+            flex-wrap: wrap;
+          }
+          .skema-dashboard-title-badge {
+            order: 3;
+            width: 100%;
+          }
+          .skema-dashboard-main {
+            padding: 12px !important;
+          }
+        }
+        @media (max-width: 1180px) {
+          .skema-command-grid,
+          .skema-work-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        @media (max-width: 720px) {
+          .skema-dash-scroll {
+            padding: 12px;
+          }
+          .skema-kpi-grid {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
-      <div className="flex flex-col h-screen" style={{ background: 'var(--skema-surface)' }}>
+      <div className="skema-dashboard-shell flex h-screen flex-col">
 
         {/* Notification Banner */}
         {notification && (
@@ -1028,28 +1212,28 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#181c1e' }}>곧 시작! (클릭하면 일정 확인)</div>
-              <div style={{ fontSize: 12, color: '#434653', marginTop: 2 }}>{notification.title} — {notification.start_time}</div>
+              <div style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>{notification.title} — {notification.start_time}</div>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); setNotification(null); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#747684', fontSize: 16, padding: 0, lineHeight: 1 }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3f4b61', fontSize: 16, padding: 0, lineHeight: 1 }}
             >×</button>
           </div>
         )}
 
         {/* Header */}
-        <header style={{
+        <header className="skema-dashboard-header" style={{
           height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 20px', borderBottom: '1px solid var(--skema-container)',
-          background: '#fff', position: 'sticky', top: 0, zIndex: 30, flexShrink: 0
+          background: 'rgba(255,255,255,0.94)', position: 'sticky', top: 0, zIndex: 30, flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'var(--skema-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MaterialIcon icon="schedule" size={15} color="#fff" filled />
             </div>
-            <span className="skema-headline" style={{ fontWeight: 800, fontSize: '18px', color: 'var(--skema-on-surface)' }}>SKEMA</span>
+              <span className="skema-headline" style={{ fontWeight: 800, fontSize: '18px', color: 'var(--skema-on-surface)', letterSpacing: 0 }}>SKEMA</span>
             {todayPct !== null && (
-              <span style={{
+              <span className="skema-dashboard-title-badge" style={{
                 padding: '2px 10px', borderRadius: 9999, fontSize: 11, fontWeight: 700,
                 background: todayPct >= 80 ? '#d1fae5' : todayPct >= 40 ? '#fef9c3' : 'var(--skema-surface-low)',
                 color: todayPct >= 80 ? '#059669' : todayPct >= 40 ? '#d97706' : 'var(--skema-on-surface-variant)',
@@ -1060,9 +1244,9 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button onClick={() => openClassForm()} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--skema-primary)', color: '#fff', border: 'none', borderRadius: '10px', padding: '7px 14px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => openClassForm()} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--skema-primary)', color: '#fff', border: 'none', borderRadius: '10px', padding: '7px 14px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 18px var(--skema-primary-shadow)' }}>
               <MaterialIcon icon="add" size={16} color="#fff" />
-              수업 추가
+              <span className="hide-mobile">일정</span> 추가
             </button>
 
             <button
@@ -1091,6 +1275,16 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
+                  {user?.is_admin && (
+                    <>
+                      <DropdownMenuItem onClick={() => router.push('/admin/users')}>
+                        관리자 회원 관리
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push('/admin/login-logs')}>
+                        관리자 로그인 로그
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
                     설정
                   </DropdownMenuItem>
@@ -1107,13 +1301,246 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
         </header>
 
         {/* Main Content */}
-        <div className="flex flex-1 overflow-hidden min-h-0">
+        <div className="skema-dash-scroll flex-1">
+          <section className="skema-command-grid">
+            <div className="skema-panel skema-focus-panel">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: '#2563eb' }}>{todayLabel}</p>
+                  <h1 className="mt-2 text-2xl font-black tracking-normal text-[#0f172a] sm:text-3xl">
+                    오늘은 이것만 놓치지 마세요
+                  </h1>
+                  <p className="mt-2 max-w-xl text-sm font-medium leading-7 text-[#516078]">
+                    다음 일정, 밀린 일정, 시험 경보를 먼저 처리하고 시간표에서 주간 흐름을 조정하세요.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button className="skema-primary-action" onClick={() => openClassForm()}>
+                    <MaterialIcon icon="add" size={16} color="#fff" />
+                    일정 추가
+                  </button>
+                  <button className="skema-secondary-action" onClick={handleShare}>
+                    <MaterialIcon icon="share" size={16} color="#334155" />
+                    공유
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                <div className="rounded-lg border border-[#d8e3ff] bg-[#f7faff] p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="skema-sticker h-9 w-9">
+                      <MaterialIcon icon="flag" size={18} color="#2563eb" filled />
+                    </span>
+                    <div>
+                      <p className="text-xs font-black text-[#2563eb]">다음 액션</p>
+                      <p className="text-lg font-black text-[#0f172a]">
+                        {nextSchedule ? nextSchedule.title : '오늘 남은 일정이 없습니다'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-[#3f4b61]">
+                    {nextSchedule
+                      ? `${nextSchedule.start_time} - ${nextSchedule.end_time}${nextSchedule.location ? ` · ${nextSchedule.location}` : ''}`
+                      : '새 일정을 추가하거나 주간 리포트를 확인해보세요.'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-[#f4c9dd] bg-[#fff6fa] p-4">
+                  <p className="text-xs font-black text-[#0ea5e9]">오늘 진행률</p>
+                  <div className="mt-3 flex items-end gap-2">
+                    <span className="text-4xl font-black text-[#0f172a]">{todayPct ?? 0}%</span>
+                    <span className="pb-1 text-xs font-bold text-[#516078]">{todayDone}/{todayTotal} 완료</span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                    <div className="h-full rounded-full bg-[#0ea5e9]" style={{ width: `${todayPct ?? 0}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="skema-kpi-grid">
+              {[
+                { label: '남은 오늘 일정', value: `${remainingToday.length}개`, icon: 'checklist', color: '#2563eb', bg: '#eaf1ff' },
+                { label: '미완료/지난 일정', value: `${unachievedSchedules.length}개`, icon: 'update', color: '#b45309', bg: '#eef6ff' },
+                { label: '시간 충돌', value: `${conflicts.length}건`, icon: 'warning', color: '#dc2626', bg: '#fff1f2' },
+                { label: '다가오는 시험', value: upcomingExam ? `D-${daysUntilExam}` : '없음', icon: 'quiz', color: '#087f5b', bg: '#e9fff7' },
+              ].map((item) => (
+                <div key={item.label} className="skema-kpi">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-[#516078]">{item.label}</span>
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: item.bg }}>
+                      <MaterialIcon icon={item.icon} size={17} color={item.color} filled />
+                    </span>
+                  </div>
+                  <p className="mt-3 text-2xl font-black text-[#0f172a]">{item.value}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="skema-work-grid">
+            <aside className="skema-panel p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="skema-section-title">오늘 할 일</p>
+                  <p className="skema-muted">클릭하면 완료 상태가 바뀝니다</p>
+                </div>
+                <span className="rounded-lg bg-[#eaf1ff] px-2.5 py-1 text-xs font-black text-[#2563eb]">
+                  {remainingToday.length} left
+                </span>
+              </div>
+              {todaySchedules.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-[#c7d2e2] bg-[#f8fbff] p-5 text-center">
+                  <MaterialIcon icon="weekend" size={24} color="#087f5b" filled />
+                  <p className="mt-2 text-sm font-bold text-[#3f4b61]">오늘은 비어 있습니다</p>
+                </div>
+              ) : (
+                <div>
+                  {todaySchedules.map((s) => (
+                    <button key={s.id} className="skema-task-row w-full text-left" onClick={() => handleToggleComplete(s)}>
+                      <span
+                        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2"
+                        style={{
+                          background: s.is_completed ? '#087f5b' : '#fff',
+                          borderColor: s.is_completed ? '#087f5b' : '#b8c5d6',
+                        }}
+                      >
+                        {s.is_completed && <MaterialIcon icon="check" size={13} color="#fff" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className="block truncate text-sm font-extrabold"
+                          style={{ color: s.is_completed ? '#64748b' : '#0f172a', textDecoration: s.is_completed ? 'line-through' : 'none' }}
+                        >
+                          {s.title}
+                        </span>
+                        <span className="mt-0.5 block text-xs font-semibold text-[#516078]">
+                          {s.start_time} - {s.end_time}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {unachievedSchedules.length > 0 && (
+                <button
+                  onClick={handleReschedule}
+                  disabled={isRegenerating}
+                  className="mt-4 w-full rounded-lg border border-[#fed7aa] bg-[#eef6ff] px-3 py-2 text-xs font-black text-[#9a5b00]"
+                >
+                  {isRegenerating ? '재배치 중...' : '밀린 일정 AI 재배치'}
+                </button>
+              )}
+            </aside>
+
+            <section className="min-w-0">
+              <div className="skema-panel mb-3 p-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="skema-section-title">주간 시간표</p>
+                    <p className="skema-muted">{weekLabel}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button className="skema-icon-btn h-9 w-9" onClick={() => setWeekOffset((o) => o - 1)} aria-label="이전 주">
+                      <MaterialIcon icon="chevron_left" size={18} color="#334155" />
+                    </button>
+                    <button className="skema-secondary-action" onClick={() => setWeekOffset(0)}>
+                      이번 주
+                    </button>
+                    <button className="skema-icon-btn h-9 w-9" onClick={() => setWeekOffset((o) => o + 1)} aria-label="다음 주">
+                      <MaterialIcon icon="chevron_right" size={18} color="#334155" />
+                    </button>
+                    <button
+                      className="skema-secondary-action"
+                      onClick={() => setActiveTypes(activeTypes.size === ALL_TYPES.length ? new Set() : new Set(ALL_TYPES))}
+                    >
+                      {activeTypes.size === ALL_TYPES.length ? '필터 해제' : '전체 표시'}
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      { type: 'class', label: '수업', color: '#4F46E5' },
+                      { type: 'study', label: '자율학습', color: '#087f5b' },
+                      { type: 'assignment', label: '과제', color: '#b45309' },
+                      { type: 'activity', label: '활동', color: '#7c3aed' },
+                      { type: 'personal', label: '개인', color: '#0ea5e9' },
+                    ] as { type: ScheduleTypeFilter; label: string; color: string }[]
+                  ).map(({ type, label, color }) => {
+                    const active = activeTypes.has(type);
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => toggleType(type)}
+                        className="rounded-lg border px-2.5 py-1.5 text-xs font-black"
+                        style={{
+                          borderColor: active ? color : '#d8e2ef',
+                          background: active ? `${color}16` : '#fff',
+                          color: active ? color : '#516078',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <Tabs defaultValue="timetable" className="skema-dashboard-main">
+                <TabsList className="mb-3 w-full sm:w-fit">
+                  <TabsTrigger value="timetable">시간표</TabsTrigger>
+                  <TabsTrigger value="exams">시험</TabsTrigger>
+                  <TabsTrigger value="report">리포트</TabsTrigger>
+                  <TabsTrigger value="type-analysis">분석</TabsTrigger>
+                </TabsList>
+                <TabsContent value="timetable">
+                  <Timetable schedules={filteredSchedules} exams={exams} weekStart={weekStart} />
+                </TabsContent>
+                <TabsContent value="exams">
+                  <ExamList />
+                </TabsContent>
+                <TabsContent value="report">
+                  <WeeklyReport schedules={schedules} />
+                </TabsContent>
+                <TabsContent value="type-analysis">
+                  <TypeAnalysis schedules={schedules} weekStart={weekStart} />
+                </TabsContent>
+              </Tabs>
+            </section>
+
+            <aside className="skema-panel p-4">
+              <div className="mb-4">
+                <p className="skema-section-title">우선순위 패널</p>
+                <p className="skema-muted">시험과 위험 신호를 먼저 봅니다</p>
+              </div>
+              {upcomingExam ? (
+                <div className="mb-4 rounded-lg border border-[#c7f3df] bg-[#effdf7] p-3">
+                  <div className="flex items-center gap-2">
+                    <MaterialIcon icon="quiz" size={18} color="#087f5b" filled />
+                    <p className="text-xs font-black text-[#087f5b]">다가오는 시험</p>
+                  </div>
+                  <p className="mt-2 text-lg font-black text-[#0f172a]">{upcomingExam.title}</p>
+                  <p className="text-xs font-bold text-[#516078]">
+                    {upcomingExam.exam_date} · D-{daysUntilExam}
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-4 rounded-lg border border-[#d8e2ef] bg-[#f8fbff] p-3">
+                  <p className="text-sm font-bold text-[#3f4b61]">등록된 예정 시험이 없습니다</p>
+                </div>
+              )}
+              <SmartAlertPanel exams={exams} schedules={schedules} currentWeekStart={weekStart} />
+            </aside>
+          </section>
+        </div>
+
+        <div style={{ display: 'none' }} className="flex flex-1 overflow-hidden min-h-0">
 
           {/* ── 오늘 할 일 사이드바 ── */}
-          <div className="w-60 flex-shrink-0 overflow-y-auto border-r p-3 flex flex-col gap-3 min-h-0" style={{ background: '#fff' }}>
+          <div className="hidden w-64 flex-shrink-0 overflow-y-auto border-r p-3 lg:flex lg:flex-col gap-3 min-h-0" style={{ background: 'rgba(255,255,255,0.94)', borderColor: '#d8e2ef' }}>
 
             {/* 동기부여 카드 */}
-            <div className="rounded-xl p-3" style={{ background: 'var(--skema-primary)' }}>
+            <div className="rounded-lg p-3" style={{ background: '#2563eb', boxShadow: '0 6px 0 rgba(37,99,235,0.16)' }}>
               <div className="flex items-center gap-1.5 mb-1.5">
                 <MaterialIcon icon="auto_awesome" size={14} color="#c3d0ff" filled />
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#c3d0ff', letterSpacing: '1px' }}>AI 인사이트</span>
@@ -1124,21 +1551,21 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
             </div>
 
             {/* 수행률 — 오늘 / 이번 주 */}
-            <div className="rounded-xl p-3" style={{ background: 'var(--skema-surface-low)' }}>
+            <div className="rounded-lg p-3" style={{ background: '#f6f8fc', border: '1px solid #d8e2ef' }}>
               <div style={{ display: 'flex', gap: 10 }}>
 
                 {/* 오늘 */}
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#747684' }}>오늘</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: todayPct === null ? '#9ca3af' : todayPct >= 80 ? '#10b981' : todayPct >= 40 ? '#f59e0b' : 'var(--skema-primary)' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#3f4b61' }}>오늘</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: todayPct === null ? '#64748b' : todayPct >= 80 ? '#10b981' : todayPct >= 40 ? '#f59e0b' : 'var(--skema-primary)' }}>
                       {todayPct !== null ? `${todayPct}%` : '-'}
                     </span>
                   </div>
                   <div style={{ height: 5, borderRadius: 99, background: '#ebeef1', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${todayPct ?? 0}%`, borderRadius: 99, transition: 'width 0.5s', background: todayPct !== null && todayPct >= 80 ? '#10b981' : todayPct !== null && todayPct >= 40 ? '#f59e0b' : 'var(--skema-primary)' }} />
                   </div>
-                  <p style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>{todayDone}/{todayTotal}개</p>
+                  <p style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{todayDone}/{todayTotal}개</p>
                 </div>
 
                 <div style={{ width: 1, background: '#e5e7eb' }} />
@@ -1146,15 +1573,15 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                 {/* 이번 주 */}
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#747684' }}>이번 주</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: weekPct === null ? '#9ca3af' : weekPct >= 80 ? '#10b981' : weekPct >= 40 ? '#f59e0b' : 'var(--skema-primary)' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#3f4b61' }}>이번 주</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: weekPct === null ? '#64748b' : weekPct >= 80 ? '#10b981' : weekPct >= 40 ? '#f59e0b' : 'var(--skema-primary)' }}>
                       {weekPct !== null ? `${weekPct}%` : '-'}
                     </span>
                   </div>
                   <div style={{ height: 5, borderRadius: 99, background: '#ebeef1', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${weekPct ?? 0}%`, borderRadius: 99, transition: 'width 0.5s', background: weekPct !== null && weekPct >= 80 ? '#10b981' : weekPct !== null && weekPct >= 40 ? '#f59e0b' : 'var(--skema-primary)' }} />
                   </div>
-                  <p style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>{weekDone}/{weekTotal}개</p>
+                  <p style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{weekDone}/{weekTotal}개</p>
                 </div>
 
               </div>
@@ -1165,7 +1592,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
               <div
                 style={{
                   padding: '8px 10px', borderRadius: 10,
-                  background: '#fff7ed', border: '1px solid #fed7aa',
+                  background: '#eef6ff', border: '1px solid #fed7aa',
                   display: 'flex', alignItems: 'flex-start', gap: 6,
                 }}
               >
@@ -1197,7 +1624,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
               {todaySchedules.length === 0 ? (
                 <div className="text-center py-4">
                   <MaterialIcon icon="check_circle" size={24} color="#10b981" filled />
-                  <p style={{ fontSize: 11, color: '#747684', marginTop: 4 }}>오늘 일정이 없습니다</p>
+                  <p style={{ fontSize: 11, color: '#3f4b61', marginTop: 4 }}>오늘 일정이 없습니다</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -1205,7 +1632,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                     <div
                       key={s.id}
                       className="flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors"
-                      style={{ background: s.is_completed ? '#f0fdf4' : '#f7fafd' }}
+                      style={{ background: s.is_completed ? '#e9fff7' : '#f8fbff', border: '1px solid rgba(232,216,196,0.72)' }}
                       onClick={() => handleToggleComplete(s)}
                     >
                       <div style={{
@@ -1222,7 +1649,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                           textDecoration: s.is_completed ? 'line-through' : 'none',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>{s.title}</p>
-                        <p style={{ fontSize: 10, color: '#747684' }}>{s.start_time} – {s.end_time}</p>
+                        <p style={{ fontSize: 10, color: '#3f4b61' }}>{s.start_time} – {s.end_time}</p>
                       </div>
                     </div>
                   ))}
@@ -1231,7 +1658,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
 
               {/* 미달성 제안 */}
               {unachievedSchedules.length > 0 && (
-                <div className="mt-3 p-2.5 rounded-xl" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                <div className="mt-3 p-2.5 rounded-lg" style={{ background: '#eef6ff', border: '1px solid #fed7aa' }}>
                   <div className="flex items-center gap-1 mb-1">
                     <MaterialIcon icon="warning" size={13} color="#f59e0b" filled />
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#92400e' }}>미완료 일정 {unachievedSchedules.length}개</span>
@@ -1252,8 +1679,8 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
             {/* 빠른 일정 추가 */}
             <button
               onClick={() => openClassForm()}
-              className="w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-              style={{ background: '#eef1ff', color: 'var(--skema-primary)', border: 'none', cursor: 'pointer' }}
+              className="w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+              style={{ background: '#e8f3ff', color: '#075985', border: '1px solid #bae6fd', cursor: 'pointer' }}
             >
               <MaterialIcon icon="add" size={14} color="var(--skema-primary)" />
               일정 추가
@@ -1261,9 +1688,9 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
           </div>
 
           {/* ── 메인 콘텐츠 ── */}
-          <div className="flex-1 overflow-auto p-4 min-h-0">
+          <div className="skema-dashboard-main min-h-0 flex-1 overflow-auto p-4">
             <Tabs defaultValue="timetable">
-              <TabsList className="mb-4">
+              <TabsList className="mb-4 w-full sm:w-fit">
                 <TabsTrigger value="timetable">시간표</TabsTrigger>
                 <TabsTrigger value="exams">시험 일정</TabsTrigger>
                 <TabsTrigger value="report">주간 리포트</TabsTrigger>
@@ -1361,7 +1788,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
           {/* ── 스마트 알림 우측 사이드바 ── */}
           <div
             className="flex-shrink-0 overflow-y-auto border-l p-3 min-h-0 hidden xl:flex xl:flex-col"
-            style={{ width: 320, background: '#fff' }}
+            style={{ width: 320, background: 'rgba(255,255,255,0.94)', borderColor: '#d8e2ef' }}
           >
             <SmartAlertPanel exams={exams} schedules={schedules} currentWeekStart={weekStart} />
           </div>

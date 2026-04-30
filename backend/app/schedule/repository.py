@@ -1,40 +1,20 @@
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.schedule.models import ExamSchedule, Schedule
+from app.schedule.models import Event, ExamSchedule, Schedule
 
 
 # ── Schedule CRUD ─────────────────────────────────────────────────────────────
 
-# soft-delete 공통 조건식 (함수가 아닌 표현식으로 정의)
-# → get_schedules / get_schedule / 오늘 할 일 / 충돌 감지 전부 동일 정책 적용
-_NOT_DELETED = or_(
-    Schedule.deleted_by_user.is_(None),
-    Schedule.deleted_by_user == False,
-)
+def get_schedules(db: Session, user_id: int) -> list[Schedule]:
+    return db.query(Schedule).filter(Schedule.user_id == user_id).all()
 
 
-def get_schedules(db: Session, user_id: int, include_deleted: bool = False) -> list[Schedule]:
-    q = db.query(Schedule).filter(Schedule.user_id == user_id)
-    if not include_deleted:
-        q = q.filter(_NOT_DELETED)
-    return q.all()
-
-
-def get_schedule(
-    db: Session,
-    schedule_id: int,
-    user_id: int,
-    include_deleted: bool = False,
-) -> Schedule | None:
-    """단건 조회. 기본적으로 soft-deleted 항목은 반환하지 않는다."""
-    q = db.query(Schedule).filter(
-        Schedule.id == schedule_id,
-        Schedule.user_id == user_id,
+def get_schedule(db: Session, schedule_id: int, user_id: int) -> Schedule | None:
+    return (
+        db.query(Schedule)
+        .filter(Schedule.id == schedule_id, Schedule.user_id == user_id)
+        .first()
     )
-    if not include_deleted:
-        q = q.filter(_NOT_DELETED)
-    return q.first()
 
 
 def create_schedule(db: Session, user_id: int, data: dict) -> Schedule:
@@ -90,4 +70,39 @@ def update_exam(db: Session, exam: ExamSchedule, updates: dict) -> ExamSchedule:
 
 def delete_exam(db: Session, exam: ExamSchedule) -> None:
     db.delete(exam)
+    db.commit()
+
+
+# ── Event CRUD ───────────────────────────────────────────────────────────────
+
+def get_events(db: Session, user_id: int) -> list[Event]:
+    return db.query(Event).filter(Event.user_id == user_id).all()
+
+
+def get_event(db: Session, event_id: int, user_id: int) -> Event | None:
+    return (
+        db.query(Event)
+        .filter(Event.id == event_id, Event.user_id == user_id)
+        .first()
+    )
+
+
+def create_event(db: Session, user_id: int, data: dict) -> Event:
+    event = Event(user_id=user_id, **data)
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+def update_event(db: Session, event: Event, updates: dict) -> Event:
+    for key, value in updates.items():
+        setattr(event, key, value)
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+def delete_event(db: Session, event: Event) -> None:
+    db.delete(event)
     db.commit()

@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { SharedTimetable } from './SharedTimetable';
+import MaterialIcon from '@/components/common/MaterialIcon';
 
 interface Props {
   params: Promise<{ token: string }>;
@@ -8,23 +9,28 @@ interface Props {
 export default async function SharePage({ params }: Props) {
   const { token } = await params;
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <header className="bg-white dark:bg-gray-900 border-b px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <span className="text-white text-sm font-bold">시</span>
+    <div className="skema-cute-page min-h-screen text-[#0f172a]">
+      <header className="sticky top-0 z-20 border-b border-[#d8e2ef] bg-white/92 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2563eb] shadow-sm">
+              <MaterialIcon icon="schedule" size={18} color="#fff" filled />
+            </div>
+            <div>
+              <h1 className="skema-headline text-lg font-extrabold text-slate-950">SKEMA</h1>
+              <p className="text-xs font-medium text-slate-500">공유 시간표</p>
+            </div>
           </div>
-          <h1 className="font-bold text-lg text-gray-900 dark:text-white">스마트 시간표</h1>
+          <span className="rounded-lg border border-[#bae6fd] bg-[#e8f3ff] px-3 py-1 text-xs font-bold text-[#075985]">
+            읽기 전용
+          </span>
         </div>
-        <span className="text-sm text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">
-          읽기 전용
-        </span>
       </header>
-      <main className="p-4 max-w-6xl mx-auto">
+      <main className="mx-auto max-w-6xl px-4 py-6">
         <Suspense
           fallback={
             <div className="flex items-center justify-center h-64">
-              <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#dbe8ff] border-t-[#2563eb]" />
             </div>
           }
         >

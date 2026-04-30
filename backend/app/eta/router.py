@@ -54,7 +54,6 @@ from app.schedule.models import Schedule
 from .bbox_parser import parse_timetable_bbox
 from .parser import parse_timetable_image as _llm_parse
 from .positional_parser import parse_image_positional
-from .positional_types import NormalizedEntry
 
 logger = logging.getLogger(__name__)
 

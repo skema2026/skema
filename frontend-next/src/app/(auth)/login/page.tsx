@@ -92,85 +92,88 @@ export default function LoginPage() {
           display: flex;
           flex-direction: column;
           position: relative;
-          overflow: hidden;
-          background: #d9c9b0 url('/register-bg.jpg') center/cover no-repeat;
+          overflow-x: hidden;
+          overflow-y: auto;
+          background: #f6f8fc url('/register-bg.jpg') center/cover no-repeat;
           font-family: inherit;
         }
         .lp-overlay {
           position: absolute; inset: 0; pointer-events: none;
-          background: linear-gradient(
-            110deg,
-            rgba(215,190,140,0.52) 0%,
-            rgba(190,165,115,0.30) 45%,
-            rgba(80,100,170,0.12) 100%
-          );
+          background:
+            linear-gradient(90deg, rgba(37,99,235,0.08) 1px, transparent 1px),
+            linear-gradient(rgba(14,165,233,0.07) 1px, transparent 1px),
+            linear-gradient(110deg, rgba(246,248,252,0.96) 0%, rgba(246,248,252,0.88) 46%, rgba(232,243,255,0.72) 100%);
+          background-size: 28px 28px, 28px 28px, auto;
         }
 
         /* Navbar */
         .lp-nav {
           position: relative; z-index: 20;
           display: flex; align-items: center; justify-content: space-between;
-          padding: 20px 48px;
+          padding: 20px clamp(20px, 4vw, 56px);
         }
         .lp-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
         .lp-logo-box {
           width: 34px; height: 34px; border-radius: 9px;
-          background: rgba(26,77,178,0.88);
+          background: #2563eb;
           display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 10px 26px rgba(19,63,124,0.22);
         }
-        .lp-logo-text { font-size: 18px; font-weight: 800; color: #1a2340; letter-spacing: -0.3px; }
+        .lp-logo-text { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: 0; }
         .lp-nav-btn {
           padding: 8px 24px; border-radius: 999px; font-size: 14px; font-weight: 600;
-          color: #1a2340; text-decoration: none;
-          border: 1.5px solid rgba(255,255,255,0.65);
-          background: rgba(255,255,255,0.28);
-          backdrop-filter: blur(10px);
-          transition: background 0.2s;
+          color: #2563eb; text-decoration: none;
+          border: 1px solid #bfd0ff;
+          background: rgba(255,255,255,0.92);
+          backdrop-filter: blur(14px);
+          box-shadow: 0 10px 30px rgba(15,23,42,0.07);
+          transition: background 0.2s, transform 0.2s;
         }
-        .lp-nav-btn:hover { background: rgba(255,255,255,0.48); }
+        .lp-nav-btn:hover { background: #eaf1ff; transform: translateY(-1px); }
 
         /* Body */
         .lp-body {
           position: relative; z-index: 1;
           flex: 1; display: flex; align-items: center;
-          padding: 0 48px 48px;
+          padding: 0 clamp(20px, 4vw, 56px) 48px;
           gap: 40px;
+          justify-content: center;
         }
 
         /* Left */
-        .lp-left { flex: 1; }
+        .lp-left { flex: 1; max-width: 560px; }
         .lp-left h2 {
           font-size: clamp(2rem, 3.2vw, 2.75rem);
           font-weight: 800; line-height: 1.2;
-          color: #1a2340; letter-spacing: -0.5px; margin: 0 0 12px;
+          color: #0f172a; letter-spacing: 0; margin: 0 0 12px;
         }
-        .lp-left h2 em { font-style: normal; color: #1a4db2; }
+        .lp-left h2 em { font-style: normal; color: #0ea5e9; }
         .lp-feat { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
         .lp-feat-icon {
           width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
-          background: rgba(255,255,255,0.50);
-          border: 1px solid rgba(255,255,255,0.6);
-          backdrop-filter: blur(6px);
+          background: #fff;
+          border: 1px solid rgba(14,165,233,0.18);
+          box-shadow: 0 6px 0 rgba(14,165,233,0.08), 0 10px 24px rgba(15,23,42,0.08);
           display: flex; align-items: center; justify-content: center;
         }
-        .lp-feat-name { font-weight: 700; font-size: 14px; color: #1a2340; margin-bottom: 2px; }
-        .lp-feat-desc { font-size: 13px; color: #3d4e6b; }
+        .lp-feat-name { font-weight: 700; font-size: 14px; color: #0f172a; margin-bottom: 2px; }
+        .lp-feat-desc { font-size: 13px; color: #475569; }
 
         /* Card */
         .lp-card {
           width: 100%; max-width: 420px; flex-shrink: 0;
-          background: rgba(255,255,255,0.17);
-          backdrop-filter: blur(24px);
-          -webkit-backdrop-filter: blur(24px);
-          border: 1px solid rgba(255,255,255,0.35);
-          border-radius: 22px;
+          background: rgba(255,255,255,0.96);
+          backdrop-filter: blur(22px) saturate(125%);
+          -webkit-backdrop-filter: blur(22px) saturate(125%);
+          border: 1px solid rgba(255,255,255,0.70);
+          border-radius: 8px;
           box-shadow:
-            0 12px 56px rgba(50,40,10,0.16),
-            inset 0 1px 0 rgba(255,255,255,0.45);
-          padding: 32px 28px 26px;
+            0 24px 70px rgba(15,23,42,0.16),
+            inset 0 1px 0 rgba(255,255,255,0.85);
+          padding: 34px 30px 28px;
         }
-        .lp-card-title { font-size: 22px; font-weight: 800; color: #1a2340; margin: 0 0 3px; }
-        .lp-card-sub   { font-size: 13px; color: #4a5568; margin: 0 0 20px; }
+        .lp-card-title { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0 0 3px; }
+        .lp-card-sub   { font-size: 13px; color: #3f4b61; margin: 0 0 20px; }
 
         /* Social */
         .lp-soc {
@@ -190,33 +193,34 @@ export default function LoginPage() {
         /* Divider */
         .lp-div { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
         .lp-div-line { flex: 1; height: 1px; background: rgba(255,255,255,0.38); }
+        .lp-card .lp-div-line { background: rgba(15,23,42,0.12); }
         .lp-div-txt  { font-size: 12px; color: rgba(30,40,70,0.52); white-space: nowrap; }
 
         /* Fields */
         .lp-field {
           display: flex; align-items: center;
-          background: rgba(255,255,255,0.22);
-          border: 1px solid rgba(255,255,255,0.38);
-          border-radius: 11px; overflow: hidden;
+          background: #fff;
+          border: 1px solid #b8c5d6;
+          border-radius: 8px; overflow: hidden;
           margin-bottom: 7px;
           transition: box-shadow .2s, border-color .2s;
         }
         .lp-field:focus-within {
-          border-color: rgba(80,120,255,0.65);
-          box-shadow: 0 0 0 3px rgba(80,120,255,0.16);
+          border-color: #2563eb;
+          box-shadow: 0 0 0 3px rgba(37,99,235,0.18);
         }
         .lp-field.err { border-color: rgba(220,38,38,0.55); }
         .lp-label {
           display: flex; align-items: center; gap: 6px;
           padding: 0 11px; min-width: 80px; height: 46px;
-          border-right: 1px solid rgba(255,255,255,0.32);
-          background: rgba(255,255,255,0.10);
-          font-size: 13px; font-weight: 600; color: #2d3a55; flex-shrink: 0;
+          border-right: 1px solid rgba(19,63,124,0.10);
+          background: #eaf1ff;
+          font-size: 13px; font-weight: 700; color: #0f172a; flex-shrink: 0;
         }
         .lp-field input {
           flex: 1; height: 46px; padding: 0 13px;
           background: transparent; border: none; outline: none;
-          font-size: 13px; color: #1a2340; font-family: inherit;
+          font-size: 13px; color: #0f172a; font-family: inherit;
         }
         .lp-field input::placeholder { color: rgba(50,65,100,0.42); }
         .lp-pw-toggle {
@@ -225,7 +229,7 @@ export default function LoginPage() {
           display: flex; align-items: center;
           transition: color .15s;
         }
-        .lp-pw-toggle:hover { color: #1a2340; }
+        .lp-pw-toggle:hover { color: #0f172a; }
         .lp-err { font-size: 11px; color: #dc2626; margin: -3px 0 5px 4px; }
 
         /* Submit */
@@ -234,26 +238,32 @@ export default function LoginPage() {
           border: none; border-radius: 11px;
           font-size: 15px; font-weight: 700; font-family: inherit;
           cursor: pointer; color: #fff;
-          background: linear-gradient(90deg, #3b6ef0 0%, #6b4fd6 100%);
-          box-shadow: 0 4px 20px rgba(70,100,230,0.38);
+          background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
+          box-shadow: 0 12px 28px rgba(26,77,178,0.24);
           transition: filter .15s, transform .1s;
         }
         .lp-submit:hover:not(:disabled) { filter: brightness(1.09); transform: translateY(-1px); }
         .lp-submit:active:not(:disabled) { transform: translateY(0); }
         .lp-submit:disabled {
-          background: linear-gradient(90deg, #94aee8 0%, #a899d6 100%);
+          background: linear-gradient(90deg, #94a3b8 0%, #8fb8b4 100%);
           box-shadow: none; cursor: not-allowed;
         }
 
-        .lp-foot { margin-top: 14px; text-align: center; font-size: 13px; color: #4a5568; }
-        .lp-foot a { color: #1a4db2; font-weight: 700; text-decoration: none; }
+        .lp-foot { margin-top: 14px; text-align: center; font-size: 13px; color: #334155; }
+        .lp-foot a { color: #2563eb; font-weight: 700; text-decoration: none; }
         .lp-foot a:hover { text-decoration: underline; }
 
-        @media (max-width: 860px) {
+        @media (max-width: 980px) {
           .lp-left { display: none; }
           .lp-body  { justify-content: center; padding: 0 16px 40px; }
           .lp-nav   { padding: 18px 24px; }
           .lp-card  { max-width: 100%; }
+        }
+        @media (max-width: 480px) {
+          .lp-card { padding: 26px 18px 22px; border-radius: 16px; }
+          .lp-label { min-width: 70px; font-size: 12px; padding: 0 9px; }
+          .lp-logo-text { font-size: 16px; }
+          .lp-nav-btn { padding: 8px 14px; }
         }
       `}</style>
 
@@ -285,7 +295,7 @@ export default function LoginPage() {
             ].map((f) => (
               <div className="lp-feat" key={f.title}>
                 <div className="lp-feat-icon">
-                  <MaterialIcon icon={f.icon} size={20} color="#1a4db2" />
+                  <MaterialIcon icon={f.icon} size={20} color="#2563eb" />
                 </div>
                 <div>
                   <div className="lp-feat-name">{f.title}</div>
@@ -297,7 +307,7 @@ export default function LoginPage() {
 
           {/* Glass card */}
           <div className="lp-card">
-            <div className="lp-card-title">다시 오셨군요!</div>
+            <div className="lp-card-title">다시 오셨군요</div>
             <div className="lp-card-sub">SKEMA 계정으로 로그인하세요</div>
 
             <button className="lp-soc lp-google" onClick={() => handleSocialLogin('google')}>
@@ -325,15 +335,15 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit}>
               <div className={`lp-field${errors.username ? ' err' : ''}`}>
-                <div className="lp-label"><MaterialIcon icon="person" size={14} color="#4a5568" />아이디</div>
-                <input type="text" placeholder="아이디를 입력하세요" value={form.username}
+                <div className="lp-label"><MaterialIcon icon="person" size={14} color="#334155" />아이디</div>
+                <input type="text" autoComplete="username" placeholder="아이디를 입력하세요" value={form.username}
                   onChange={(e) => setForm({ ...form, username: e.target.value })} />
               </div>
               {errors.username && <div className="lp-err">{errors.username}</div>}
 
               <div className={`lp-field${errors.password ? ' err' : ''}`}>
-                <div className="lp-label"><MaterialIcon icon="lock" size={14} color="#4a5568" />비밀번호</div>
-                <input type={showPassword ? 'text' : 'password'} placeholder="비밀번호를 입력하세요" value={form.password}
+                <div className="lp-label"><MaterialIcon icon="lock" size={14} color="#334155" />비밀번호</div>
+                <input type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="비밀번호를 입력하세요" value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })} />
                 <button type="button" className="lp-pw-toggle" onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? <EyeOffIcon /> : <EyeIcon />}

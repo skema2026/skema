@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useExams, useCreateExam, useUpdateExam, useDeleteExam } from '@/hooks/useExams';
+import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 import { formatDate } from '@/lib/utils';
 import { ExamSchedule, Schedule } from '@/types';
 import { api } from '@/lib/api';
@@ -60,9 +61,9 @@ function AmPmToggle({ time, onChange }: { time: string; onChange: (t: string) =>
   return (
     <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', flexShrink: 0 }}>
       <button type="button" onClick={() => onChange(applyAmPm(time, 'am'))}
-        style={{ ...base, background: am ? 'var(--skema-primary)' : '#f9fafb', color: am ? '#fff' : '#747684' }}>오전</button>
+        style={{ ...base, background: am ? 'var(--skema-primary)' : '#f9fafb', color: am ? '#fff' : '#3f4b61' }}>오전</button>
       <button type="button" onClick={() => onChange(applyAmPm(time, 'pm'))}
-        style={{ ...base, background: !am ? 'var(--skema-primary)' : '#f9fafb', color: !am ? '#fff' : '#747684', borderLeft: '1px solid #e5e7eb' }}>오후</button>
+        style={{ ...base, background: !am ? 'var(--skema-primary)' : '#f9fafb', color: !am ? '#fff' : '#3f4b61', borderLeft: '1px solid #e5e7eb' }}>오후</button>
     </div>
   );
 }
@@ -81,7 +82,7 @@ function getSchedulesForDate(allSchedules: Schedule[], dateStr: string): Schedul
   const dow = jsDay === 0 ? 6 : jsDay - 1;
   return allSchedules.filter(s => {
     if (s.date === dateStr) return true;
-    if (!s.date && s.day_of_week === dow) return true;
+    if (!s.date && recurringDayToIndex(s.recurring_day) === dow) return true;
     return false;
   });
 }
@@ -309,7 +310,7 @@ export function ExamList() {
 
         await api.post('/schedules', {
           title: `📖 ${blockExam.title} 준비`,
-          day_of_week: dow,
+          recurring_day: indexToRecurringDay(dow),
           date: dateStr,
           start_time,
           end_time,
@@ -339,7 +340,7 @@ export function ExamList() {
   const btnStyle = (active: boolean) => ({
     borderColor: active ? '#059669' : '#ebeef1',
     background: active ? '#d1fae5' : '#fff',
-    color: active ? '#059669' : '#747684',
+    color: active ? '#059669' : '#3f4b61',
   });
 
   return (
@@ -395,7 +396,7 @@ export function ExamList() {
                   <ExamBadge days={days} />
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }}
-                    style={{ color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
+                    style={{ color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
                   >
                     ✕
                   </button>
@@ -542,7 +543,7 @@ export function ExamList() {
             {blockExam && (
               <div style={{ padding: '10px 14px', borderRadius: 10, background: '#f7fafd', border: '1px solid #ebeef1' }}>
                 <p style={{ fontSize: 13, fontWeight: 700, color: '#181c1e' }}>{blockExam.title}</p>
-                <p style={{ fontSize: 11, color: '#747684', marginTop: 2 }}>
+                <p style={{ fontSize: 11, color: '#3f4b61', marginTop: 2 }}>
                   {formatDate(blockExam.exam_date)} · D-{getDaysUntil(blockExam.exam_date)}
                 </p>
               </div>
@@ -599,7 +600,7 @@ export function ExamList() {
               </select>
             </div>
 
-            <div style={{ fontSize: 11, color: '#747684', background: '#f0fdf4', padding: '8px 12px', borderRadius: 8, lineHeight: 1.7, border: '1px solid #bbf7d0' }}>
+            <div style={{ fontSize: 11, color: '#3f4b61', background: '#f0fdf4', padding: '8px 12px', borderRadius: 8, lineHeight: 1.7, border: '1px solid #bbf7d0' }}>
               기존 일정을 피해 <strong style={{ color: '#059669' }}>비어있는 시간에 자동 배치</strong>합니다<br />
               {blockDays === 0 ? '오늘부터' : `D-${blockDays}부터`} · 주 {daysPerWeek === 7 ? '매일' : `${daysPerWeek}일`} · {formatDuration(studyMinutes)}
             </div>

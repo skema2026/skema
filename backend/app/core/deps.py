@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
+from app.core.config import settings
 from app.db.database import SessionLocal
 
 # tokenUrl은 실제 로그인 엔드포인트 경로와 일치해야 Swagger UI에서 정상 동작
@@ -51,3 +52,23 @@ def get_current_user(
         )
 
     return user
+
+
+def is_admin_email(email: str | None) -> bool:
+    if not email:
+        return False
+    admin_emails = {
+        item.strip().lower()
+        for item in settings.ADMIN_EMAILS.split(",")
+        if item.strip()
+    }
+    return email.lower() in admin_emails
+
+
+def get_current_admin_user(current_user=Depends(get_current_user)):
+    if not is_admin_email(current_user.email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다.",
+        )
+    return current_user

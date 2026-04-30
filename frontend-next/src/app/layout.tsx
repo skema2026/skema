@@ -21,8 +21,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SKEMA",
-  description: "AI로 관리하는 스마트 시간표",
+  title: {
+    default: "SKEMA",
+    template: "%s | SKEMA",
+  },
+  description: "AI로 관리하는 스마트 시간표와 시험 준비 대시보드",
 };
 
 export default function RootLayout({
@@ -36,11 +39,6 @@ export default function RootLayout({
       className={`${manrope.variable} ${inter.variable} h-full antialiased light`}
     >
       <head>
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
-        />
-        {/* suppress Next.js dev-mode negative timestamp warning */}
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             var _measure = performance.measure.bind(performance);
@@ -50,10 +48,10 @@ export default function RootLayout({
           })();
         `}} />
       </head>
-      <body className="min-h-full flex flex-col bg-[#f7fafd] text-[#181c1e]" style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}>
+      <body className="min-h-full flex flex-col bg-[#f6f8fc] text-[#0f172a]" style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}>
         <Providers>
           {children}
-          <Toaster richColors position="top-right" />
+          <Toaster richColors position="top-center" />
         </Providers>
       </body>
     </html>
