@@ -22,6 +22,8 @@ class User(Base):
     # 소셜 로그인 정보
     social_provider = Column(String(50), nullable=True)        # "google" | "naver" | "kakao"
     social_id = Column(String(255), nullable=True)
+    kakao_access_token = Column(String(512), nullable=True)    # 카카오톡 메시지 발송용
+    kakao_refresh_token = Column(String(512), nullable=True)
 
     # Relationships
     profile = relationship(

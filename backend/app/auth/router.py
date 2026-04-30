@@ -196,9 +196,11 @@ def oauth_callback(
             return response
 
     try:
-        social_id, email, display_name, _, _ = service.exchange_oauth_code(provider, code, state)
+        social_id, email, display_name, kakao_at, kakao_rt = service.exchange_oauth_code(provider, code, state)
         user = service.get_or_create_social_user(
             db, provider, social_id, email, display_name,
+            kakao_access_token=kakao_at,
+            kakao_refresh_token=kakao_rt,
         )
         token = create_access_token(user.id)
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?token={token}")

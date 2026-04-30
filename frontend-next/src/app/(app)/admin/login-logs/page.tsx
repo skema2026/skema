@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 import { LoginLog } from '@/types';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
@@ -24,23 +25,28 @@ const formatDate = (value: string) => {
 
 export default function AdminLoginLogsPage() {
   const router = useRouter();
+  const currentUser = useAuthStore((state) => state.user);
   const [logs, setLogs] = useState<LoginLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (currentUser !== undefined && !currentUser?.is_admin) {
+      router.replace('/dashboard');
+      return;
+    }
     api
       .get<LoginLog[]>('/admin/login-logs?limit=200')
       .then((res) => setLogs(res.data))
       .catch((err) => {
         if (err?.response?.status === 403) {
-          setError('관리자 권한이 필요합니다.');
+          router.replace('/dashboard');
         } else {
           setError('로그를 불러오지 못했습니다.');
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentUser, router]);
 
   return (
     <main className="skema-cute-page min-h-screen p-4 sm:p-6">

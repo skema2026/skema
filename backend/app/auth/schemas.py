@@ -16,7 +16,7 @@ class SignupRequest(BaseModel):
     @classmethod
     def validate_signup_email(cls, value: str) -> str:
         try:
-            result = validate_email(value.strip(), check_deliverability=True)
+            result = validate_email(value.strip(), check_deliverability=False)
         except EmailNotValidError as exc:
             raise ValueError("올바른 이메일 형식이 아닙니다.") from exc
         return result.normalized

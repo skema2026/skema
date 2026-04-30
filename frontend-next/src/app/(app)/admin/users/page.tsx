@@ -39,18 +39,22 @@ export default function AdminUsersPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
+    if (currentUser !== undefined && !currentUser?.is_admin) {
+      router.replace('/dashboard');
+      return;
+    }
     api
       .get<AdminUser[]>('/admin/users?limit=500')
       .then((res) => setUsers(res.data))
       .catch((err) => {
         if (err?.response?.status === 403) {
-          setError('관리자 권한이 필요합니다.');
+          router.replace('/dashboard');
         } else {
           setError('회원 목록을 불러오지 못했습니다.');
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentUser, router]);
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
