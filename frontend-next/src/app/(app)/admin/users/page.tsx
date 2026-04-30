@@ -32,6 +32,7 @@ const providerLabel = (provider?: string | null) => {
 export default function AdminUsersPage() {
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
+  const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,7 +40,8 @@ export default function AdminUsersPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (currentUser !== undefined && !currentUser?.is_admin) {
+    if (!hasHydrated) return;
+    if (!currentUser?.is_admin) {
       router.replace('/dashboard');
       return;
     }
@@ -54,7 +56,7 @@ export default function AdminUsersPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, [currentUser, router]);
+  }, [hasHydrated, currentUser, router]);
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();

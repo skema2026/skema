@@ -38,13 +38,14 @@ export const useAuthStore = create<AuthState>()(
       setHasHydrated: (v) => set({ _hasHydrated: v }),
       setUser: (user) => set({ user }),
       setToken: (token) => {
-        set({ user: null, token });
+        set({ token });
         if (token) {
           if (typeof window !== 'undefined') {
             localStorage.setItem('token', token);
           }
           setTokenCookie(token);
         } else {
+          set({ user: null });
           clearStoredAuth();
         }
       },

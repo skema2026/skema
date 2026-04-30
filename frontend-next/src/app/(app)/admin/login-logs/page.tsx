@@ -26,12 +26,14 @@ const formatDate = (value: string) => {
 export default function AdminLoginLogsPage() {
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
+  const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const [logs, setLogs] = useState<LoginLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (currentUser !== undefined && !currentUser?.is_admin) {
+    if (!hasHydrated) return;
+    if (!currentUser?.is_admin) {
       router.replace('/dashboard');
       return;
     }
@@ -46,7 +48,7 @@ export default function AdminLoginLogsPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, [currentUser, router]);
+  }, [hasHydrated, currentUser, router]);
 
   return (
     <main className="skema-cute-page min-h-screen p-4 sm:p-6">

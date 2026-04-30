@@ -202,9 +202,6 @@ def exchange_oauth_code(provider: str, code: str, state: str = "") -> tuple[str,
     if client_secret:
         token_data_req["client_secret"] = client_secret
 
-    import logging
-    logger = logging.getLogger(__name__)
-
     token_resp = http_requests.post(
         cfg["token_url"],
         data=token_data_req,

@@ -110,8 +110,8 @@ def create_login_log(
         login_method=login_method,
         success=success,
         failure_reason=failure_reason,
-        ip_address=ip_address,
-        user_agent=user_agent,
+        ip_address=ip_address[:64] if ip_address else None,
+        user_agent=user_agent[:512] if user_agent else None,
     )
     db.add(log)
     db.commit()

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -13,7 +13,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(100), nullable=True)              # 표시 이름 (선택)
+    username = Column(String(100), unique=True, index=True, nullable=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=True)       # 소셜 로그인 시 null 허용
     is_active = Column(Boolean, default=True, nullable=True, server_default="1")
@@ -81,7 +81,7 @@ class LoginLog(Base):
     success = Column(Boolean, nullable=False, default=False, server_default="0")
     failure_reason = Column(String(100), nullable=True)
     ip_address = Column(String(64), nullable=True)
-    user_agent = Column(Text, nullable=True)
+    user_agent = Column(String(512), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user = relationship("User", back_populates="login_logs")

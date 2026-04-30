@@ -1,7 +1,7 @@
+import logging
 import secrets
 
 from typing import Optional
-
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -25,6 +25,7 @@ from app.core.deps import get_current_user, get_db, is_admin_email
 from app.core.security import create_access_token
 
 router = APIRouter(tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 def _serialize_current_user(user: User) -> dict:
@@ -209,13 +210,13 @@ def oauth_callback(
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?token={token}")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
-    except ValueError as exc:
-        import traceback; traceback.print_exc()
-        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error={exc}")
+    except ValueError:
+        logger.exception("OAuth value error provider=%s", provider)
+        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_failed")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
-    except Exception as exc:
-        import traceback; traceback.print_exc()
+    except Exception:
+        logger.exception("OAuth unexpected error provider=%s", provider)
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_failed")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
