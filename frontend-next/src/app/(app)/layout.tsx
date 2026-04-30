@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { token, _hasHydrated, setUser, logout } = useAuthStore();
-  const [checking, setChec4king] = useState(true);
+  const [checking, setChecking] = useState(true);
   const isInitialized = useRef(false);
 
   useEffect(() => {
