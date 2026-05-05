@@ -2,36 +2,23 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.schedule import repository
-from app.schedule.models import DayOfWeek, Event, ExamSchedule, Schedule
+from app.schedule.models import DayOfWeek, ExamSchedule, Event, Schedule
 from app.schedule.schemas import (
-    EventCreate,
     EventUpdate,
-    ExamScheduleCreate,
     ExamScheduleUpdate,
     ScheduleCreate,
     ScheduleUpdate,
 )
+from app.utils.time_utils import overlap
 
 
 # ── Schedule (수업 시간표) ────────────────────────────────────────────────────
-
-def list_schedules(db: Session, user_id: int) -> list[Schedule]:
-    return repository.get_schedules(db, user_id)
-
 
 def get_schedule_or_404(db: Session, schedule_id: int, user_id: int) -> Schedule:
     schedule = repository.get_schedule(db, schedule_id, user_id)
     if not schedule:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="수업을 찾을 수 없습니다.")
     return schedule
-
-
-def _overlap(s1: str, e1: str, s2: str, e2: str) -> bool:
-    """두 시간 범위가 겹치는지 확인."""
-    def t2m(t: str) -> int:
-        h, m = t.split(":")
-        return int(h) * 60 + int(m)
-    return t2m(s1) < t2m(e2) and t2m(s2) < t2m(e1)
 
 
 def _check_no_conflict(
@@ -47,7 +34,7 @@ def _check_no_conflict(
     for s in existing:
         if exclude_id is not None and s.id == exclude_id:
             continue
-        if s.recurring_day.value == recurring_day and _overlap(start_time, end_time, s.start_time, s.end_time):
+        if s.recurring_day.value == recurring_day and overlap(start_time, end_time, s.start_time, s.end_time):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"'{s.course_name}' 수업과 시간이 겹칩니다. ({s.recurring_day.value} {s.start_time}~{s.end_time})",
@@ -99,19 +86,11 @@ def delete_schedule(db: Session, schedule_id: int, user_id: int) -> None:
 
 # ── ExamSchedule ─────────────────────────────────────────────────────────────
 
-def list_exams(db: Session, user_id: int) -> list[ExamSchedule]:
-    return repository.get_exams(db, user_id)
-
-
 def get_exam_or_404(db: Session, exam_id: int, user_id: int) -> ExamSchedule:
     exam = repository.get_exam(db, exam_id, user_id)
     if not exam:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="시험 일정을 찾을 수 없습니다.")
     return exam
-
-
-def create_exam(db: Session, user_id: int, data: ExamScheduleCreate) -> ExamSchedule:
-    return repository.create_exam(db, user_id, data.model_dump())
 
 
 def update_exam(db: Session, exam_id: int, user_id: int, data: ExamScheduleUpdate) -> ExamSchedule:
@@ -127,19 +106,11 @@ def delete_exam(db: Session, exam_id: int, user_id: int) -> None:
 
 # ── Event ────────────────────────────────────────────────────────────────────
 
-def list_events(db: Session, user_id: int) -> list[Event]:
-    return repository.get_events(db, user_id)
-
-
 def get_event_or_404(db: Session, event_id: int, user_id: int) -> Event:
     event = repository.get_event(db, event_id, user_id)
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="이벤트를 찾을 수 없습니다.")
     return event
-
-
-def create_event(db: Session, user_id: int, data: EventCreate) -> Event:
-    return repository.create_event(db, user_id, data.model_dump())
 
 
 def update_event(db: Session, event_id: int, user_id: int, data: EventUpdate) -> Event:

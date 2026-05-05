@@ -7,6 +7,7 @@ Kakao REST API: POST https://kapi.kakao.com/v2/api/talk/memo/default/send
 import requests as http_requests
 from app.auth.models import User
 from app.auth import repository
+from app.core.config import settings
 from sqlalchemy.orm import Session
 
 
@@ -52,8 +53,8 @@ def send_kakao_memo(db: Session, user: User, text: str) -> dict:
         "object_type": "text",
         "text": text,
         "link": {
-            "web_url": "http://localhost:3000",
-            "mobile_web_url": "http://localhost:3000",
+            "web_url": settings.FRONTEND_URL,
+            "mobile_web_url": settings.FRONTEND_URL,
         },
     }
 
@@ -89,3 +90,43 @@ def get_kakao_status(user: User) -> dict:
         "connected": bool(user.kakao_access_token),
         "provider": user.social_provider,
     }
+
+
+def build_schedule_summary(db: Session, user_id: int) -> str:
+    """오늘 수업 목록을 카카오톡 발송용 텍스트로 조합."""
+    from datetime import date
+    from app.schedule.models import Schedule, INT_TO_DAY
+
+    today = date.today()
+    today_str = today.isoformat()
+    today_day = INT_TO_DAY.get(today.weekday(), "MON")
+
+    # 반복 수업 + 오늘 날짜 지정 수업 합산
+    recurring = (
+        db.query(Schedule)
+        .filter(
+            Schedule.user_id == user_id,
+            Schedule.recurring_day == today_day,
+            Schedule.date.is_(None),
+            Schedule.deleted_by_user.is_not(True),
+        )
+        .all()
+    )
+    specific = (
+        db.query(Schedule)
+        .filter(
+            Schedule.user_id == user_id,
+            Schedule.date == today_str,
+            Schedule.deleted_by_user.is_not(True),
+        )
+        .all()
+    )
+    schedules = sorted(recurring + specific, key=lambda s: s.start_time)
+
+    if not schedules:
+        return f"📅 {today.strftime('%Y년 %m월 %d일')} 오늘 일정이 없습니다. 여유로운 하루 보내세요!"
+
+    lines = [f"📅 {today.strftime('%Y년 %m월 %d일')} 오늘 일정 ({len(schedules)}개)\n"]
+    for s in schedules:
+        lines.append(f"📚 {s.start_time}–{s.end_time} {s.course_name}")
+    return "\n".join(lines)

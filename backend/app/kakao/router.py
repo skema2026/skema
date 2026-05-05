@@ -36,30 +36,5 @@ def send_schedule_summary(
     current_user: User = Depends(get_current_user),
 ):
     """오늘 일정 요약을 카카오톡으로 발송."""
-    from datetime import date
-    from app.schedule.models import Schedule
-
-    today = date.today()
-    from app.schedule.models import INT_TO_DAY
-    today_day = INT_TO_DAY.get(today.weekday(), "MON")
-
-    schedules = (
-        db.query(Schedule)
-        .filter(
-            Schedule.user_id == current_user.id,
-            Schedule.recurring_day == today_day,
-        )
-        .order_by(Schedule.start_time)
-        .all()
-    )
-
-    if not schedules:
-        text = f"📅 {today.strftime('%Y년 %m월 %d일')} 오늘 수업이 없습니다. 여유로운 하루 보내세요!"
-    else:
-        lines = [f"📅 {today.strftime('%Y년 %m월 %d일')} 오늘 수업 ({len(schedules)}개)\n"]
-        for s in schedules:
-            lines.append(f"📚 {s.start_time}–{s.end_time} {s.course_name}")
-        text = "\n".join(lines)
-
-    result = service.send_kakao_memo(db, current_user, text)
-    return result
+    text = service.build_schedule_summary(db, current_user.id)
+    return service.send_kakao_memo(db, current_user, text)

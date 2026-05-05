@@ -16,6 +16,12 @@ def _validate_time(v: Optional[str]) -> Optional[str]:
     return v
 
 
+def _validate_color(v: Optional[str]) -> Optional[str]:
+    if v and not _COLOR_RE.match(v):
+        raise ValueError("색상 코드는 #RRGGBB 또는 #RGB 형식이어야 합니다.")
+    return v
+
+
 def _normalize_day(v: str | int) -> str:
     if isinstance(v, int):
         if not 0 <= v <= 6:
@@ -78,9 +84,7 @@ class ScheduleCreate(BaseModel):
     @field_validator("color_code")
     @classmethod
     def validate_color(cls, v: Optional[str]) -> Optional[str]:
-        if v and not _COLOR_RE.match(v):
-            raise ValueError("색상 코드는 #RRGGBB 또는 #RGB 형식이어야 합니다.")
-        return v
+        return _validate_color(v)
 
     @model_validator(mode="after")
     def normalize_legacy_fields(self):
@@ -124,9 +128,7 @@ class ScheduleUpdate(BaseModel):
     @classmethod
     def validate_day(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
-            v = v.upper()
-            if v not in _VALID_DAYS:
-                raise ValueError(f"유효하지 않은 요일: {v}. MON~SUN 중 선택하세요.")
+            return _normalize_day(v)
         return v
 
     @field_validator("start_time", "end_time")
@@ -137,9 +139,7 @@ class ScheduleUpdate(BaseModel):
     @field_validator("color_code")
     @classmethod
     def validate_color(cls, v: Optional[str]) -> Optional[str]:
-        if v and not _COLOR_RE.match(v):
-            raise ValueError("색상 코드는 #RRGGBB 또는 #RGB 형식이어야 합니다.")
-        return v
+        return _validate_color(v)
 
     @model_validator(mode="after")
     def normalize_legacy_fields(self):
@@ -244,9 +244,7 @@ class EventCreate(BaseModel):
     @field_validator("color_code")
     @classmethod
     def validate_color(cls, v: Optional[str]) -> Optional[str]:
-        if v and not _COLOR_RE.match(v):
-            raise ValueError("색상 코드는 #RRGGBB 또는 #RGB 형식이어야 합니다.")
-        return v
+        return _validate_color(v)
 
 
 class EventUpdate(BaseModel):
@@ -266,9 +264,7 @@ class EventUpdate(BaseModel):
     @field_validator("color_code")
     @classmethod
     def validate_color(cls, v: Optional[str]) -> Optional[str]:
-        if v and not _COLOR_RE.match(v):
-            raise ValueError("색상 코드는 #RRGGBB 또는 #RGB 형식이어야 합니다.")
-        return v
+        return _validate_color(v)
 
 
 class EventResponse(BaseModel):

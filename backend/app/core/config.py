@@ -8,7 +8,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24시간
 
     # ── DB ────────────────────────────────────────────────────────────────────
-    DATABASE_URL: str = "mysql+pymysql://skema:skemapassword@localhost:3306/skema_db"
+    # 로컬: mysql+pymysql://user:pw@127.0.0.1:3306/dbname  (Auth Proxy 사용)
+    # Cloud Run: /cloudsql/project:region:instance
+    DATABASE_URL: str = "mysql+pymysql://skema:skemapassword@127.0.0.1:3306/skema_db"
+    DB_USER: str = "skema"
+    DB_PASSWORD: str = "skemapassword"
+    DB_NAME: str = "skema_db"
 
     # ── AI ────────────────────────────────────────────────────────────────────
     GEMINI_API_KEY: str = ""

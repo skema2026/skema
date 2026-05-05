@@ -11,6 +11,16 @@ from app.notification.schemas import NotificationResponse, NotificationUnreadCou
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
+def _get_notification_or_404(db: Session, notification_id: int, user_id: int) -> Notification:
+    notif = db.query(Notification).filter(
+        Notification.id == notification_id,
+        Notification.user_id == user_id,
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+    return notif
+
+
 @router.get("", response_model=List[NotificationResponse])
 def list_notifications(
     limit: int = 30,
@@ -46,12 +56,7 @@ def mark_read(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    notif = db.query(Notification).filter(
-        Notification.id == notification_id,
-        Notification.user_id == current_user.id,
-    ).first()
-    if not notif:
-        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+    notif = _get_notification_or_404(db, notification_id, current_user.id)
     notif.is_read = True
     db.commit()
     db.refresh(notif)
@@ -77,11 +82,6 @@ def delete_notification(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    notif = db.query(Notification).filter(
-        Notification.id == notification_id,
-        Notification.user_id == current_user.id,
-    ).first()
-    if not notif:
-        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+    notif = _get_notification_or_404(db, notification_id, current_user.id)
     db.delete(notif)
     db.commit()

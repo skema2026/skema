@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.core.deps import get_current_user, get_db
-from app.schedule import service
+from app.schedule import repository, service
 from app.schedule.schemas import (
     EventCreate,
     EventResponse,
@@ -29,7 +29,7 @@ def list_schedules(
     current_user: User = Depends(get_current_user),
 ):
     """내 수업 시간표 전체 목록을 반환합니다."""
-    return service.list_schedules(db, current_user.id)
+    return repository.get_schedules(db, current_user.id)
 
 
 @router.post("/schedules", response_model=List[ScheduleResponse], status_code=status.HTTP_201_CREATED)
@@ -81,7 +81,7 @@ def list_exams(
     current_user: User = Depends(get_current_user),
 ):
     """내 시험 일정 전체 목록을 반환합니다."""
-    return service.list_exams(db, current_user.id)
+    return repository.get_exams(db, current_user.id)
 
 
 @router.post("/exam-schedules", response_model=ExamScheduleResponse, status_code=status.HTTP_201_CREATED)
@@ -91,7 +91,7 @@ def create_exam(
     current_user: User = Depends(get_current_user),
 ):
     """시험 일정을 추가합니다."""
-    return service.create_exam(db, current_user.id, data)
+    return repository.create_exam(db, current_user.id, data.model_dump())
 
 
 @router.get("/exam-schedules/{exam_id}", response_model=ExamScheduleResponse)
@@ -133,7 +133,7 @@ def list_events(
     current_user: User = Depends(get_current_user),
 ):
     """내 이벤트 전체 목록을 반환합니다."""
-    return service.list_events(db, current_user.id)
+    return repository.get_events(db, current_user.id)
 
 
 @router.post("/events", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
@@ -143,7 +143,7 @@ def create_event(
     current_user: User = Depends(get_current_user),
 ):
     """이벤트를 추가합니다."""
-    return service.create_event(db, current_user.id, data)
+    return repository.create_event(db, current_user.id, data.model_dump())
 
 
 @router.get("/events/{event_id}", response_model=EventResponse)

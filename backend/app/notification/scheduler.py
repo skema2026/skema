@@ -16,6 +16,8 @@ import logging
 import random
 from datetime import date, datetime, timedelta
 
+from app.utils.time_utils import time_to_minutes
+
 logger = logging.getLogger(__name__)
 
 _MOTIVATIONS = [
@@ -165,8 +167,8 @@ def job_reminders():
                 if not is_today:
                     continue
 
-                start_min = _hhmm_to_min(s.start_time)
-                end_min = _hhmm_to_min(s.end_time)
+                start_min = time_to_minutes(s.start_time)
+                end_min = time_to_minutes(s.end_time)
                 in_window = (
                     window_start <= start_min <= window_end
                     if window_start <= window_end
@@ -261,14 +263,6 @@ def job_comparison():
         logger.error("job_comparison failed: %s", e, exc_info=True)
     finally:
         db.close()
-
-
-def _hhmm_to_min(t: str) -> int:
-    try:
-        h, m = t.split(":")
-        return int(h) * 60 + int(m)
-    except Exception:
-        return 0
 
 
 _scheduler = None

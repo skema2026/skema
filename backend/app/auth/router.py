@@ -46,12 +46,6 @@ def signup(data: SignupRequest, db: Session = Depends(get_db)):
     return service.signup(db, data)
 
 
-@router.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(data: SignupRequest, db: Session = Depends(get_db)):
-    """회원가입 별칭 엔드포인트 (/auth/signup과 동일)."""
-    return service.signup(db, data)
-
-
 @router.post("/auth/login", response_model=TokenResponse)
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """이메일 + 비밀번호 검증 후 Bearer JWT를 발급합니다. (JSON body)"""
@@ -89,15 +83,8 @@ def get_me(current_user: User = Depends(get_current_user)):
     return _serialize_current_user(current_user)
 
 
-@router.get("/auth/me", response_model=UserResponse)
-def get_me_alias(current_user: User = Depends(get_current_user)):
-    """현재 인증된 사용자 정보를 반환합니다 (/users/me 별칭)."""
-    return _serialize_current_user(current_user)
-
-
 # ── 프로필 ────────────────────────────────────────────────────────────────────
 
-@router.get("/profile", response_model=ProfileResponse)
 @router.get("/profiles", response_model=ProfileResponse)
 def get_profile(
     db: Session = Depends(get_db),
@@ -114,17 +101,15 @@ def create_profile(
     current_user: User = Depends(get_current_user),
 ):
     """프로필을 생성합니다. 이미 존재하면 409를 반환합니다."""
-    from app.auth import repository
-    if repository.get_profile_by_user_id(db, current_user.id):
+    from app.auth import repository as auth_repo
+    if auth_repo.get_profile_by_user_id(db, current_user.id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="이미 프로필이 존재합니다. PUT /profiles 로 수정하세요.",
         )
-    from app.auth.repository import create_profile as repo_create
-    return repo_create(db, current_user.id, data.model_dump(exclude_none=True))
+    return auth_repo.create_profile(db, current_user.id, data.model_dump(exclude_none=True))
 
 
-@router.put("/profile", response_model=ProfileResponse)
 @router.put("/profiles", response_model=ProfileResponse)
 def update_profile(
     data: ProfileUpdate,

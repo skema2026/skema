@@ -1,7 +1,7 @@
 """
 Everytime 등에서 캡처한 시간표 이미지를 파싱하고 결과를 일정으로 저장하는 엔드포인트.
 
-POST /eta/parse-image    : 이미지 업로드 → Gemini Vision 파싱 결과 반환
+POST /eta/parse-image    : 이미지 업로드 → LLM Vision 파싱 결과 반환
 POST /eta/save-schedules : 확정된 항목을 Schedule DB에 저장
 POST /eta/parse-image-v2 : 위치 기반 파서 결과 반환
 """
@@ -11,10 +11,9 @@ import logging
 import os
 import re
 import tempfile
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
@@ -28,38 +27,15 @@ from app.core.llm import (
 from app.schedule.models import Schedule
 from app.utils.text_validation import normalize_korean_field
 
+from app.utils.time_utils import DAY_NAMES as KR_DAYS
+
 from .positional_parser import parse_image_positional
+from .schemas import NormalizedEntryModel, ParsedEntry, SaveSchedulesRequest
 from .time_utils import parse_time_range, parse_time_token
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/eta", tags=["eta"])
-
-
-class ParsedEntry(BaseModel):
-    subject_name: str
-    day_of_week: int  # 0=월 ... 6=일
-    start_time: str  # HH:MM
-    end_time: str  # HH:MM
-    raw_text: Optional[str] = None
-    source: str = "eta_image"
-    requires_review: bool = False
-
-
-class SaveSchedulesRequest(BaseModel):
-    entries: List[ParsedEntry]
-
-
-class NormalizedEntryModel(BaseModel):
-    title: str
-    day: str
-    startTime: str
-    endTime: str
-    location: str = ""
-    bbox: tuple[int, int, int, int]
-
-
-KR_DAYS = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
 
 _ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 _MAX_BYTES = 20 * 1024 * 1024  # 20 MB
@@ -199,6 +175,19 @@ def _normalize_time(t: str) -> str:
     return "00:00"
 
 
+async def _read_image_file(file: UploadFile) -> tuple[bytes, str]:
+    """이미지 파일 유효성 검사 후 (bytes, content_type) 반환."""
+    content_type = file.content_type or ""
+    if content_type not in _ALLOWED_TYPES:
+        raise HTTPException(status_code=422, detail=f"지원하지 않는 파일 형식: {content_type}")
+    image_bytes = await file.read()
+    if len(image_bytes) > _MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Image too large (max 20MB)")
+    if len(image_bytes) == 0:
+        raise HTTPException(status_code=422, detail="Empty file")
+    return image_bytes, content_type
+
+
 def _dedup_entries(entries: List[ParsedEntry]) -> List[ParsedEntry]:
     seen: set = set()
     result: List[ParsedEntry] = []
@@ -232,10 +221,8 @@ def _extract_json(text: str) -> list:
         return []
 
 
-def _parse_via_gemini(image_bytes: bytes, content_type: str) -> List[ParsedEntry]:
-    """
-    Gemini Vision(또는 fallback provider)으로 이미지에서 시간표 항목을 추출한다.
-    """
+def _parse_via_llm(image_bytes: bytes, content_type: str) -> List[ParsedEntry]:
+    """LLM Vision으로 이미지에서 시간표 항목을 추출한다."""
     suffix = {
         "image/jpeg": ".jpg",
         "image/png": ".png",
@@ -345,25 +332,11 @@ async def parse_eta_image(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    이미지 기반 시간표를 LLM Vision으로 파싱.
-    실패 또는 결과 없음이면 위치 기반 파서로 폴백.
-    """
-    content_type = file.content_type or ""
-    if content_type not in _ALLOWED_TYPES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"지원하지 않는 파일 형식: {content_type}",
-        )
-
-    image_bytes = await file.read()
-    if len(image_bytes) > _MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Image too large (max 20MB)")
-    if len(image_bytes) == 0:
-        raise HTTPException(status_code=422, detail="Empty file")
+    """이미지 기반 시간표를 LLM Vision으로 파싱. 실패 시 위치 기반 파서로 폴백."""
+    image_bytes, content_type = await _read_image_file(file)
 
     try:
-        entries = _parse_via_gemini(image_bytes, content_type)
+        entries = _parse_via_llm(image_bytes, content_type)
     except HTTPException:
         raise
     except (LLMRateLimitedError, LLMProviderUnavailableError, LLMEmptyResponseError) as exc:
@@ -434,23 +407,8 @@ async def parse_eta_image_v2(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    위치 기반 파서 결과를 반환한다.
-    제목/위치는 텍스트를 쓰고, 요일/시간은 위치 기반으로 계산한다.
-    """
-    content_type = file.content_type or ""
-    if content_type not in _ALLOWED_TYPES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Unsupported content type: {content_type}",
-        )
-
-    image_bytes = await file.read()
-    if len(image_bytes) > _MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Image too large (max 20MB)")
-    if len(image_bytes) == 0:
-        raise HTTPException(status_code=422, detail="Empty file")
-
+    """위치 기반 파서 결과를 반환한다."""
+    image_bytes, _ = await _read_image_file(file)
     _grid, entries = parse_image_positional(image_bytes)
 
     if not entries:

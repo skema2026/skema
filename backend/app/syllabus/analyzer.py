@@ -160,19 +160,17 @@ Rules:
 # 섹션 3. AI 분석 호출
 
 
-def _call_gemini_text(subject_name: str, raw_text: str) -> str:
+def _analyze_text(subject_name: str, raw_text: str) -> str:
     """OpenAI gpt-4.1로 강의계획서 텍스트를 분석한다."""
     from app.core.llm import call_openai
     prompt = _build_prompt(subject_name, raw_text)
-    logger.info("Syllabus text analysis: calling OpenAI gpt-4.1 directly")
     return call_openai(prompt, temperature=0.1)
 
 
-def _call_gemini_vision(image_path: str, content_type: str, subject_name: str) -> str:
+def _analyze_vision(image_path: str, content_type: str, subject_name: str) -> str:
     """OpenAI gpt-4.1 Vision으로 강의계획서 이미지를 분석한다."""
     from app.core.llm import _call_openai_vision
     prompt = _build_prompt(subject_name, "(이미지에서 텍스트를 먼저 추출(ocr)한 뒤 분석해 주세요)")
-    logger.info("Syllabus vision analysis: calling OpenAI gpt-4.1 directly")
     return _call_openai_vision(image_path, content_type, prompt, temperature=0.1)
 
 
@@ -319,7 +317,7 @@ def analyze_syllabus(
     # 이미지 입력: Vision 모델로 직접 분석
     if content_type in _IMAGE_TYPES:
         try:
-            ai_response = _call_gemini_vision(file_path, content_type, subject_name)
+            ai_response = _analyze_vision(file_path, content_type, subject_name)
         except LLMRateLimitedError as e:
             logger.warning(f"Vision rate limited: {e}")
             return AnalysisPayload(), "rate_limited", "", str(e)[:200]
@@ -344,7 +342,7 @@ def analyze_syllabus(
     raw_text = extract_text(file_path, content_type)
 
     try:
-        ai_response = _call_gemini_text(subject_name, raw_text)
+        ai_response = _analyze_text(subject_name, raw_text)
     except LLMRateLimitedError as e:
         logger.warning(f"Text LLM rate limited: {e}")
         return AnalysisPayload(), "rate_limited", raw_text, str(e)[:200]

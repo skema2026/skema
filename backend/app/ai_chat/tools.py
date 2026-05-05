@@ -1,13 +1,3 @@
-"""
-Gemini API 클라이언트 모듈.
-AI 채팅에 사용할 도구(Tool) 정의 및 API 호출을 담당.
-실제 비즈니스 로직은 schedule/service.py에 있으며, 여기서는 API 통신만 처리.
-"""
-from app.core.config import settings
-
-# ── Function Calling 도구 정의 ────────────────────────────────────────────────
-# AI가 호출할 수 있는 도구 목록. 실제 구현은 schedule/service.py에 있음.
-
 TOOLS_SPEC = [
     {
         "name": "add_schedule",
@@ -124,6 +114,24 @@ TOOLS_SPEC = [
         },
     },
     {
+        "name": "add_exam_schedule",
+        "description": (
+            "시험 일정을 추가합니다. 사용자가 시험 날짜/과목을 언급하면 이 툴을 사용하세요. "
+            "일반 일정(add_schedule)이 아닌 시험 전용 테이블에 저장되어 학습 계획 생성에 활용됩니다."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "시험 제목 (예: '알고리즘 중간고사')"},
+                "exam_date": {"type": "string", "description": "시험 날짜 YYYY-MM-DD"},
+                "subject": {"type": "string", "description": "과목명 (선택)"},
+                "exam_time": {"type": "string", "description": "시험 시작 시간 HH:MM (선택)"},
+                "location": {"type": "string", "description": "시험 장소 (선택)"},
+            },
+            "required": ["title", "exam_date"],
+        },
+    },
+    {
         "name": "list_exam_schedules",
         "description": "등록된 시험 일정 목록을 조회합니다. 학습 계획 생성 전에 항상 먼저 호출하세요.",
         "parameters": {
@@ -144,117 +152,100 @@ TOOLS_SPEC = [
                 "exam_id": {"type": "integer", "description": "특정 시험 ID (미지정 시 모든 예정 시험 대상)"},
                 "target_days": {"type": "integer", "description": "학습 일정 생성 기간(일수), 기본 14"},
                 "daily_study_hours": {"type": "number", "description": "기본 하루 학습 시간(시간), 기본 2. 시험 임박 시 자동 증가"},
+                "sessions_per_week": {"type": "integer", "description": "주당 학습 횟수(1~7). 사용자가 '주 N일' 또는 '주 N회'를 언급하면 반드시 설정. 미지정 시 매일 생성"},
+                "preferred_start_time": {"type": "string", "description": "선호 시작 시간 HH:MM (예: '07:00'). 사용자가 '몇 시부터'를 언급하면 반드시 설정"},
             },
+        },
+    },
+    {
+        "name": "list_syllabus_analyses",
+        "description": (
+            "업로드된 강의계획서의 AI 분석 결과를 조회합니다. "
+            "과목별 평가 비율(중간/기말/과제/출석), 시험 일정, 과제 마감일, 주차별 주제를 확인할 수 있습니다. "
+            "학습 계획 생성 전에 반드시 호출하여 강의계획서 데이터가 있는지 확인하세요."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subject": {"type": "string", "description": "특정 과목명 필터 (선택, 미지정 시 전체)"},
+            },
+        },
+    },
+    {
+        "name": "import_syllabus_exams",
+        "description": (
+            "강의계획서 분석 결과에 있는 시험·과제 일정을 exam_schedules에 자동 등록합니다. "
+            "사용자가 '강의계획서 일정 등록', '시험 일정 가져오기' 등을 요청할 때 사용하세요."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subject": {"type": "string", "description": "가져올 과목명"},
+            },
+            "required": ["subject"],
+        },
+    },
+    {
+        "name": "complete_schedule",
+        "description": (
+            "일정을 완료 처리합니다. '완료했어', '다 했어', '끝냈어' 등의 표현에 사용하세요. "
+            "완료된 일정은 이후 AI 재계획에서 다시 생성되지 않습니다."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "schedule_id": {"type": "integer", "description": "완료할 일정 ID"},
+            },
+            "required": ["schedule_id"],
+        },
+    },
+    {
+        "name": "postpone_schedule",
+        "description": (
+            "특정 날짜 일정을 지정한 일수만큼 연기합니다. "
+            "'내일로 연기', '하루 미뤄', '3일 뒤로' 등의 표현에 사용하세요."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "schedule_id": {"type": "integer", "description": "연기할 일정 ID"},
+                "days": {"type": "integer", "description": "연기할 일수, 기본 1"},
+            },
+            "required": ["schedule_id"],
+        },
+    },
+    {
+        "name": "update_exam",
+        "description": "시험 일정의 날짜·제목·과목·시간·장소를 수정합니다.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "exam_id": {"type": "integer", "description": "수정할 시험 ID"},
+                "title": {"type": "string", "description": "새 제목"},
+                "exam_date": {"type": "string", "description": "새 날짜 YYYY-MM-DD"},
+                "subject": {"type": "string", "description": "새 과목명"},
+                "exam_time": {"type": "string", "description": "새 시작 시간 HH:MM"},
+                "location": {"type": "string", "description": "새 장소"},
+            },
+            "required": ["exam_id"],
+        },
+    },
+    {
+        "name": "delete_exam",
+        "description": (
+            "시험 일정을 삭제합니다. 해당 시험을 위해 AI가 생성한 학습 일정도 함께 정리됩니다. "
+            "'시험 삭제', '시험 일정 지워줘' 등의 표현에 사용하세요."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "exam_id": {"type": "integer", "description": "삭제할 시험 ID"},
+            },
+            "required": ["exam_id"],
         },
     },
 ]
 
 
-# ── Gemini Tool 빌더 ─────────────────────────────────────────────────────────
-
-def build_genai_tool():
-    """TOOLS_SPEC을 google-genai Tool 객체로 변환."""
-    from google.genai import types
-
-    type_map = {
-        "string": "STRING",
-        "integer": "INTEGER",
-        "number": "NUMBER",
-        "boolean": "BOOLEAN",
-        "object": "OBJECT",
-    }
-
-    function_declarations = []
-    for spec in TOOLS_SPEC:
-        props = {}
-        for prop_name, prop_def in spec["parameters"].get("properties", {}).items():
-            props[prop_name] = types.Schema(
-                type=type_map.get(prop_def.get("type", "string"), "STRING"),
-                description=prop_def.get("description", ""),
-            )
-
-        fd = types.FunctionDeclaration(
-            name=spec["name"],
-            description=spec["description"],
-            parameters=types.Schema(
-                type="OBJECT",
-                properties=props,
-                required=spec["parameters"].get("required", []),
-            ),
-        )
-        function_declarations.append(fd)
-
-    return types.Tool(function_declarations=function_declarations)
-
-
-# ── 채팅 세션 생성 ────────────────────────────────────────────────────────────
-
-def create_chat_session(system_prompt: str, history: list):
-    """Gemini 채팅 세션 생성."""
-    from google import genai
-    from google.genai import types
-
-    if not settings.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다.")
-
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
-
-    return client.chats.create(
-        model=settings.GEMINI_MODEL,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            tools=[build_genai_tool()],
-        ),
-        history=history,
-    )
-
-
-# ── 메시지 송수신 ─────────────────────────────────────────────────────────────
-
-def send_message(chat, message):
-    """채팅 세션에 메시지(str 또는 Part 리스트)를 전송하고 응답 반환."""
-    return chat.send_message(message)
-
-
-def extract_text(response) -> str:
-    """응답에서 텍스트 파트를 추출해 이어붙인 문자열 반환."""
-    return "".join(
-        part.text
-        for part in response.candidates[0].content.parts
-        if part.text
-    )
-
-
-def extract_function_calls(response) -> list:
-    """응답에서 function_call 파트 목록 반환. 없으면 빈 리스트."""
-    return [
-        part.function_call
-        for part in response.candidates[0].content.parts
-        if part.function_call is not None
-    ]
-
-
-def make_function_response_parts(fn_calls: list, tool_results: list):
-    """tool_results 문자열 목록을 FunctionResponse Part 객체 리스트로 변환."""
-    from google.genai import types
-
-    return [
-        types.Part.from_function_response(
-            name=fc.name,
-            response={"result": result},
-        )
-        for fc, result in zip(fn_calls, tool_results)
-    ]
-
-
-def history_to_contents(conversation_history: list) -> list:
-    """dict 형태의 대화 히스토리를 google-genai Content 객체 리스트로 변환."""
-    from google.genai import types
-
-    return [
-        types.Content(
-            role="model" if msg["role"] == "assistant" else "user",
-            parts=[types.Part.from_text(text=msg["content"])],
-        )
-        for msg in conversation_history
-    ]
+def build_tools() -> list:
+    return [{"type": "function", "function": spec} for spec in TOOLS_SPEC]

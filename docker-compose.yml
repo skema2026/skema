@@ -40,6 +40,9 @@ services:
     environment:
       # DB — 서비스명 'db' 로 연결 (localhost 금지)
       DATABASE_URL: mysql+pymysql://${MYSQL_USER:-skema}:${MYSQL_PASSWORD:-skemapassword}@db:3306/${MYSQL_DATABASE:-skema_db}
+      DB_USER: ${MYSQL_USER:-skema}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-skemapassword}
+      DB_NAME: ${MYSQL_DATABASE:-skema_db}
       # JWT
       SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-in-production}
       ALGORITHM: HS256

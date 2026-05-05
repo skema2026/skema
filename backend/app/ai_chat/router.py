@@ -33,10 +33,10 @@ def chat(
     AI 에이전트와 대화합니다.
     대화 내용(user 메시지 + assistant 응답)을 ai_chat_logs에 자동 저장합니다.
     """
-    if not settings.GEMINI_API_KEY:
+    if not settings.OPENAI_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI 서비스가 설정되지 않았습니다. GEMINI_API_KEY를 확인하세요.",
+            detail="AI 서비스가 설정되지 않았습니다. OPENAI_API_KEY를 확인하세요.",
         )
 
     history = [{"role": m.role, "content": m.content} for m in request.messages]
