@@ -24,6 +24,7 @@ ALLOWED_TYPES = {
     "image/png",
     "image/webp",
 }
+ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".webp"}
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 
 _DONE_STATUSES = {"success", "partial"}
@@ -32,9 +33,14 @@ _FAILED_STATUSES = {"failed", "rate_limited", "provider_unavailable", "empty_res
 
 def save_uploaded_file(content: bytes, user_id: int, original_filename: str) -> tuple[str, str]:
     """파일을 디스크에 저장하고 (file_path, stored_name)을 반환."""
+    ext = os.path.splitext(original_filename)[1].lower() or ".bin"
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"허용되지 않는 파일 확장자입니다: {ext}",
+        )
     user_dir = os.path.join(UPLOAD_DIR, str(user_id))
     os.makedirs(user_dir, exist_ok=True)
-    ext = os.path.splitext(original_filename)[1].lower() or ".bin"
     stored_name = f"{uuid.uuid4().hex}{ext}"
     file_path = os.path.join(user_dir, stored_name)
     with open(file_path, "wb") as f:

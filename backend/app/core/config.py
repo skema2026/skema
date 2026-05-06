@@ -1,9 +1,16 @@
+import logging
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+_cfg_logger = logging.getLogger(__name__)
+
+_DEFAULT_SECRET = "change-this-secret-key-in-production"
 
 
 class Settings(BaseSettings):
     # ── JWT ───────────────────────────────────────────────────────────────────
-    SECRET_KEY: str = "change-this-secret-key-in-production"
+    SECRET_KEY: str = _DEFAULT_SECRET
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24시간
 
@@ -41,6 +48,20 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    @model_validator(mode="after")
+    def _warn_insecure_defaults(self):
+        if self.SECRET_KEY == _DEFAULT_SECRET:
+            _cfg_logger.critical(
+                "SECRET_KEY is set to the insecure default value. "
+                "Set SECRET_KEY in your .env file before deploying to production."
+            )
+        if "skemapassword" in self.DATABASE_URL:
+            _cfg_logger.warning(
+                "DATABASE_URL contains the default password 'skemapassword'. "
+                "Update your .env file for production use."
+            )
+        return self
 
 
 settings = Settings()

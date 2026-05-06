@@ -9,6 +9,7 @@
 """
 import json
 import logging
+import re
 import warnings
 from app.utils.text_validation import normalize_korean_field
 
@@ -58,9 +59,9 @@ def _extract_pdf(path: str) -> str:
                     lines.append(text)
             except Exception as e:
                 # "e cannot be parsed as 4 floats" — bbox 파싱 실패 시 해당 페이지 건너뜀
-                logger.warning(f"PDF page {page_num + 1} text extraction failed: {e} ??skipping page")
+                logger.warning(f"PDF page {page_num + 1} text extraction failed: {e} → skipping page")
                 try:
-                    # bbox ?놁씠 ?⑥닚 몄옄?붿텧 (fallback)
+                    # bbox 없이 단어 단위 추출 (fallback)
                     words = page.extract_words()
                     if words:
                         lines.append(" ".join(w.get("text", "") for w in words))
@@ -81,7 +82,14 @@ def _extract_docx(path: str) -> str:
 
 # 섹션 2. LLM 프롬프트 빌드
 
+def _sanitize_subject_name(name: str) -> str:
+    """프롬프트 삽입 전 subject_name 정제: 줄바꿈·제어문자 제거, 길이 제한."""
+    sanitized = re.sub(r"[\n\r\x00-\x1f]", " ", name)
+    return sanitized[:100].strip()
+
+
 def _build_prompt(subject_name: str, syllabus_text: str) -> str:
+    subject_name = _sanitize_subject_name(subject_name)
     text_block = (
         syllabus_text.strip()
         if syllabus_text.strip()
@@ -247,7 +255,7 @@ def _sanitize_payload(payload: AnalysisPayload, raw_text_for_compare: str) -> An
         pass
     return payload
 def _ensure_weekly_plan(raw) -> list:
-    """[{week, topic, subtopics, difficulty, keywords}] ?먮뒗 ["1주차: ..."] ⑤몢 ?덉슜 ???뺢퇋??"""
+    """dict 또는 str 형태의 weekly_plan 항목을 정규화된 dict 리스트로 변환."""
     if not isinstance(raw, list):
         return []
     normalized = []
@@ -295,7 +303,7 @@ def analyze_syllabus(
     subject_name: str,
 ) -> tuple["AnalysisPayload", str, str, str]:
     """
-    과목꾪쉷???뚯씪??꾩꽍?쒕떎.
+    강의계획서 파일을 분석한다.
 
     Returns:
         (payload, status, raw_text, reason)

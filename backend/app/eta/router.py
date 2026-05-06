@@ -370,15 +370,20 @@ def save_eta_schedules(
     사용자가 검토 완료한 ETA 시간표 항목들을 반복 일정(date=None)으로 DB에 저장한다.
     """
     saved_count = 0
+    skipped_count = 0
 
     for entry in body.entries:
         if not entry.subject_name.strip():
+            skipped_count += 1
             continue
         if not entry.start_time or not entry.end_time:
+            skipped_count += 1
             continue
         if entry.start_time >= entry.end_time:
+            skipped_count += 1
             continue
         if not (0 <= entry.day_of_week <= 6):
+            skipped_count += 1
             continue
 
         sch = Schedule(
@@ -398,8 +403,8 @@ def save_eta_schedules(
         saved_count += 1
 
     db.commit()
-    logger.info(f"ETA: saved {saved_count} schedules for user {current_user.id}")
-    return {"saved": saved_count}
+    logger.info(f"ETA: saved {saved_count} schedules for user {current_user.id} (skipped={skipped_count})")
+    return {"saved": saved_count, "skipped": skipped_count}
 
 
 @router.post("/parse-image-v2", response_model=List[NormalizedEntryModel])

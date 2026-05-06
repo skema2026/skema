@@ -25,6 +25,13 @@ from app.utils.time_utils import DAY_NAMES, DAY_NAMES_SHORT, minutes_to_time, ov
 
 logger = logging.getLogger(__name__)
 
+# 학습 블록 관련 상수
+_MAX_BLOCK_MINS = 180     # 한 블록 최대 학습 시간 (분)
+_BLOCK_BUFFER_MINS = 60  # 일정 사이 최소 여유 시간 (분)
+_MIN_BLOCK_MINS = 30      # 배치 가능한 최소 블록 길이 (분)
+_DEFAULT_START_HOUR = 8   # 기상 시간 기본값 미설정 시 사용 (시)
+_FREE_SLOT_END_HOUR = 22  # 빈 시간 탐색 종료 시각 (시)
+
 _SUBJECT_PALETTE = [
     "#4F46E5", "#0891B2", "#059669", "#D97706",
     "#DC2626", "#7C3AED", "#DB2777", "#0284C7",
@@ -229,13 +236,13 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             return "❌ 날짜 또는 요일을 지정해 주세요."
         existing = _day_schedules(db, user_id, dow, date_str)
         busy = sorted((time_to_minutes(s.start_time), time_to_minutes(s.end_time)) for s in existing)
-        free, cursor = [], 8 * 60
+        free, cursor = [], _DEFAULT_START_HOUR * 60
         for bs, be in busy:
             if cursor + duration <= bs:
                 free.append((_m2t(cursor), _m2t(bs)))
-            cursor = max(cursor, be + 60)  # +1시간 버퍼
-        if cursor + duration <= 22 * 60:
-            free.append((_m2t(cursor), _m2t(22 * 60)))
+            cursor = max(cursor, be + _BLOCK_BUFFER_MINS)
+        if cursor + duration <= _FREE_SLOT_END_HOUR * 60:
+            free.append((_m2t(cursor), _m2t(_FREE_SLOT_END_HOUR * 60)))
         label = date_str if date_str else DAY_NAMES[dow]
         if not free:
             return f"😅 {label}에는 {duration}분 이상의 빈 시간이 없습니다."
@@ -314,16 +321,16 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             existing = _day_schedules(db, user_id, dow, date_str)
             busy = sorted((time_to_minutes(s.start_time), time_to_minutes(s.end_time)) for s in existing)
             remaining = int(daily_hours * 60)
-            cursor = max(8 * 60, wake)
+            cursor = max(_DEFAULT_START_HOUR * 60, wake)
             blocks = []
             for bs, be in busy:
-                if cursor + 30 <= bs and remaining > 0:
-                    b = min(bs - cursor, remaining, 180)
+                if cursor + _MIN_BLOCK_MINS <= bs and remaining > 0:
+                    b = min(bs - cursor, remaining, _MAX_BLOCK_MINS)
                     blocks.append((cursor, cursor + b))
                     remaining -= b
-                cursor = max(cursor, be + 60)  # +1시간 버퍼
-            if remaining >= 30 and cursor + 30 <= sleep:
-                b = min(sleep - cursor, remaining, 180)
+                cursor = max(cursor, be + _BLOCK_BUFFER_MINS)
+            if remaining >= _MIN_BLOCK_MINS and cursor + _MIN_BLOCK_MINS <= sleep:
+                b = min(sleep - cursor, remaining, _MAX_BLOCK_MINS)
                 blocks.append((cursor, cursor + b))
             for sm, em in blocks:
                 if task_pool:
@@ -394,7 +401,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                 dow = tdate.weekday()
                 existing = _day_schedules(db, user_id, dow, date_str)
                 busy = sorted((time_to_minutes(x.start_time), time_to_minutes(x.end_time)) for x in existing if x.id != s.id)
-                cursor = max(8 * 60, wake)
+                cursor = max(_DEFAULT_START_HOUR * 60, wake)
                 placed = False
                 for bs, be in busy:
                     if cursor + duration <= bs:
@@ -407,7 +414,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                         moved.append(f"  • {s.title} → {date_str} {s.start_time}~{s.end_time}")
                         placed = True
                         break
-                    cursor = max(cursor, be + 60)  # +1시간 버퍼
+                    cursor = max(cursor, be + _BLOCK_BUFFER_MINS)
                 if not placed and cursor + duration <= sleep:
                     s.date = date_str
                     s.day_of_week = dow
@@ -674,19 +681,18 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                 existing = _day_schedules(db, user_id, dow, date_str)
                 busy = sorted((time_to_minutes(s.start_time), time_to_minutes(s.end_time)) for s in existing)
                 remaining = int(day_hours * 60)
-                # 선호 시작 시간 또는 기상 시간 사용 (하드코딩 8시 제거)
                 cursor = pref_start if pref_start is not None else wake
                 blocks = []
 
                 for bs, be in busy:
-                    if cursor + 30 <= bs and remaining > 0:
-                        block_len = min(bs - cursor, remaining, 180)
+                    if cursor + _MIN_BLOCK_MINS <= bs and remaining > 0:
+                        block_len = min(bs - cursor, remaining, _MAX_BLOCK_MINS)
                         blocks.append((cursor, cursor + block_len))
                         remaining -= block_len
-                    cursor = max(cursor, be + 60)  # +1시간 버퍼
+                    cursor = max(cursor, be + _BLOCK_BUFFER_MINS)
 
-                if remaining >= 30 and cursor + 30 <= sleep:
-                    block_len = min(sleep - cursor, remaining, 180)
+                if remaining >= _MIN_BLOCK_MINS and cursor + _MIN_BLOCK_MINS <= sleep:
+                    block_len = min(sleep - cursor, remaining, _MAX_BLOCK_MINS)
                     blocks.append((cursor, cursor + block_len))
 
                 day_placed = 0
@@ -711,8 +717,8 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                         block_priority = task.get("priority", default_priority)
                         # task의 estimated_minutes가 있으면 블록 크기에 반영
                         task_mins = task.get("estimated_minutes")
-                        if task_mins and 20 <= task_mins <= 180:
-                            task_em = min(sm + task_mins, em, sm + 180)
+                        if task_mins and 20 <= task_mins <= _MAX_BLOCK_MINS:
+                            task_em = min(sm + task_mins, em, sm + _MAX_BLOCK_MINS)
                             em = max(task_em, sm + 20)
 
                         # ── dedup: 이미 삭제하거나 완료한 동일 task 재생성 금지 ──

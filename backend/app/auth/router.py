@@ -141,22 +141,19 @@ def oauth_authorize(provider: str):
         "response_type": "code",
         "scope": cfg["scope"],
     }
-    state = ""
-    if provider == "naver":
-        state = secrets.token_urlsafe(16)
-        params["state"] = state
+    state = secrets.token_urlsafe(16)
+    params["state"] = state
 
     query = urlencode({k: v for k, v in params.items() if v})
     response = RedirectResponse(url=f"{cfg['auth_url']}?{query}")
-    if state:
-        response.set_cookie(
-            key=f"oauth_state_{provider}",
-            value=state,
-            httponly=True,
-            samesite="lax",
-            secure=settings.BACKEND_URL.startswith("https://"),
-            max_age=600,
-        )
+    response.set_cookie(
+        key=f"oauth_state_{provider}",
+        value=state,
+        httponly=True,
+        samesite="lax",
+        secure=settings.BACKEND_URL.startswith("https://"),
+        max_age=600,
+    )
     return response
 
 
@@ -177,12 +174,11 @@ def oauth_callback(
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
 
-    if provider == "naver":
-        expected_state = request.cookies.get("oauth_state_naver", "")
-        if not state or not expected_state or not secrets.compare_digest(state, expected_state):
-            response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
-            response.delete_cookie(key="oauth_state_naver")
-            return response
+    expected_state = request.cookies.get(f"oauth_state_{provider}", "")
+    if not state or not expected_state or not secrets.compare_digest(state, expected_state):
+        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
+        response.delete_cookie(key=f"oauth_state_{provider}")
+        return response
 
     try:
         social_id, email, display_name, kakao_at, kakao_rt = service.exchange_oauth_code(provider, code, state)
