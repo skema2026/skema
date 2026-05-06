@@ -148,6 +148,49 @@ def _determine_start_minute(content_rows: List[int], header_bottom: int, img_h: 
     return start_minute
 
 
+def _refine_grid_origin(
+    solid_centers: List[int],
+    grid_origin_y: int,
+    pixels_per_slot: float,
+) -> int:
+    """
+    모든 solid(:00) 라인을 이용해 grid_origin_y를 ±2슬롯 범위에서 정밀 보정한다.
+
+    solid line은 매 2슬롯(1시간)마다 나타나므로 잔차는 hour_px 주기.
+    잔차 평균이 최소인 정수 y를 반환한다.
+    """
+    if not solid_centers or pixels_per_slot <= 0:
+        return grid_origin_y
+
+    hour_px = pixels_per_slot * 2
+
+    def mean_residual(gy: int) -> float:
+        total = 0.0
+        for sc in solid_centers:
+            diff = (sc - gy) % hour_px
+            total += min(diff, hour_px - diff)
+        return total / len(solid_centers)
+
+    best_gy = grid_origin_y
+    best_res = mean_residual(grid_origin_y)
+    search_range = int(pixels_per_slot * 2 + 0.5)
+
+    for delta in range(-search_range, search_range + 1):
+        gy_trial = grid_origin_y + delta
+        if gy_trial < 0:
+            continue
+        res = mean_residual(gy_trial)
+        if res < best_res - 0.5:
+            best_res = res
+            best_gy = gy_trial
+
+    logger.debug(
+        "_refine_grid_origin: original=%d refined=%d residual=%.2f",
+        grid_origin_y, best_gy, best_res,
+    )
+    return best_gy
+
+
 def detect_grid(image_bytes: bytes) -> GridModel:
     """
     에브리타임 이미지에서 column_bounds와 row_bounds를 감지한다.
@@ -312,6 +355,8 @@ def detect_grid(image_bytes: bytes) -> GridModel:
         if grid_origin_y < header_bottom and n_slots > 0:
             grid_origin_y = int(first_solid - (n_slots - 1) * pixels_per_slot)
         grid_origin_y = max(0, grid_origin_y)
+        # 모든 solid line으로 grid_origin_y를 정밀 보정 (±2슬롯 탐색)
+        grid_origin_y = _refine_grid_origin(solid_centers, grid_origin_y, pixels_per_slot)
         start_minute = 0
     else:
         grid_origin_y = header_bottom
