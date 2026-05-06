@@ -21,3 +21,7 @@ Pillow>=10.0.0
 # Scheduler (알림 주기 실행)
 apscheduler>=3.10.0
 pdfplumber>=0.10.0
+
+# OCR — EasyOCR + 위치 기반 파서 조합 (/eta/parse-image-easyocr)
+# 첫 실행 시 한국어 모델 자동 다운로드 (~300 MB)
+easyocr>=1.7.0

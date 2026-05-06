@@ -420,3 +420,63 @@ async def parse_eta_image_v2(
         return []
 
     return entries
+
+
+@router.post("/parse-image-easyocr", response_model=List[ParsedEntry])
+async def parse_eta_image_easyocr(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    EasyOCR + OpenCV 위치 기반 파서.
+    API 키 없이 동작. 첫 호출 시 모델 로딩으로 수 초 소요될 수 있음.
+    """
+    image_bytes, _ = await _read_image_file(file)
+
+    try:
+        from app.eta.easyocr_parser import parse_timetable_easyocr
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="easyocr가 설치되지 않았습니다. 서버 관리자에게 문의하세요.",
+        )
+
+    try:
+        entries_raw = parse_timetable_easyocr(image_bytes)
+    except Exception as exc:
+        logger.error(f"EasyOCR parse error (user={current_user.id}): {exc}", exc_info=True)
+        fb = _fallback_positional(image_bytes)
+        return fb if fb else []
+
+    entries: List[ParsedEntry] = []
+    for item in entries_raw:
+        try:
+            subject = str(item.get("subject_name", "")).strip()
+            dow = int(item.get("day_of_week", 0))
+            st = str(item.get("start_time", ""))
+            et = str(item.get("end_time", ""))
+            if not (0 <= dow <= 6) or not st or not et or st >= et:
+                continue
+            if subject:
+                subject, _ = normalize_korean_field(subject, "")
+            entries.append(
+                ParsedEntry(
+                    subject_name=subject,
+                    day_of_week=dow,
+                    start_time=st,
+                    end_time=et,
+                    raw_text=None,
+                    source="eta_easyocr",
+                    requires_review=not bool(subject),
+                )
+            )
+        except Exception:
+            continue
+
+    if not entries:
+        fb = _fallback_positional(image_bytes)
+        return fb if fb else []
+
+    result = _dedup_entries(entries)
+    logger.info(f"EasyOCR: {len(result)} entries for user {current_user.id}")
+    return result
