@@ -26,6 +26,11 @@ export const metadata: Metadata = {
     template: "%s | SKEMA",
   },
   description: "AI로 관리하는 스마트 시간표와 시험 준비 대시보드",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/skema-icon.svg",
+    apple: "/skema-icon.svg",
+  },
 };
 
 export default function RootLayout({

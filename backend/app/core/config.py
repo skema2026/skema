@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     # 로컬: http://localhost:8000  / 배포: https://api.yourdomain.com
     BACKEND_URL: str = "http://localhost:8000"
 
+    # ── Web Push (PWA 푸시 알림) ──────────────────────────────────────────────
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_SUBJECT: str = "mailto:admin@example.com"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     @model_validator(mode="after")

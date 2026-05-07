@@ -1,0 +1,18 @@
+{
+  "name": "SKEMA",
+  "short_name": "SKEMA",
+  "description": "AI로 관리하는 스마트 시간표와 시험 준비 대시보드",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fc",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/skema-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

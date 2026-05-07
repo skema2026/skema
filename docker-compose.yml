@@ -65,6 +65,10 @@ services:
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       # OAuth redirect_uri 생성에 사용 (OAuth 앱 설정의 callback URL과 일치해야 함)
       BACKEND_URL: ${BACKEND_URL:-http://localhost:8000}
+      # Web Push (PWA 푸시 알림)
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
     ports:
       - "8000:8000"
     volumes:
