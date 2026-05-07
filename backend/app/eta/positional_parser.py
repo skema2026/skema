@@ -1,8 +1,11 @@
 """
-에브리타임 시간표 이미지 위치기반 파서 (LLM 장애 시 fallback).
+에브리타임 시간표 이미지 위치기반 파서 (LLM 장애 시 fallback) + EasyOCR 확장.
 
-파이프라인:
+파이프라인 (위치 기반):
   이미지 → 그리드 감지(컬럼/행) → 색상 블록 감지 → 요일/시간 추론 → 정규화
+
+파이프라인 (EasyOCR 확장):
+  이미지 → 그리드·블록 감지(OpenCV) → EasyOCR 텍스트 추출 → 최종 정규화
 
 핵심 설계 원칙:
   - LLM 없이 동작하는 fallback: 과목명은 비어있을 수 있음
@@ -13,14 +16,68 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Tuple
+from dataclasses import dataclass
+from typing import List, Literal, Tuple, TypedDict
 
 import numpy as np
 import cv2  # opencv-python-headless
 
-from .positional_types import GridModel, DetectedBlock, NormalizedEntry, DOW_TO_NAME
+from .location_utils import normalize_location
 
 logger = logging.getLogger(__name__)
+
+
+# ── 타입 정의 ─────────────────────────────────────────────────────────────────
+
+WeekdayName = Literal[
+    "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"
+]
+
+DOW_TO_NAME: List[WeekdayName] = [
+    "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"
+]
+
+NAME_TO_DOW = {name: i for i, name in enumerate(DOW_TO_NAME)}
+
+
+@dataclass
+class GridModel:
+    # Pixel bounds of seven weekday columns (x0, x1) per column, left<=x<right
+    column_bounds: List[Tuple[int, int]]
+    # Pixel Y positions of horizontal time grid lines, sorted ascending.
+    # Should include half-hour lines if present (i.e., 2 per hour)
+    row_bounds: List[int]
+    # Calibration: what time does row_bounds[0] represent?
+    # Everytime timetables: the first detected horizontal line is the 9:30 separator
+    # (the header/border line at 9:00 is usually not detected by the line filter),
+    # so row_bounds[0] = 9:30 line → start_minute=30.
+    # Formula: time(idx) = start_hour*60 + start_minute + idx*minutes_per_step
+    start_hour: int = 9
+    start_minute: int = 30   # was 0; changed to 30 to fix systematic -30 min offset
+    minutes_per_step: int = 30
+    # Direct pixel calibration for (top_y - header_bottom) / pixels_per_slot calculation
+    header_bottom: int = 0        # y-pixel where content grid starts (below day-header row)
+    pixels_per_slot: float = 0.0  # pixels per 30-minute slot; 0 means not calibrated
+    grid_origin_y: int = 0        # y-pixel corresponding to slot 0 (09:00); may be above header_bottom
+
+
+@dataclass
+class DetectedBlock:
+    # Bounding box in pixels (x0,y0,x1,y1)
+    bbox: Tuple[int, int, int, int]
+    center_x: int
+    top_y: int
+    bottom_y: int
+    ocr_text: str = ""
+
+
+class NormalizedEntry(TypedDict):
+    title: str
+    day: WeekdayName
+    startTime: str  # "HH:MM"
+    endTime: str    # "HH:MM"
+    location: str
+    bbox: Tuple[int, int, int, int]
 
 
 # ── Stage 1: 그리드 감지 ──────────────────────────────────────────────────────
@@ -857,7 +914,7 @@ def normalize_blocks(blocks: List[DetectedBlock], grid: GridModel) -> List[Norma
     return out
 
 
-# ── 편의 함수: 전체 파이프라인 ────────────────────────────────────────────────
+# ── 편의 함수: 위치 기반 전체 파이프라인 ─────────────────────────────────────
 
 def parse_image_positional(image_bytes: bytes):
     """
@@ -868,3 +925,117 @@ def parse_image_positional(image_bytes: bytes):
     blocks = detect_blocks(image_bytes, grid)
     entries = normalize_blocks(blocks, grid)
     return grid, entries
+
+
+# ── EasyOCR 확장 ──────────────────────────────────────────────────────────────
+
+# EasyOCR Reader 싱글톤 — 첫 호출 시 모델 다운로드 (~300 MB)
+_reader = None
+
+
+def _get_reader():
+    global _reader
+    if _reader is None:
+        try:
+            import easyocr
+        except ImportError:
+            raise ImportError(
+                "easyocr가 설치되지 않았습니다. "
+                "pip install easyocr 를 실행하세요."
+            )
+        logger.info("EasyOCR Reader 초기화 중 (첫 실행 시 모델 다운로드)…")
+        _reader = easyocr.Reader(["ko", "en"], gpu=False, verbose=False)
+        logger.info("EasyOCR Reader 준비 완료")
+    return _reader
+
+
+def _ocr_block(
+    reader,
+    img: np.ndarray,
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+) -> Tuple[str, str]:
+    """
+    블록 bbox를 크롭해서 (subject_name, location)을 반환한다.
+
+    - y 좌표 기준 위쪽 텍스트 = 과목명
+    - 아래쪽 텍스트 = 강의실 (있으면)
+    - confidence 0.3 미만은 버림
+    """
+    pad = 4
+    h, w = img.shape[:2]
+    cx0, cy0 = max(0, x0 - pad), max(0, y0 - pad)
+    cx1, cy1 = min(w, x1 + pad), min(h, y1 + pad)
+    crop = img[cy0:cy1, cx0:cx1]
+
+    if crop.size == 0 or crop.shape[0] < 8 or crop.shape[1] < 8:
+        return "", ""
+
+    # detail=1 → [(bbox_quad, text, conf), ...]
+    results = reader.readtext(crop, detail=1, paragraph=False)
+    if not results:
+        return "", ""
+
+    # y 중심 기준 정렬
+    def _y_center(r):
+        quad = r[0]
+        return sum(pt[1] for pt in quad) / len(quad)
+
+    filtered = [(r[1].strip(), r[2]) for r in sorted(results, key=_y_center)
+                if r[2] >= 0.3 and r[1].strip()]
+
+    if not filtered:
+        return "", ""
+
+    subject_name = filtered[0][0]
+    location = normalize_location(filtered[1][0] if len(filtered) > 1 else "")
+    return subject_name, location
+
+
+def parse_timetable_easyocr(image_bytes: bytes) -> List[dict]:
+    """
+    EasyOCR + 위치 기반 파서로 시간표를 파싱한다.
+
+    Returns:
+        [{"subject_name", "day_of_week", "start_time", "end_time", "location"}, ...]
+    """
+    # ── 1. 그리드·블록 감지 (OpenCV) ─────────────────────────────────────
+    grid = detect_grid(image_bytes)
+    blocks = detect_blocks(image_bytes, grid)
+
+    if not blocks:
+        logger.info("easyocr_parser: no blocks detected")
+        return []
+
+    logger.info("easyocr_parser: %d blocks detected, running OCR…", len(blocks))
+
+    # ── 2. 각 블록에서 EasyOCR 텍스트 추출 ───────────────────────────────
+    reader = _get_reader()
+    img = _load_image(image_bytes)
+
+    locations: dict[int, str] = {}
+    for idx, block in enumerate(blocks):
+        x0, y0, x1, y1 = block.bbox
+        subject_name, location = _ocr_block(reader, img, x0, y0, x1, y1)
+        block.ocr_text = subject_name
+        locations[idx] = location
+
+    # ── 3. 요일·시간 정규화 ──────────────────────────────────────────────
+    entries_norm = normalize_blocks(blocks, grid)
+
+    # ── 4. 최종 형식으로 변환 ─────────────────────────────────────────────
+    result = []
+    for idx, e in enumerate(entries_norm):
+        dow = NAME_TO_DOW.get(e["day"], 0)
+        result.append({
+            "subject_name": e["title"],
+            "day_of_week": dow,
+            "start_time": e["startTime"],
+            "end_time": e["endTime"],
+            "location": locations.get(idx, ""),
+        })
+
+    logger.info("easyocr_parser: %d entries returned", len(result))
+    return result
