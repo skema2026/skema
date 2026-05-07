@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.schedule.models import ExamSchedule
+from app.schedule.service import stage_exam_record
 from app.syllabus.analyzer import analyze_syllabus
 from app.syllabus.models import SyllabusAnalysis
 from app.syllabus import repository
@@ -133,12 +134,11 @@ def _auto_create_exams(db: Session, user_id: int, record, payload) -> None:
             if exists:
                 continue
 
-            db.add(ExamSchedule(
-                user_id=user_id,
-                title=title,
-                subject=record.subject_name,
-                exam_date=exam_date_obj,
-            ))
+            stage_exam_record(db, user_id, {
+                "title": title,
+                "subject": record.subject_name,
+                "exam_date": exam_date_obj,
+            })
 
         db.commit()
     except Exception as e:
@@ -300,8 +300,11 @@ def auto_create_exam_from_analysis(
             created_exams.append({"id": existing.id, "title": title, "exam_date": str(exam_date_obj), "already_existed": True})
             continue
 
-        rec = ExamSchedule(user_id=user_id, title=title, subject=analysis.subject_name, exam_date=exam_date_obj)
-        db.add(rec)
+        rec = stage_exam_record(db, user_id, {
+            "title": title,
+            "subject": analysis.subject_name,
+            "exam_date": exam_date_obj,
+        })
         db.flush()
         created_exams.append({"id": rec.id, "title": title, "exam_date": str(exam_date_obj), "already_existed": False})
 

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import UserProfile
 from app.core.config import settings
 from app.schedule.models import ExamSchedule, Schedule
+from app.schedule.service import create_exam_record, create_schedule_record, stage_exam_record, stage_schedule_record
 from app.ai_chat.study_planner import (
     get_syllabus_context,
     get_weekly_scope,
@@ -147,22 +148,18 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         ]
 
         title_str = tool_input["title"]
-        s = Schedule(
-            user_id=user_id,
-            title=title_str,
-            day_of_week=dow,
-            date=date_str,
-            start_time=start_time,
-            end_time=end_time,
-            location=tool_input.get("location"),
-            color=tool_input.get("color") or _subject_color(title_str),
-            priority=tool_input.get("priority", 0),
-            schedule_type=tool_input.get("schedule_type", "event"),
-            schedule_source="user_created",
-        )
-        db.add(s)
-        db.commit()
-        db.refresh(s)
+        s = create_schedule_record(db, user_id, {
+            "title": title_str,
+            "day_of_week": dow,
+            "date": date_str,
+            "start_time": start_time,
+            "end_time": end_time,
+            "location": tool_input.get("location"),
+            "color": tool_input.get("color") or _subject_color(title_str),
+            "priority": tool_input.get("priority", 0),
+            "schedule_type": tool_input.get("schedule_type", "event"),
+            "schedule_source": "user_created",
+        })
         label = date_str if date_str else f"매주 {DAY_NAMES[dow]}"
         loc = f"  📍 {s.location}" if s.location else ""
         result = f"✅ '{s.title}' 추가 완료!\n📅 {label}  ⏰ {s.start_time}~{s.end_time}{loc}\n🆔 ID: {s.id}"
@@ -305,7 +302,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             logger.warning(f"_weekly_topics_to_tasks failed: {_e}")
 
         # 2순위: LLM 기반 task 생성 (weekly_topics 없는 경우)
-        if not task_pool and (settings.GEMINI_API_KEY or settings.OPENAI_API_KEY):
+        if not task_pool and settings.OPENAI_API_KEY:
             task_pool = get_subject_study_tasks(
                 subject=subject,
                 syllabus_context=syllabus_ctx,
@@ -354,19 +351,18 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                     title = f"📚 {subject} — 강의 내용 정리 및 예제 풀기"
                     priority = 1
                 task_idx += 1
-                db.add(Schedule(
-                    user_id=user_id,
-                    title=title,
-                    day_of_week=dow,
-                    date=date_str,
-                    start_time=_m2t(sm),
-                    end_time=_m2t(em),
-                    color=_subject_color(subject),
-                    priority=priority,
-                    schedule_type="study",
-                    schedule_source="ai_generated",
-                    original_generated_title=raw_task_title,
-                ))
+                stage_schedule_record(db, user_id, {
+                    "title": title,
+                    "day_of_week": dow,
+                    "date": date_str,
+                    "start_time": _m2t(sm),
+                    "end_time": _m2t(em),
+                    "color": _subject_color(subject),
+                    "priority": priority,
+                    "schedule_type": "study",
+                    "schedule_source": "ai_generated",
+                    "original_generated_title": raw_task_title,
+                })
                 created += 1
         db.commit()
         end_date = (today + timedelta(days=target_days - 1)).strftime("%Y-%m-%d")
@@ -439,17 +435,13 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         except ValueError:
             return f"❌ 날짜 형식이 올바르지 않습니다: {exam_date_str} (YYYY-MM-DD 형식으로 입력하세요)"
 
-        e = ExamSchedule(
-            user_id=user_id,
-            title=tool_input["title"],
-            exam_date=exam_date_obj,
-            subject=tool_input.get("subject"),
-            exam_time=tool_input.get("exam_time"),
-            location=tool_input.get("location"),
-        )
-        db.add(e)
-        db.commit()
-        db.refresh(e)
+        e = create_exam_record(db, user_id, {
+            "title": tool_input["title"],
+            "exam_date": exam_date_obj,
+            "subject": tool_input.get("subject"),
+            "exam_time": tool_input.get("exam_time"),
+            "location": tool_input.get("location"),
+        })
         days_left = (exam_date_obj - today).days
         status_str = f"D-{days_left}" if days_left > 0 else ("오늘!" if days_left == 0 else "종료")
         result = (
@@ -460,7 +452,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         )
 
         # ── 자동 학습 일정 생성 (백그라운드 스레드) ──────────────────────────
-        if days_left > 0 and (settings.GEMINI_API_KEY or settings.OPENAI_API_KEY):
+        if days_left > 0 and settings.OPENAI_API_KEY:
             exam_id_bg = e.id
             target_days_bg = min(days_left, 14)
             _uid = user_id
@@ -574,7 +566,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             # ── 2. 시험 종류 분석 → phase별 구체적 컴포넌트 생성 ─────────────
             #    (한 번만 호출, 결과를 day 루프에서 재사용)
             exam_components: list[dict] = []
-            if settings.GEMINI_API_KEY or settings.OPENAI_API_KEY:
+            if settings.OPENAI_API_KEY:
                 exam_components = analyze_exam_requirements(
                     exam_title=exam.title,
                     subject=subject,
@@ -754,20 +746,19 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                         block_priority = default_priority
                     task_idx += 1
 
-                    db.add(Schedule(
-                        user_id=user_id,
-                        title=title,
-                        day_of_week=dow,
-                        date=date_str,
-                        start_time=_m2t(sm),
-                        end_time=_m2t(em),
-                        color=color,
-                        priority=block_priority,
-                        schedule_type="study",
-                        schedule_source="ai_generated",
-                        linked_exam_id=exam.id,
-                        original_generated_title=raw_task_title,
-                    ))
+                    stage_schedule_record(db, user_id, {
+                        "title": title,
+                        "day_of_week": dow,
+                        "date": date_str,
+                        "start_time": _m2t(sm),
+                        "end_time": _m2t(em),
+                        "color": color,
+                        "priority": block_priority,
+                        "schedule_type": "study",
+                        "schedule_source": "ai_generated",
+                        "linked_exam_id": exam.id,
+                        "original_generated_title": raw_task_title,
+                    })
                     day_placed += 1
                     exam_created += 1
                     created += 1
@@ -962,14 +953,12 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                         ExamSchedule.subject == analysis.subject_name,
                     ).first()
                     if not exists:
-                        exam = ExamSchedule(
-                            user_id=user_id,
-                            title=title,
-                            exam_date=exam_date_obj,
-                            subject=analysis.subject_name,
-                            exam_time=e.get("time"),
-                        )
-                        db.add(exam)
+                        exam = stage_exam_record(db, user_id, {
+                            "title": title,
+                            "exam_date": exam_date_obj,
+                            "subject": analysis.subject_name,
+                            "exam_time": e.get("time"),
+                        })
                         imported.append(f"  📝 {title} ({date_str})")
             except Exception as ex:
                 logger.warning(f"import_syllabus_exams exam error: {ex}")

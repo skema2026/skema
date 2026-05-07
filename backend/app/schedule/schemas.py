@@ -184,13 +184,16 @@ class ScheduleResponse(BaseModel):
 class ExamScheduleCreate(BaseModel):
     title: str
     schedule_id: Optional[int] = None
+    subject: Optional[str] = None
     exam_date: date
+    exam_time: Optional[str] = None
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     location: Optional[str] = None
     memo: Optional[str] = None
+    exam_duration_minutes: Optional[int] = 120
 
-    @field_validator("start_time", "end_time")
+    @field_validator("exam_time", "start_time", "end_time")
     @classmethod
     def validate_time_format(cls, v: Optional[str]) -> Optional[str]:
         return _validate_time(v)
@@ -199,13 +202,16 @@ class ExamScheduleCreate(BaseModel):
 class ExamScheduleUpdate(BaseModel):
     title: Optional[str] = None
     schedule_id: Optional[int] = None
+    subject: Optional[str] = None
     exam_date: Optional[date] = None
+    exam_time: Optional[str] = None
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     location: Optional[str] = None
     memo: Optional[str] = None
+    exam_duration_minutes: Optional[int] = None
 
-    @field_validator("start_time", "end_time")
+    @field_validator("exam_time", "start_time", "end_time")
     @classmethod
     def validate_time_format(cls, v: Optional[str]) -> Optional[str]:
         return _validate_time(v)
@@ -216,11 +222,14 @@ class ExamScheduleResponse(BaseModel):
     user_id: int
     schedule_id: Optional[int] = None
     title: str
+    subject: Optional[str] = None
     exam_date: date
+    exam_time: Optional[str] = None
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     location: Optional[str] = None
     memo: Optional[str] = None
+    exam_duration_minutes: Optional[int] = None
 
     model_config = {"from_attributes": True}
 

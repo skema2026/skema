@@ -43,7 +43,7 @@ def extract_text(file_path: str, content_type: str) -> str:
             return _extract_pdf(file_path)
         if content_type in _WORD_TYPES:
             return _extract_docx(file_path)
-        return ""   # 이미지 입력: Gemini Vision으로 직접 처리
+        return ""   # 이미지 입력: Vision 모델로 직접 처리
     except Exception as e:
         logger.warning(f"Text extraction failed for {file_path}: {e}")
         return ""
@@ -318,8 +318,8 @@ def analyze_syllabus(
         LLMError,
     )
 
-    if not settings.GEMINI_API_KEY and not settings.OPENAI_API_KEY:
-        logger.warning("GEMINI_API_KEY and OPENAI_API_KEY both not configured — skipping analysis")
+    if not settings.OPENAI_API_KEY:
+        logger.warning("OPENAI_API_KEY not configured — skipping analysis")
         return AnalysisPayload(), "failed", "", "LLM API key not configured"
 
     # 이미지 입력: Vision 모델로 직접 분석

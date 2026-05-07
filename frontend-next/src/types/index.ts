@@ -42,8 +42,11 @@ export type ExamSchedule = {
   subject?: string;
   exam_date: string; // YYYY-MM-DD
   exam_time?: string; // HH:MM
+  start_time?: string; // HH:MM
+  end_time?: string; // HH:MM
   exam_duration_minutes?: number; // default 120
   location?: string;
+  memo?: string;
 };
 
 export type User = {

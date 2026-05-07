@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Any
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -13,6 +16,58 @@ from app.utils.time_utils import overlap
 
 
 # ── Schedule (수업 시간표) ────────────────────────────────────────────────────
+
+_DAY_CODES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+
+
+def _day_to_enum(value: DayOfWeek | str | int) -> DayOfWeek:
+    if isinstance(value, DayOfWeek):
+        return value
+    if isinstance(value, int):
+        if not 0 <= value <= 6:
+            raise ValueError("day_of_week must be an integer between 0 and 6.")
+        return DayOfWeek(_DAY_CODES[value])
+    return DayOfWeek(str(value).upper())
+
+
+def normalize_schedule_record(data: dict[str, Any]) -> dict[str, Any]:
+    """AI/ETA/legacy 입력을 schedules 테이블의 canonical 필드로 정규화한다."""
+    normalized = dict(data)
+
+    if "course_name" not in normalized and "title" in normalized:
+        normalized["course_name"] = normalized.pop("title")
+    else:
+        normalized.pop("title", None)
+
+    if "color_code" not in normalized and "color" in normalized:
+        normalized["color_code"] = normalized.pop("color")
+    else:
+        normalized.pop("color", None)
+
+    if "recurring_day" not in normalized:
+        if "day_of_week" in normalized:
+            normalized["recurring_day"] = _day_to_enum(int(normalized.pop("day_of_week")))
+        elif normalized.get("date"):
+            dow = datetime.strptime(str(normalized["date"]), "%Y-%m-%d").weekday()
+            normalized["recurring_day"] = _day_to_enum(dow)
+    else:
+        normalized["recurring_day"] = _day_to_enum(normalized["recurring_day"])
+        normalized.pop("day_of_week", None)
+
+    return normalized
+
+
+def stage_schedule_record(db: Session, user_id: int, data: dict[str, Any]) -> Schedule:
+    schedule = Schedule(user_id=user_id, **normalize_schedule_record(data))
+    db.add(schedule)
+    return schedule
+
+
+def create_schedule_record(db: Session, user_id: int, data: dict[str, Any]) -> Schedule:
+    schedule = stage_schedule_record(db, user_id, data)
+    db.commit()
+    db.refresh(schedule)
+    return schedule
 
 def get_schedule_or_404(db: Session, schedule_id: int, user_id: int) -> Schedule:
     schedule = repository.get_schedule(db, schedule_id, user_id)
@@ -85,6 +140,19 @@ def delete_schedule(db: Session, schedule_id: int, user_id: int) -> None:
 
 
 # ── ExamSchedule ─────────────────────────────────────────────────────────────
+
+
+def stage_exam_record(db: Session, user_id: int, data: dict[str, Any]) -> ExamSchedule:
+    exam = ExamSchedule(user_id=user_id, **data)
+    db.add(exam)
+    return exam
+
+
+def create_exam_record(db: Session, user_id: int, data: dict[str, Any]) -> ExamSchedule:
+    exam = stage_exam_record(db, user_id, data)
+    db.commit()
+    db.refresh(exam)
+    return exam
 
 def get_exam_or_404(db: Session, exam_id: int, user_id: int) -> ExamSchedule:
     exam = repository.get_exam(db, exam_id, user_id)

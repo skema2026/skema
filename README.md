@@ -29,7 +29,7 @@
 | 백엔드 | FastAPI (Python 3.11+), SQLAlchemy ORM, Alembic |
 | 데이터베이스 | MySQL 8.0 |
 | 인증 | JWT (python-jose, passlib) + Kakao OAuth 2.0 |
-| AI | Google Gemini 2.5 Flash (OCR·분석) / GPT-4.1 (fallback) |
+| AI | OpenAI GPT-4.1 (채팅·OCR·분석) |
 | 알림 | APScheduler (백그라운드 주기 작업) + Kakao 메시지 API |
 | 운영 | Docker, Docker Compose |
 
@@ -195,8 +195,7 @@ DATABASE_URL=mysql+pymysql://user:password@localhost:3306/skema_db
 # JWT
 SECRET_KEY=your-secret-key
 
-# AI (둘 중 하나 이상 필요)
-GEMINI_API_KEY=...
+# AI
 OPENAI_API_KEY=...
 
 # OAuth
@@ -237,7 +236,6 @@ capstone-design-2026-1/
 │       ├── schedule/           # 일정·시험 CRUD
 │       ├── share/              # 공유 토큰
 │       ├── syllabus/           # 강의계획서 업로드
-│       ├── clients/            # Gemini API 클라이언트
 │       ├── core/               # 설정, JWT, LLM 유틸
 │       └── db/                 # DB 세션·베이스
 └── frontend-next/

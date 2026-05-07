@@ -20,7 +20,7 @@ def run_ai_agent(
     user_message: str,
     conversation_history: list | None = None,
 ) -> str:
-    if not settings.GEMINI_API_KEY and not settings.OPENAI_API_KEY:
+    if not settings.OPENAI_API_KEY:
         return "AI 서비스 키가 설정되지 않았습니다. 관리자에게 문의하세요."
 
     today = date.today()

@@ -16,6 +16,8 @@ from typing import List, Tuple
 
 import numpy as np
 
+from .location_utils import normalize_location
+
 logger = logging.getLogger(__name__)
 
 # EasyOCR Reader 싱글톤 — 첫 호출 시 모델 다운로드 (~300 MB)
@@ -79,7 +81,7 @@ def _ocr_block(
         return "", ""
 
     subject_name = filtered[0][0]
-    location = filtered[1][0] if len(filtered) > 1 else ""
+    location = normalize_location(filtered[1][0] if len(filtered) > 1 else "")
     return subject_name, location
 
 

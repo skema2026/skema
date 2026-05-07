@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     DB_NAME: str = "skema_db"
 
     # ── AI ────────────────────────────────────────────────────────────────────
-    GEMINI_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
     GOOGLE_CLOUD_VISION_API_KEY: str = ""
