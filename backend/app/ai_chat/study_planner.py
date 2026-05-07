@@ -3,8 +3,6 @@ import json
 import logging
 import re
 
-from sqlalchemy.orm import Session
-
 from app.ai_chat.llm_client import call_llm, extract_json_array
 
 logger = logging.getLogger(__name__)
@@ -23,129 +21,6 @@ _PHASE_LABEL = {
     "late":  "말기 — 실전 모의고사/오답 총정리/약점 보완",
 }
 
-
-def get_syllabus_context(db: Session, user_id: int, subject: str) -> str:
-    """SyllabusAnalysis에서 과목 관련 컨텍스트를 추출해 프롬프트용 문자열로 반환."""
-    try:
-        from app.syllabus.models import SyllabusAnalysis as _SA
-        analysis = (
-            db.query(_SA)
-            .filter(
-                _SA.user_id == user_id,
-                _SA.subject_name.ilike(f"%{subject}%"),
-                _SA.analysis_status != "failed",
-            )
-            .first()
-        )
-        if not analysis:
-            return ""
-        parts = []
-        if analysis.weekly_topics:
-            try:
-                topics_raw = json.loads(analysis.weekly_topics)
-                if isinstance(topics_raw, list) and topics_raw:
-                    topic_lines = []
-                    for i, item in enumerate(topics_raw[:16]):
-                        if isinstance(item, dict):
-                            w = item.get('week', i + 1)
-                            t = item.get('topic', '').strip()
-                            subtopics = item.get('subtopics') or []
-                            keywords = item.get('keywords') or []
-                            difficulty = item.get('difficulty', '')
-                            line = f"  {w}주차: {t}"
-                            if subtopics:
-                                line += f" / 세부: {', '.join(str(s) for s in subtopics[:3])}"
-                            if keywords:
-                                line += f" / 키워드: {', '.join(str(k) for k in keywords[:3])}"
-                            if difficulty:
-                                line += f" [{difficulty}]"
-                            topic_lines.append(line)
-                        elif isinstance(item, str):
-                            topic_lines.append(f"  {item.strip()}")
-                    if topic_lines:
-                        parts.append("주차별 학습 주제:\n" + "\n".join(topic_lines))
-            except Exception:
-                pass
-        if analysis.exam_dates:
-            try:
-                exam_dates = json.loads(analysis.exam_dates)
-                if isinstance(exam_dates, list) and exam_dates:
-                    exam_lines = []
-                    for e in exam_dates:
-                        if isinstance(e, dict):
-                            etype = {"midterm": "중간고사", "final": "기말고사"}.get(
-                                e.get("type", ""), e.get("type", "시험")
-                            )
-                            exam_lines.append(f"{etype}: {e.get('date', '?')}")
-                    if exam_lines:
-                        parts.append("시험 일정: " + ", ".join(exam_lines))
-            except Exception:
-                pass
-        if analysis.assignment_dates:
-            try:
-                assignments = json.loads(analysis.assignment_dates)
-                if isinstance(assignments, list) and assignments:
-                    assign_lines = [
-                        f"{a.get('title', '과제')} (마감: {a.get('due_date', '?')})"
-                        for a in assignments[:4] if isinstance(a, dict)
-                    ]
-                    if assign_lines:
-                        parts.append("과제: " + ", ".join(assign_lines))
-            except Exception:
-                pass
-        if analysis.important_factors:
-            try:
-                factors = json.loads(analysis.important_factors)
-                if factors:
-                    parts.append("중요 사항: " + " / ".join(str(f) for f in factors[:4]))
-            except Exception:
-                pass
-        weights = []
-        if analysis.midterm_weight:
-            weights.append(f"중간고사 {analysis.midterm_weight}%")
-        if analysis.final_weight:
-            weights.append(f"기말고사 {analysis.final_weight}%")
-        if analysis.assignment_weight:
-            weights.append(f"과제 {analysis.assignment_weight}%")
-        if analysis.attendance_weight:
-            weights.append(f"출석 {analysis.attendance_weight}%")
-        if weights:
-            parts.append("평가 비율: " + " / ".join(weights))
-        return "\n".join(parts)
-    except Exception as e:
-        logger.warning(f"get_syllabus_context failed: {e}")
-        return ""
-
-
-def get_weekly_scope(db: Session, user_id: int, subject: str, exam_type: str) -> list[dict]:
-    """강의계획서 study_mapping에서 시험 범위 주차를 읽어 weekly_topics 항목을 반환."""
-    try:
-        from app.syllabus.models import SyllabusAnalysis as _SA
-        analysis = (
-            db.query(_SA)
-            .filter(
-                _SA.user_id == user_id,
-                _SA.subject_name.ilike(f"%{subject}%"),
-                _SA.analysis_status != "failed",
-            )
-            .first()
-        )
-        if not analysis or not analysis.weekly_topics or not analysis.study_mapping:
-            return []
-        mapping = json.loads(analysis.study_mapping) if isinstance(analysis.study_mapping, str) else analysis.study_mapping
-        if not isinstance(mapping, dict):
-            return []
-        key = "midterm_scope_weeks" if exam_type == "midterm" else "final_scope_weeks"
-        scope_weeks = set(mapping.get(key) or [])
-        if not scope_weeks:
-            return []
-        topics_raw = json.loads(analysis.weekly_topics) if isinstance(analysis.weekly_topics, str) else analysis.weekly_topics
-        if not isinstance(topics_raw, list):
-            return []
-        return [item for item in topics_raw if isinstance(item, dict) and item.get("week") in scope_weeks]
-    except Exception as e:
-        logger.warning(f"get_weekly_scope failed: {e}")
-        return []
 
 
 def weekly_topics_to_tasks(weekly_topics: list[dict], subject: str) -> list[dict]:

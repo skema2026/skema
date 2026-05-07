@@ -14,7 +14,7 @@ export type Schedule = {
   is_completed: boolean;
   schedule_type: 'class' | 'study' | 'assignment' | 'activity' | 'personal' | 'event';
   // Phase 5: AI 일관성 추적 필드
-  schedule_source?: 'eta_import' | 'syllabus_based' | 'ai_generated' | 'user_created';
+  schedule_source?: 'eta_import' | 'ai_generated' | 'user_created';
   linked_exam_id?: number | null;
   user_override?: boolean;
   deleted_by_user?: boolean;
