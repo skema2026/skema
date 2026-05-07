@@ -142,6 +142,28 @@ docker compose exec frontend sh
 
 ---
 
+### 웹앱 운영 배포
+
+운영 서버에서는 Caddy가 HTTPS 인증서를 자동 발급하고, Next.js 프런트엔드와 FastAPI 백엔드를 도메인별로 프록시합니다.
+
+```bash
+cp .env.production.example .env.production
+# .env.production에 실제 도메인, 비밀번호, API 키 입력
+./scripts/deploy-prod.sh
+```
+
+기본 구성:
+
+| 서비스 | 예시 URL |
+|--------|----------|
+| 웹앱 | https://skema.example.com |
+| 백엔드 API | https://api.skema.example.com |
+| Swagger 문서 | https://api.skema.example.com/docs |
+
+자세한 서버 준비, DNS, OAuth callback 설정은 [docs/webapp-deploy.md](docs/webapp-deploy.md)를 참고하세요.
+
+---
+
 ### 로컬 개발 (Docker 없이)
 
 **백엔드**

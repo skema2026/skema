@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,12 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
+import {
+  getPushAvailability,
+  sendTestPush,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from '@/lib/push';
 
 const OCCUPATIONS = ['학생', '직장인', '프리랜서', '기타'];
 
@@ -45,6 +51,20 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const [notifMinutes, setNotifMinutes] = useState(() => (
     typeof window === 'undefined' ? 30 : parseInt(localStorage.getItem('skema_notif_minutes') || '30', 10)
   ));
+  const [pushState, setPushState] = useState<{
+    loading: boolean;
+    supported: boolean;
+    enabled: boolean;
+    subscribed: boolean;
+    reason: string | null;
+  }>({
+    loading: true,
+    supported: false,
+    enabled: false,
+    subscribed: false,
+    reason: null,
+  });
+  const [pushBusy, setPushBusy] = useState(false);
 
   const isCustomOccupation = !!profileForm.occupation && !OCCUPATIONS.includes(profileForm.occupation);
   const updateProfileDraft = (next: ProfileForm) => setProfileDraft(next);
@@ -72,6 +92,79 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     localStorage.setItem('skema_notif_minutes', String(notifMinutes));
     toast.success('알림 설정이 저장되었습니다');
     onClose();
+  };
+
+  const refreshPushState = async () => {
+    try {
+      const state = await getPushAvailability();
+      setPushState({ loading: false, ...state });
+    } catch {
+      setPushState({
+        loading: false,
+        supported: true,
+        enabled: false,
+        subscribed: false,
+        reason: 'server',
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    refreshPushState();
+  }, [open]);
+
+  const handleEnablePush = async () => {
+    setPushBusy(true);
+    try {
+      await subscribeToPush();
+      await refreshPushState();
+      toast.success('휴대폰 푸시 알림이 켜졌습니다');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'insecure') {
+        toast.error('휴대폰 푸시는 HTTPS 주소에서만 켤 수 있습니다');
+      } else if (message === 'server_disabled') {
+        toast.error('서버에 Web Push 키가 설정되지 않았습니다');
+      } else if (message === 'permission_denied') {
+        toast.error('브라우저 알림 권한이 허용되지 않았습니다');
+      } else {
+        toast.error('푸시 알림을 켤 수 없습니다');
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    setPushBusy(true);
+    try {
+      await unsubscribeFromPush();
+      await refreshPushState();
+      toast.success('휴대폰 푸시 알림이 꺼졌습니다');
+    } catch {
+      toast.error('푸시 알림 해제 중 오류가 발생했습니다');
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    setPushBusy(true);
+    try {
+      const result = await sendTestPush();
+      if (result.disabled) {
+        toast.error('서버에 Web Push 키가 설정되지 않았습니다');
+      } else if ((result.sent ?? 0) > 0) {
+        toast.success('테스트 푸시를 보냈습니다');
+      } else {
+        toast.error('등록된 푸시 기기가 없습니다');
+      }
+    } catch {
+      toast.error('테스트 푸시 발송에 실패했습니다');
+    } finally {
+      setPushBusy(false);
+    }
   };
 
   return (
@@ -189,6 +282,62 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 </div>
               </div>
             )}
+
+            <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium text-sm">휴대폰 푸시</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {pushState.subscribed ? '이 기기에 푸시 알림이 연결되었습니다' : '앱을 닫아도 일정 알림을 받을 수 있습니다'}
+                  </p>
+                </div>
+                <span
+                  className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                    pushState.subscribed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {pushState.subscribed ? '켜짐' : '꺼짐'}
+                </span>
+              </div>
+
+              {!pushState.loading && pushState.reason === 'insecure' && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                  HTTPS 주소에서만 사용할 수 있습니다.
+                </p>
+              )}
+              {!pushState.loading && pushState.supported && !pushState.enabled && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                  서버 Web Push 키 설정이 필요합니다.
+                </p>
+              )}
+              {!pushState.loading && pushState.reason === 'unsupported' && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                  이 브라우저는 푸시 알림을 지원하지 않습니다.
+                </p>
+              )}
+
+              <div className="flex gap-2">
+                {pushState.subscribed ? (
+                  <>
+                    <Button type="button" variant="outline" onClick={handleDisablePush} disabled={pushBusy}>
+                      끄기
+                    </Button>
+                    <Button type="button" onClick={handleTestPush} disabled={pushBusy} style={{ background: 'var(--skema-primary)', color: '#fff' }}>
+                      테스트
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={handleEnablePush}
+                    disabled={pushBusy || pushState.loading || !pushState.supported || !pushState.enabled}
+                    style={{ background: 'var(--skema-primary)', color: '#fff' }}
+                  >
+                    푸시 켜기
+                  </Button>
+                )}
+              </div>
+            </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>취소</Button>
