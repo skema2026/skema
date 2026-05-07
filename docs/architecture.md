@@ -35,10 +35,6 @@ graph TB
             Config[core/config.py\n환경변수 (pydantic-settings)]
         end
 
-        subgraph Clients[External Clients]
-            GeminiClient[clients/gemini_client.py\nGemini Function Calling\n일정 생성/추론]
-        end
-
         subgraph DBLayer[Database Layer]
             DBSession[db/database.py\nSQLAlchemy 세션/엔진]
             DBBase[db/base.py\nBase · 모델 import]
@@ -46,7 +42,7 @@ graph TB
 
         Modules --> Core
         Modules --> DBLayer
-        AIRouter --> GeminiClient
+        AIRouter --> OpenAIClient[core/llm.py\nOpenAI API 호출]
     end
 
     subgraph Infra[배포 (Docker Compose)]
@@ -57,7 +53,7 @@ graph TB
     ApiClient -- "HTTP REST / JSON" --> Modules
     DBLayer -- "ORM Query" --> MySQL
     Alembic -- "Schema Migration" --> MySQL
-    GeminiClient -- "google-genai SDK" --> Gemini[Google Gemini API]
+    OpenAIClient -- "OpenAI SDK" --> OpenAI[OpenAI API]
     AuthRouter -- "OAuth 2.0 Redirect" --> OAuth[OAuth Providers\nGoogle · Naver · Kakao]
 
     style Client fill:#EFF6FF,stroke:#3B82F6

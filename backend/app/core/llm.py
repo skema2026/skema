@@ -31,8 +31,8 @@ OPENAI_MODEL = "gpt-4.1"
 class LLMResult:
     """Unified response from call_llm / call_llm_vision."""
     content: str                          # response text
-    status: str                           # "success" | "fallback_used"
-    provider: str                         # "gemini" | "openai"
+    status: str                           # "success"
+    provider: str                         # "openai"
     model: str                            # exact model string
     reasoning_details: Optional[Any] = field(default=None)
 

@@ -13,6 +13,8 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
+from .location_utils import normalize_location
+
 logger = logging.getLogger(__name__)
 
 # ── 상수 ───────────────────────────────────────────────────────────────────────
@@ -73,7 +75,12 @@ Output ONLY the JSON array — no markdown fences (no ```), no explanation text.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 VISUAL STRUCTURE OF THE TIMETABLE IMAGE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-The image is a GRID:
+The upload may be either a tight timetable crop or a full mobile app screenshot.
+If it is a full screenshot, first ignore the app toolbar, back button, menu button,
+semester tabs, bottom empty page area, and floating chat button. Locate the actual
+timetable GRID by finding the weekday header row and the left time gutter.
+
+The timetable itself is a GRID:
   • TOP HEADER ROW: weekday column labels  →  월 | 화 | 수 | 목 | 금 [| 토 | 일]
   • LEFT GUTTER COLUMN: time labels  →  9 / 10 / 11 / 12 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8
   • INTERIOR CELLS: colored rectangular blocks, each representing one class session
@@ -119,6 +126,8 @@ THE MOST IMPORTANT RULE:
   the colored rectangle), NOT by where the text ends.
   Blocks are tall rectangles. The text is only at the top. The color continues
   all the way down to the end_time boundary.
+  If the text occupies only the top 30-60 minutes of a tall block, IGNORE the text
+  height and continue tracing the pale background color until the rectangle stops.
 
 PROCEDURE for each block:
   1. Locate the TOP EDGE of the colored rectangle → start_time
@@ -187,6 +196,15 @@ CONCRETE EXAMPLES:
   Block: top at "1" label, bottom at "5" label
     → start_time "13:00",  end_time "17:00"   (240 min, 4 gaps)
 
+  Block: top at "9" label, bottom at "12" label
+    → start_time "09:00",  end_time "12:00"   (180 min)
+
+  Block: top at "2" label, bottom at "5" label
+    → start_time "14:00",  end_time "17:00"   (180 min)
+
+  Block: top at "1" label, bottom at "3" label
+    → start_time "13:00",  end_time "15:00"   (120 min)
+
   Block: top at dashed between 10–11, bottom at "12" label
     → start_time "10:30",  end_time "12:00"   (90 min)
 
@@ -202,6 +220,9 @@ STEP 4 — EXTRACT SUBJECT NAME AND LOCATION
 For each block:
   • subject_name = the LARGEST / topmost text inside the block (Korean characters, exact)
   • location = the smaller text below the subject name (room code), or "" if absent
+  • Room codes can be compact Korean building name + digits, e.g. "소프트102", "미디어509".
+    Do NOT insert a stray Latin letter between them. If the image says "소프트102",
+    output "소프트102", not "소프트E102".
   • PRESERVE Korean text exactly — do NOT translate, romanize, or abbreviate
   • Do NOT use "수업", "class", "강의", "Unknown", or any generic placeholder
   • If you cannot read a block's subject name at all → OMIT that block
@@ -414,7 +435,7 @@ def _parse_llm_array(data: list) -> List[NormalizedEntry]:
         wday_raw  = str(item.get("weekday") or item.get("day") or "").strip()
         start_raw = str(item.get("start_time", "")).strip()
         end_raw   = str(item.get("end_time", "")).strip()
-        location  = str(item.get("location", "")).strip()
+        location  = normalize_location(str(item.get("location", "")).strip())
 
         logger.debug(
             "LLM[%d] raw: subject=%r  weekday=%r  start=%r  end=%r  loc=%r",

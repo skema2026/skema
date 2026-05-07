@@ -276,7 +276,7 @@ export default function OnboardingPage() {
       const res = await api.post('/eta/parse-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      const v1 = Array.isArray(res.data) ? res.data as Array<{ subject_name: string; day_of_week: number; start_time: string; end_time: string; raw_text?: string; source?: string; requires_review?: boolean; }> : [];
+      const v1 = Array.isArray(res.data) ? res.data as Array<{ subject_name: string; day_of_week: number; start_time: string; end_time: string; location?: string | null; raw_text?: string; source?: string; requires_review?: boolean; }> : [];
       const dayKo = ['월요일','화요일','수요일','목요일','금요일','토요일','일요일'];
       const entries: EtaEntry[] = v1.map((e, i) => ({
         _id: `eta-${Date.now()}-${i}`,
@@ -284,9 +284,9 @@ export default function OnboardingPage() {
         day_of_week: e.day_of_week,
         start_time: normalizeTimeString(e.start_time) || e.start_time,
         end_time: normalizeTimeString(e.end_time) || e.end_time,
-        location: '',
+        location: e.location || '',
         raw_text: e.raw_text || `${dayKo[e.day_of_week] ?? ''} ${e.start_time}~${e.end_time}`,
-        source: 'eta_image',
+        source: e.source || 'eta_image',
       }));
       setEtaEntries(entries);
       if (entries.length === 0) {

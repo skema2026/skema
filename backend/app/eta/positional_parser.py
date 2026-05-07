@@ -88,7 +88,7 @@ def _detect_header_bottom(h_proj: np.ndarray, img_h: int) -> int:
 
 def _detect_gutter_x(v_proj: np.ndarray, w: int) -> int:
     """시간 거터(time gutter)의 오른쪽 경계 x를 반환한다."""
-    search_end = min(int(w * 0.25), len(v_proj))
+    search_end = min(int(w * 0.30), len(v_proj))
     region = v_proj[:search_end]
     if region.max() <= 0:
         return max(20, int(w * 0.10))
@@ -99,7 +99,25 @@ def _detect_gutter_x(v_proj: np.ndarray, w: int) -> int:
         return max(20, int(w * 0.10))
 
     clusters = _cluster_line_positions(strong_xs)
-    gutter_x = clusters[-1][1] + 1
+
+    # 에브리타임 격자는 보통
+    #   왼쪽 외곽선 → 시간 숫자 칸 오른쪽 선 → 월/화 경계선 ...
+    # 순서로 세로선이 나온다. 전체 화면 캡처에서는 첫 요일 경계선까지
+    # search 영역에 들어와서 기존 "마지막 선" 방식이 gutter를 과하게 잡았다.
+    leftish = [
+        c for c in clusters
+        if int(w * 0.015) <= (c[0] + c[1]) / 2 <= int(w * 0.14)
+    ]
+    if len(leftish) >= 2:
+        gutter_cluster = leftish[1]
+    elif leftish:
+        gutter_cluster = leftish[-1]
+    elif len(clusters) >= 2:
+        gutter_cluster = clusters[1]
+    else:
+        gutter_cluster = clusters[-1]
+
+    gutter_x = gutter_cluster[1] + 1
     if gutter_x < 10 or gutter_x > int(w * 0.30):
         gutter_x = max(20, int(w * 0.10))
 
@@ -191,6 +209,60 @@ def _refine_grid_origin(
     return best_gy
 
 
+def _detect_time_lines_from_gutter(gray: np.ndarray, gutter_x: int) -> List[int]:
+    """
+    왼쪽 시간 거터에서 시간축 실선을 직접 찾는다.
+
+    수업 블록 내부 색/텍스트는 본문 영역에 있으므로 전체 폭 projection을 쓰면
+    색상 블록과 텍스트가 수평선으로 오인될 수 있다. 시간 거터에는 시간 라벨과
+    그리드 실선만 있어 9:00, 10:00, ... 라인을 더 안정적으로 찾을 수 있다.
+    """
+    h, _w = gray.shape[:2]
+    if gutter_x <= 20:
+        return []
+
+    left = max(0, int(gutter_x * 0.42))
+    right = max(left + 8, gutter_x - 2)
+    roi = gray[:, left:right]
+    if roi.size == 0:
+        return []
+
+    # 흰 배경/검은 시간 텍스트를 제외하고 연한 회색 그리드 선만 집계한다.
+    lineish = (roi < 245) & (roi > 180)
+    scores = lineish.mean(axis=1)
+    ys = [int(y) for y, val in enumerate(scores) if val >= 0.55]
+    clusters = _cluster_line_positions(ys, min_gap=2)
+    centers = [int((s + e) / 2) for s, e in clusters if e - s <= 8]
+
+    if len(centers) < 4:
+        return []
+
+    # 하단 카드 테두리 등 시간축 간격에서 벗어난 선 제거.
+    if len(centers) >= 3:
+        diffs = np.diff(centers)
+        hour_px = float(np.median(diffs[: min(len(diffs), 8)]))
+
+        # 맨 위 앱/카드/요일 헤더 테두리가 시간선보다 먼저 잡힐 수 있다.
+        # 시간선은 이후 간격이 거의 일정하므로, "다음 선과 1시간 간격"을
+        # 이루는 첫 번째 y를 9:00 라인으로 채택한다.
+        start_idx = 0
+        for idx, gap in enumerate(diffs):
+            if 0.65 * hour_px <= gap <= 1.35 * hour_px:
+                start_idx = idx
+                break
+        centers = centers[start_idx:]
+
+        clean = [centers[0]]
+        for y in centers[1:]:
+            gap = y - clean[-1]
+            if 0.55 * hour_px <= gap <= 1.45 * hour_px:
+                clean.append(y)
+        centers = clean
+
+    logger.debug("_detect_time_lines_from_gutter: centers=%s", centers)
+    return centers
+
+
 def detect_grid(image_bytes: bytes) -> GridModel:
     """
     에브리타임 이미지에서 column_bounds와 row_bounds를 감지한다.
@@ -231,7 +303,11 @@ def detect_grid(image_bytes: bytes) -> GridModel:
         thresh = 0.35 * float(day_region.max())
         day_xs = [gutter_x + x for x, val in enumerate(day_region) if val >= thresh]
         day_col_edges = _cluster_line_positions(day_xs)
-        day_col_edges = [e for e in day_col_edges if e[0] < w - 5]
+        min_day_edge_x = gutter_x + max(4, int(w * 0.006))
+        day_col_edges = [
+            e for e in day_col_edges
+            if e[0] < w - 5 and (e[0] + e[1]) / 2 >= min_day_edge_x
+        ]
 
     num_day_cols = len(day_col_edges) + 1
     if num_day_cols < 5:
@@ -261,6 +337,36 @@ def detect_grid(image_bytes: bytes) -> GridModel:
         gutter_x, header_bottom, num_day_cols,
         [(l, r) for l, r in column_bounds],
     )
+
+    gutter_time_lines = _detect_time_lines_from_gutter(gray, gutter_x)
+    if len(gutter_time_lines) >= 4:
+        hour_diffs = np.diff(gutter_time_lines)
+        hour_px = float(np.median(hour_diffs))
+        pixels_per_slot = hour_px / 2.0
+        row_bounds: List[int] = []
+        for i, y in enumerate(gutter_time_lines):
+            row_bounds.append(int(y))
+            if i + 1 < len(gutter_time_lines):
+                row_bounds.append(int(y + pixels_per_slot))
+        row_bounds.append(int(gutter_time_lines[-1] + pixels_per_slot))
+
+        row_bounds = sorted(set(row_bounds))
+        grid_origin_y = int(gutter_time_lines[0])
+        header_bottom = grid_origin_y
+        logger.debug(
+            "detect_grid: using gutter time lines origin=%d pps=%.2f rows=%d",
+            grid_origin_y, pixels_per_slot, len(row_bounds),
+        )
+        return GridModel(
+            column_bounds=column_bounds,
+            row_bounds=row_bounds,
+            start_hour=9,
+            start_minute=0,
+            minutes_per_step=30,
+            header_bottom=header_bottom,
+            pixels_per_slot=pixels_per_slot,
+            grid_origin_y=grid_origin_y,
+        )
 
     # ── 행 감지: solid(:00) / dashed(:30) 강도 분리 ──────────────────────
     # solid 실선은 h_proj 강도가 높고, dashed 점선은 낮다.
@@ -467,6 +573,83 @@ def detect_blocks(image_bytes: bytes, grid: GridModel) -> List[DetectedBlock]:
         grid.row_bounds[0] if grid.row_bounds else int(h * 0.12)
     )
     gutter_x = grid.column_bounds[0][1] if len(grid.column_bounds) > 1 else int(w * 0.10)
+
+    # ── 우선: 컬럼별 색상 점유율로 블록 감지 ───────────────────────────────
+    # 연한 pastel 블록은 기존 contour 방식에서 텍스트 영역만 잡히기 쉽다.
+    # 각 요일 컬럼의 30분 슬롯 내부를 샘플링해 색상 채도가 일정 이상인
+    # 연속 슬롯을 하나의 수업 블록으로 본다.
+    if grid.pixels_per_slot > 0 and len(grid.column_bounds) >= 2:
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        slot_blocks: List[DetectedBlock] = []
+        max_slots = int((h - grid.grid_origin_y) / grid.pixels_per_slot)
+        max_slots = max(1, min(max_slots, 26))
+
+        for day_idx in range(min(7, len(grid.column_bounds) - 1)):
+            x0, x1 = grid.column_bounds[day_idx + 1]
+            if x1 <= x0:
+                continue
+
+            occupied: list[bool] = []
+            ratios: list[float] = []
+            colors: list[np.ndarray | None] = []
+            for slot in range(max_slots):
+                y0 = int(grid.grid_origin_y + slot * grid.pixels_per_slot) + 5
+                y1 = int(grid.grid_origin_y + (slot + 1) * grid.pixels_per_slot) - 5
+                sx0, sx1 = x0 + 8, x1 - 8
+                if y1 <= y0 or sx1 <= sx0:
+                    occupied.append(False)
+                    ratios.append(0.0)
+                    colors.append(None)
+                    continue
+                crop = hsv[max(0, y0):min(h, y1), max(0, sx0):min(w, sx1)]
+                if crop.size == 0:
+                    ratio = 0.0
+                    color = None
+                else:
+                    # grid/background sat≈0~7, pastel blocks sat≈10~45.
+                    occ_mask = (crop[:, :, 1] >= 9) & (crop[:, :, 2] >= 180)
+                    ratio = float(np.mean(occ_mask))
+                    color = np.median(crop[occ_mask][:, :3], axis=0) if np.any(occ_mask) else None
+                ratios.append(ratio)
+                colors.append(color)
+                occupied.append(ratio >= 0.35)
+
+            run_start: int | None = None
+            prev_color: np.ndarray | None = None
+            for idx, is_occ in enumerate(occupied + [False]):
+                color_changed = False
+                if is_occ and run_start is not None and prev_color is not None and idx < len(colors):
+                    cur = colors[idx]
+                    if cur is not None:
+                        hue_diff = min(abs(float(cur[0]) - float(prev_color[0])), 180 - abs(float(cur[0]) - float(prev_color[0])))
+                        sat_diff = abs(float(cur[1]) - float(prev_color[1]))
+                        val_diff = abs(float(cur[2]) - float(prev_color[2]))
+                        color_changed = hue_diff >= 12 or sat_diff >= 12 or val_diff >= 10
+
+                if is_occ and run_start is None:
+                    run_start = idx
+                    prev_color = colors[idx] if idx < len(colors) else None
+                elif (not is_occ or color_changed) and run_start is not None:
+                    run_end = idx
+                    if run_end - run_start >= 1:
+                        by0 = int(grid.grid_origin_y + run_start * grid.pixels_per_slot)
+                        by1 = int(grid.grid_origin_y + run_end * grid.pixels_per_slot)
+                        bx0, bx1 = x0 + 1, x1 - 1
+                        slot_blocks.append(DetectedBlock(
+                            bbox=(bx0, by0, bx1, by1),
+                            center_x=(bx0 + bx1) // 2,
+                            top_y=by0,
+                            bottom_y=by1,
+                            ocr_text="",
+                        ))
+                    run_start = idx if is_occ else None
+                    prev_color = colors[idx] if is_occ and idx < len(colors) else None
+                elif is_occ and idx < len(colors) and colors[idx] is not None:
+                    prev_color = colors[idx]
+
+        if slot_blocks:
+            logger.debug("detect_blocks: slot occupancy blocks=%d", len(slot_blocks))
+            return slot_blocks
 
     # ── 마스크 생성 ──────────────────────────────────────────────────────────
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)

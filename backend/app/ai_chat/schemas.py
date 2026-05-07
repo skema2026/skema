@@ -23,7 +23,7 @@ class AIChatLogResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── AI 채팅 요청/응답 (Gemini 에이전트용) ─────────────────────────────────────
+# ── AI 채팅 요청/응답 ─────────────────────────────────────────────────────────
 
 class ChatMessage(BaseModel):
     role: str   # "user" | "assistant"

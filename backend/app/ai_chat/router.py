@@ -21,7 +21,7 @@ from app.core.deps import get_current_user, get_db
 router = APIRouter(tags=["ai"])
 
 
-# ── AI 채팅 (Gemini 에이전트) ─────────────────────────────────────────────────
+# ── AI 채팅 ───────────────────────────────────────────────────────────────────
 
 @router.post("/ai/chat", response_model=ChatResponse)
 def chat(
