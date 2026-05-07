@@ -11,17 +11,7 @@ from app.auth.models import UserProfile
 from app.core.config import settings
 from app.schedule.models import ExamSchedule, Schedule
 from app.schedule.service import create_exam_record, create_schedule_record, stage_exam_record, stage_schedule_record
-from app.ai_chat.study_planner import (
-    get_syllabus_context,
-    get_weekly_scope,
-    weekly_topics_to_tasks,
-    scope_to_syllabus_context,
-    analyze_exam_requirements,
-    get_subject_study_tasks,
-    get_personalized_study_tasks,
-    pick_phase,
-    validate_task_quality,
-)
+from app.ai_chat.study_planner import get_subject_study_tasks
 from app.utils.time_utils import DAY_NAMES, DAY_NAMES_SHORT, minutes_to_time, overlap, time_to_minutes
 
 logger = logging.getLogger(__name__)
@@ -278,34 +268,10 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         daily_hours = tool_input.get("daily_study_hours", 2)
         wake, sleep = _get_user_wake_sleep(db, user_id)
 
-        # 강의계획서 주차별 데이터 → 구체적 task 풀 생성
-        syllabus_ctx = get_syllabus_context(db, user_id, subject)
         task_pool: list[dict] = []
-
-        # 1순위: weekly_topics 직접 변환 (LLM 없이 구체적 task 생성)
-        try:
-            from app.syllabus.models import SyllabusAnalysis as _SA
-            _sa = (
-                db.query(_SA)
-                .filter(
-                    _SA.user_id == user_id,
-                    _SA.subject_name.ilike(f"%{subject}%"),
-                    _SA.analysis_status != "failed",
-                )
-                .first()
-            )
-            if _sa and _sa.weekly_topics:
-                _raw = json.loads(_sa.weekly_topics) if isinstance(_sa.weekly_topics, str) else _sa.weekly_topics
-                if isinstance(_raw, list) and _raw:
-                    task_pool = weekly_topics_to_tasks(_raw, subject)
-        except Exception as _e:
-            logger.warning(f"_weekly_topics_to_tasks failed: {_e}")
-
-        # 2순위: LLM 기반 task 생성 (weekly_topics 없는 경우)
-        if not task_pool and settings.OPENAI_API_KEY:
+        if settings.OPENAI_API_KEY:
             task_pool = get_subject_study_tasks(
                 subject=subject,
-                syllabus_context=syllabus_ctx,
                 daily_hours=float(daily_hours),
             )
 
@@ -545,84 +511,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             subject = exam.subject or exam.title
             exam_created = 0
 
-            # ── 1. 중간/기말 구분 → 범위 주차 기반 컨텍스트 로드 ────────────
-            title_lower = exam.title.lower()
-            if "중간" in exam.title or "midterm" in title_lower:
-                detected_exam_type = "midterm"
-            elif "기말" in exam.title or "final" in title_lower:
-                detected_exam_type = "final"
-            else:
-                detected_exam_type = None
-
-            scope_items = []
-            if detected_exam_type and (exam.subject or exam.title):
-                scope_items = get_weekly_scope(db, user_id, subject, detected_exam_type)
-
-            if scope_items:
-                syllabus_ctx = scope_to_syllabus_context(scope_items, detected_exam_type)
-            else:
-                syllabus_ctx = get_syllabus_context(db, user_id, subject)
-
-            # ── 2. 시험 종류 분석 → phase별 구체적 컴포넌트 생성 ─────────────
-            #    (한 번만 호출, 결과를 day 루프에서 재사용)
-            exam_components: list[dict] = []
-            if settings.OPENAI_API_KEY:
-                exam_components = analyze_exam_requirements(
-                    exam_title=exam.title,
-                    subject=subject,
-                    syllabus_context=syllabus_ctx,
-                    days_until_exam=days_until_exam,
-                )
-
-            # ── 3. phase별 task 버킷 구성 ────────────────────────────────────
-            phase_buckets: dict[str, list[dict]] = {"early": [], "mid": [], "late": []}
-            for comp in exam_components:
-                p = comp.get("phase", "mid")
-                if p not in phase_buckets:
-                    p = "mid"
-                t_type = _PHASE_TYPE.get(p, "study")
-                t_prio = _PHASE_PRIO.get(p, 1)
-                for task_item in comp.get("tasks", []):
-                    # task_item은 str(구버전) 또는 {title, estimated_minutes, reason}(신버전)
-                    if isinstance(task_item, str):
-                        title = task_item.strip()
-                        estimated_minutes = 60
-                        reason = ""
-                    elif isinstance(task_item, dict):
-                        title = task_item.get("title", "").strip()
-                        estimated_minutes = int(task_item.get("estimated_minutes") or 60)
-                        reason = str(task_item.get("reason") or "")
-                    else:
-                        continue
-                    if not title or not validate_task_quality(title):
-                        continue
-                    phase_buckets[p].append({
-                        "title": title,
-                        "task_type": t_type,
-                        "priority": t_prio,
-                        "estimated_minutes": estimated_minutes,
-                        "reason": reason,
-                    })
-
-            # component 없으면 personalized tasks로 fallback
-            if not any(phase_buckets.values()):
-                existing_study = db.query(Schedule).filter(
-                    Schedule.user_id == user_id, Schedule.schedule_type == "study"
-                ).all()
-                total_blocks = len(existing_study)
-                completed_blocks = sum(1 for s in existing_study if s.is_completed)
-                fallback_tasks = get_personalized_study_tasks(
-                    exam_title=exam.title,
-                    subject=subject,
-                    days_until_exam=days_until_exam,
-                    completed_blocks=completed_blocks,
-                    total_blocks=total_blocks,
-                    syllabus_context=syllabus_ctx,
-                )
-                for t in fallback_tasks:
-                    phase_buckets["mid"].append(t)
-
-            # ── 4. 날짜별 일정 배치 ──────────────────────────────────────────
+            # ── 날짜별 일정 배치 ──────────────────────────────────────────────
             task_idx = 0
 
             # sessions_per_week: 실제 배치된 날짜만 카운트 (빈 시간 없어 스킵된 날 제외)
@@ -662,14 +551,6 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                     color = "#8B5CF6"
                     default_priority = 1
 
-                # 현재 days_left 기반 phase 결정
-                current_phase = pick_phase(days_left)
-
-                # 현재 phase bucket 선택 (없으면 전체 합산)
-                current_bucket = phase_buckets.get(current_phase, [])
-                if not current_bucket:
-                    current_bucket = [t for bucket in phase_buckets.values() for t in bucket]
-
                 existing = _day_schedules(db, user_id, dow, date_str)
                 busy = sorted((time_to_minutes(s.start_time), time_to_minutes(s.end_time)) for s in existing)
                 remaining = int(day_hours * 60)
@@ -702,48 +583,15 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                         task_idx += 1
                         continue
 
-                    if current_bucket:
-                        task = current_bucket[task_idx % len(current_bucket)]
-                        raw_task_title = task['title']
-                        title = f"📚 {raw_task_title}"
-                        block_priority = task.get("priority", default_priority)
-                        # task의 estimated_minutes가 있으면 블록 크기에 반영
-                        task_mins = task.get("estimated_minutes")
-                        if task_mins and 20 <= task_mins <= _MAX_BLOCK_MINS:
-                            task_em = min(sm + task_mins, em, sm + _MAX_BLOCK_MINS)
-                            em = max(task_em, sm + 20)
-
-                        # ── dedup: 이미 삭제하거나 완료한 동일 task 재생성 금지 ──
-                        _nd = _not_deleted_filter()
-                        already_blocked = db.query(Schedule).filter(
-                            Schedule.user_id == user_id,
-                            Schedule.linked_exam_id == exam.id,
-                            Schedule.original_generated_title == raw_task_title,
-                            Schedule.deleted_by_user == True,
-                        ).first()
-                        if already_blocked:
-                            task_idx += 1
-                            continue
-                        already_done = db.query(Schedule).filter(
-                            Schedule.user_id == user_id,
-                            Schedule.linked_exam_id == exam.id,
-                            Schedule.original_generated_title == raw_task_title,
-                            Schedule.is_completed == True,
-                        ).first()
-                        if already_done:
-                            task_idx += 1
-                            continue
-                    else:
-                        raw_task_title = None
-                        # fallback: 구체적이지만 최소한의 맥락 포함
-                        stage = (
-                            f"{subject} 실전 모의고사 1회분 풀기 + 오답 분석" if days_left <= 3
-                            else f"{subject} 기출문제 취약 단원 오답 분석 + 재정리"
-                            if days_left <= 7
-                            else f"{subject} 핵심 개념 정리 + 기본 문제 3개 풀기"
-                        )
-                        title = f"📚 {stage}"
-                        block_priority = default_priority
+                    raw_task_title = None
+                    stage = (
+                        f"{subject} 실전 모의고사 1회분 풀기 + 오답 분석" if days_left <= 3
+                        else f"{subject} 기출문제 취약 단원 오답 분석 + 재정리"
+                        if days_left <= 7
+                        else f"{subject} 핵심 개념 정리 + 기본 문제 3개 풀기"
+                    )
+                    title = f"📚 {stage}"
+                    block_priority = default_priority
                     task_idx += 1
 
                     stage_schedule_record(db, user_id, {
@@ -769,9 +617,8 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                     week_placed_counts[iso_week] = week_placed_counts.get(iso_week, 0) + 1
 
             if exam_created > 0:
-                component_summary = f" ({len(exam_components)}개 준비영역 분석)" if exam_components else ""
                 results.append(
-                    f"  • {subject} ({exam.exam_date} D-{days_until_exam}): {exam_created}개 생성{component_summary}"
+                    f"  • {subject} ({exam.exam_date} D-{days_until_exam}): {exam_created}개 생성"
                 )
 
         db.commit()
@@ -855,117 +702,6 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         db.commit()
         cleaned_msg = f"\n🧹 연관 학습 일정 {cleaned}개 자동 정리" if cleaned > 0 else ""
         return f"🗑️ 시험 '{exam_title}' 삭제 완료!{cleaned_msg}"
-
-    elif tool_name == "list_syllabus_analyses":
-        from app.syllabus.models import SyllabusAnalysis as _SyllabusAnalysis
-        analyses = (
-            db.query(_SyllabusAnalysis)
-            .filter(
-                _SyllabusAnalysis.user_id == user_id,
-                _SyllabusAnalysis.analysis_status != "failed",
-            )
-            .all()
-        )
-        subject_filter = (tool_input.get("subject") or "").strip().lower()
-        if subject_filter:
-            analyses = [a for a in analyses if subject_filter in a.subject_name.lower()]
-        if not analyses:
-            return "📭 분석된 강의계획서가 없습니다. 먼저 강의계획서를 업로드하세요."
-        lines = ["📋 강의계획서 분석 결과:\n"]
-        for a in analyses:
-            lines.append(f"\n📚 **{a.subject_name}** (분석상태: {a.analysis_status})")
-            weights = []
-            if a.midterm_weight is not None:
-                weights.append(f"중간고사 {a.midterm_weight}%")
-            if a.final_weight is not None:
-                weights.append(f"기말고사 {a.final_weight}%")
-            if a.assignment_weight is not None:
-                weights.append(f"과제 {a.assignment_weight}%")
-            if a.attendance_weight is not None:
-                weights.append(f"출석 {a.attendance_weight}%")
-            if a.presentation_weight is not None:
-                weights.append(f"발표 {a.presentation_weight}%")
-            if weights:
-                lines.append(f"  평가비율: {' / '.join(weights)}")
-            if a.exam_dates:
-                try:
-                    for e in json.loads(a.exam_dates):
-                        etype = {"midterm": "중간고사", "final": "기말고사"}.get(e.get("type", ""), e.get("type", "시험"))
-                        lines.append(f"  📝 {etype}: {e.get('date', '?')} {e.get('title', '')}")
-                except Exception:
-                    pass
-            if a.assignment_dates:
-                try:
-                    for ad in json.loads(a.assignment_dates):
-                        lines.append(f"  📌 과제: {ad.get('date', '?')} {ad.get('title', '')}")
-                except Exception:
-                    pass
-            if a.weekly_topics:
-                try:
-                    topics = json.loads(a.weekly_topics)
-                    if topics:
-                        preview_strs = []
-                        for _t in topics[:4]:
-                            if isinstance(_t, dict):
-                                preview_strs.append(f"{_t.get('week','')}주차 {_t.get('topic','')}")
-                            elif isinstance(_t, str):
-                                preview_strs.append(_t)
-                        suffix = " ..." if len(topics) > 4 else ""
-                        lines.append(f"  주차별: {', '.join(preview_strs)}{suffix}")
-                except Exception:
-                    pass
-        return "\n".join(lines)
-
-    elif tool_name == "import_syllabus_exams":
-        from app.syllabus.models import SyllabusAnalysis as _SyllabusAnalysis
-        from datetime import datetime as _dt
-        subject = (tool_input.get("subject") or "").strip()
-        if not subject:
-            return "❌ 과목명을 지정해 주세요."
-        analysis = (
-            db.query(_SyllabusAnalysis)
-            .filter(
-                _SyllabusAnalysis.user_id == user_id,
-                _SyllabusAnalysis.subject_name.ilike(f"%{subject}%"),
-                _SyllabusAnalysis.analysis_status != "failed",
-            )
-            .first()
-        )
-        if not analysis:
-            return f"❌ '{subject}' 강의계획서 분석 결과가 없습니다."
-        imported = []
-        if analysis.exam_dates:
-            try:
-                for e in json.loads(analysis.exam_dates):
-                    date_str = e.get("date")
-                    if not date_str:
-                        continue
-                    try:
-                        exam_date_obj = _dt.strptime(date_str, "%Y-%m-%d").date()
-                    except ValueError:
-                        continue
-                    etype = e.get("type", "exam")
-                    title = e.get("title") or f"{analysis.subject_name} {'중간고사' if etype == 'midterm' else '기말고사' if etype == 'final' else '시험'}"
-                    # 중복 확인
-                    exists = db.query(ExamSchedule).filter(
-                        ExamSchedule.user_id == user_id,
-                        ExamSchedule.exam_date == exam_date_obj,
-                        ExamSchedule.subject == analysis.subject_name,
-                    ).first()
-                    if not exists:
-                        exam = stage_exam_record(db, user_id, {
-                            "title": title,
-                            "exam_date": exam_date_obj,
-                            "subject": analysis.subject_name,
-                            "exam_time": e.get("time"),
-                        })
-                        imported.append(f"  📝 {title} ({date_str})")
-            except Exception as ex:
-                logger.warning(f"import_syllabus_exams exam error: {ex}")
-        db.commit()
-        if not imported:
-            return f"ℹ️ '{subject}' 강의계획서에서 새로 가져올 시험 일정이 없습니다 (이미 등록됐거나 날짜 정보 없음)."
-        return f"✅ '{subject}' 강의계획서에서 시험 {len(imported)}개 등록 완료!\n" + "\n".join(imported)
 
     return f"❌ 알 수 없는 도구: {tool_name}"
 
