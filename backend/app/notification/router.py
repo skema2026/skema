@@ -1,12 +1,30 @@
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.core.deps import get_current_user, get_db
 from app.notification.models import Notification
-from app.notification.schemas import NotificationResponse, NotificationUnreadCount
+
+
+class NotificationResponse(BaseModel):
+    id: int
+    user_id: int
+    type: str
+    title: str
+    body: str
+    is_read: bool
+    created_at: datetime
+    related_schedule_id: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+class NotificationUnreadCount(BaseModel):
+    unread: int
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 

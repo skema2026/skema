@@ -25,7 +25,7 @@ from app.share.router import router as share_router
 from app.ai_chat.router import router as ai_chat_router
 from app.eta.router import router as eta_router
 from app.notification.router import router as notification_router
-from app.notification.push_router import router as push_router
+from app.notification.push import router as push_router
 from app.kakao.router import router as kakao_router
 from app.core.config import settings
 
