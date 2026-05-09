@@ -114,11 +114,10 @@ _try_register("google_vision", _make_google_vision)
 
 # 4. LLM Vision (OpenAI) — API 키 필요, --llm 플래그로 활성화
 def _make_llm_vision() -> ParserFn:
-    from app.eta.router import _parse_via_llm
-    from app.eta.schemas import ParsedEntry
+    from app.eta.router import _parse_via_refined_llm
 
     def _run(image_bytes: bytes) -> List[dict]:
-        entries: List[ParsedEntry] = _parse_via_llm(image_bytes, "image/png")
+        entries = _parse_via_refined_llm(image_bytes, "image/png")
         return [
             {
                 "subject_name": e.subject_name,
