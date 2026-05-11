@@ -18,7 +18,7 @@ import { api } from '@/lib/api';
 import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 import { timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
-import { Schedule, UserProfile, ExamSchedule } from '@/types';
+import { Schedule, UserProfile } from '@/types';
 import {
   DashboardHeader,
   DashboardStyles,
@@ -301,8 +301,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   return (
     <>
       <DashboardStyles />
-
-      <div className="skema-dashboard-shell flex h-screen flex-col bg-slate-50">
+      <div className="flex h-screen flex-col bg-[#f8fbff]">
         <NotificationBanner
           notification={notification}
           onOpen={(schedule) => {
@@ -325,36 +324,51 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
           onLogout={handleLogout}
         />
 
-        {/* 메인 영역 */}
-        <main className="flex min-h-0 flex-1 gap-4 overflow-hidden bg-slate-50 p-4">
-          {/* 왼쪽: 시간표 */}
-          <section className="flex min-w-0 flex-[3] flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-            <div className="mb-6 flex items-end justify-between">
+        <main className="flex min-h-0 flex-1 gap-5 overflow-hidden bg-[#f8fbff] p-5">
+          <section className="flex min-w-0 flex-[3] flex-col overflow-hidden rounded-[28px] border border-blue-100/60 bg-white/90 p-7 shadow-[0_8px_30px_rgba(37,99,235,0.08)] backdrop-blur-sm">
+            <div className="mb-7 flex items-end justify-between">
               <div>
                 <h1 className="text-4xl font-black tracking-tight text-slate-900">
                   주간 시간표
                 </h1>
-                <p className="mt-2 text-sm text-slate-400">
+                <p className="mt-2 text-sm font-medium text-slate-400">
                   {weekLabel} · 이번 주는 {weekTotal}개의 일정이 있습니다
                 </p>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="flex rounded-lg bg-slate-100 p-0.5">
-                  <button className="rounded p-1.5 hover:bg-white" onClick={() => setWeekOffset((o) => o - 1)}>
-                    <MaterialIcon icon="chevron_left" size={18} color="#334155" />
+                <div className="flex rounded-xl border border-blue-100 bg-blue-50/70 p-1 shadow-sm">
+                  <button
+                    className="rounded-lg p-2 transition hover:bg-white"
+                    onClick={() => setWeekOffset((o) => o - 1)}
+                  >
+                    <MaterialIcon icon="chevron_left" size={18} color="#2563eb" />
                   </button>
-                  <button className="px-4 py-1 text-xs font-bold text-slate-700" onClick={() => setWeekOffset(0)}>
+
+                  <button
+                    className="px-4 py-1 text-xs font-black text-blue-700"
+                    onClick={() => setWeekOffset(0)}
+                  >
                     이번 주
                   </button>
-                  <button className="rounded p-1.5 hover:bg-white" onClick={() => setWeekOffset((o) => o + 1)}>
-                    <MaterialIcon icon="chevron_right" size={18} color="#334155" />
+
+                  <button
+                    className="rounded-lg p-2 transition hover:bg-white"
+                    onClick={() => setWeekOffset((o) => o + 1)}
+                  >
+                    <MaterialIcon icon="chevron_right" size={18} color="#2563eb" />
                   </button>
                 </div>
 
                 <button
-                  className="rounded-lg border border-slate-200 px-4 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                  onClick={() => setActiveTypes(activeTypes.size === ALL_TYPES.length ? new Set() : new Set(ALL_TYPES))}
+                  className="rounded-xl border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-50"
+                  onClick={() =>
+                    setActiveTypes(
+                      activeTypes.size === ALL_TYPES.length
+                        ? new Set()
+                        : new Set(ALL_TYPES)
+                    )
+                  }
                 >
                   {activeTypes.size === ALL_TYPES.length ? '필터 해제' : '전체 표시'}
                 </button>
@@ -362,32 +376,30 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
             </div>
 
             <div className="mb-6 flex gap-4">
-              <div className="flex flex-1 items-center justify-between rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-blue-500 p-2 text-white">
-                    <MaterialIcon icon="event_upcoming" size={18} color="#fff" />
+              <div className="flex flex-1 items-center justify-between rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-sky-50 p-5 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-md">
+                    <MaterialIcon icon="event_upcoming" size={20} color="#fff" />
                   </div>
 
                   <div>
+                    <p className="mb-1 text-[11px] font-black uppercase tracking-wider text-blue-600">
+                      오늘의 포커스
+                    </p>
                     <h2 className="text-sm font-bold text-slate-900">
-                      오늘은 이것만 놓치지 마세요:{" "}
+                      오늘은 이것만 놓치지 마세요:{' '}
                       {nextSchedule ? nextSchedule.title : '남은 일정이 없습니다'}
                     </h2>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                    <p className="text-[10px] font-bold uppercase text-blue-500">다음 액션</p>
-                    <p className="mt-1 truncate text-sm font-bold text-slate-900">
-                      {nextSchedule ? nextSchedule.title : '남은 일정이 없습니다'}
-                    </p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex w-48 flex-col justify-center rounded-xl border border-slate-100 bg-slate-50 p-4">
-                <p className="text-[10px] font-bold text-slate-400">남은 오늘 일정</p>
-                <div className="flex items-baseline gap-1">
-                  <p className="text-2xl font-black text-slate-900">
+              <div className="flex w-48 flex-col justify-center rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  남은 일정
+                </p>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <p className="text-3xl font-black text-blue-600">
                     {remainingToday.length}
                   </p>
                   <p className="text-xs font-bold text-slate-500">개</p>
@@ -398,20 +410,22 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
             <div className="mb-6 flex flex-wrap gap-2">
               {[
                 { type: 'class', label: '수업', color: '#2563eb' },
-                { type: 'study', label: '자율학습', color: '#16a34a' },
-                { type: 'assignment', label: '과제', color: '#ea580c' },
-                { type: 'activity', label: '활동', color: '#9333ea' },
-                { type: 'personal', label: '개인', color: '#0ea5e9' },
+                { type: 'study', label: '자율학습', color: '#0ea5e9' },
+                { type: 'assignment', label: '과제', color: '#0284c7' },
+                { type: 'activity', label: '활동', color: '#1d4ed8' },
+                { type: 'personal', label: '개인', color: '#38bdf8' },
               ].map(({ type, label, color }) => {
                 const active = activeTypes.has(type as ScheduleTypeFilter);
+
                 return (
                   <button
                     key={type}
                     onClick={() => toggleType(type as ScheduleTypeFilter)}
-                    className="rounded-full px-3 py-1 text-xs font-bold"
+                    className="rounded-full border px-4 py-1.5 text-xs font-black transition-all"
                     style={{
-                      background: active ? `${color}20` : '#f1f5f9',
+                      background: active ? `${color}15` : '#ffffff',
                       color: active ? color : '#64748b',
+                      borderColor: active ? `${color}40` : '#e2e8f0',
                     }}
                   >
                     {label}
@@ -421,23 +435,26 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
             </div>
 
             <Tabs defaultValue="timetable" className="flex min-h-0 flex-1 flex-col">
-              <TabsList className="mb-4 w-fit">
+              <TabsList className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-1">
                 <TabsTrigger value="timetable">시간표</TabsTrigger>
                 <TabsTrigger value="exams">시험 일정</TabsTrigger>
                 <TabsTrigger value="report">리포트</TabsTrigger>
                 <TabsTrigger value="type-analysis">분석</TabsTrigger>
               </TabsList>
 
-              <div className="min-h-0 flex-1 overflow-hidden">
+              <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-white">
                 <TabsContent value="timetable" className="h-full">
                   <Timetable schedules={filteredSchedules} exams={exams} weekStart={weekStart} />
                 </TabsContent>
+
                 <TabsContent value="exams">
                   <ExamList />
                 </TabsContent>
+
                 <TabsContent value="report">
                   <WeeklyReport schedules={schedules} />
                 </TabsContent>
+
                 <TabsContent value="type-analysis">
                   <TypeAnalysis schedules={schedules} weekStart={weekStart} />
                 </TabsContent>
@@ -445,30 +462,105 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
             </Tabs>
           </section>
 
-          {/* 오른쪽: 요약 */}
           <aside className="flex-1 max-w-sm overflow-y-auto pr-1">
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-400">오늘 진행률</p>
-                  <p className="mt-2 text-2xl font-black text-slate-900">{todayPct ?? 0}%</p>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-blue-500" style={{ width: `${todayPct ?? 0}%` }} />
+              {/*작은 달력*/}
+              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 text-xs font-black text-slate-900">
+                    <MaterialIcon icon="calendar_today" size={16} color="#2563eb" />
+                    {todayLabel}
+                  </h3>
+
+                  <div className="flex gap-1">
+                    <button
+                      className="rounded-lg p-1 transition hover:bg-blue-50"
+                      onClick={() => setWeekOffset((o) => o - 1)}
+                    >
+                      <MaterialIcon icon="chevron_left" size={18} color="#94a3b8" />
+                    </button>
+                    <button
+                      className="rounded-lg p-1 transition hover:bg-blue-50"
+                      onClick={() => setWeekOffset((o) => o + 1)}
+                    >
+                      <MaterialIcon icon="chevron_right" size={18} color="#94a3b8" />
+                    </button>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-400">남은 일정</p>
-                  <p className="mt-2 text-2xl font-black text-slate-900">{remainingToday.length}개</p>
+                <div className="grid grid-cols-7 gap-y-2 text-center">
+                  {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+                    <div
+                      key={day}
+                      className="text-[10px] font-black uppercase text-slate-400"
+                    >
+                      {day}
+                    </div>
+                  ))}
+
+                  {Array.from({ length: 35 }).map((_, index) => {
+                    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+                    const date = index - firstDay + 1;
+                    const lastDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                    const isCurrentMonth = date >= 1 && date <= lastDate;
+                    const isToday = isCurrentMonth && date === now.getDate();
+
+                    return (
+                      <div
+                        key={index}
+                        className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                          isToday
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : isCurrentMonth
+                            ? 'text-slate-700'
+                            : 'text-transparent'
+                        }`}
+                      >
+                        {isCurrentMonth ? date : ''}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    오늘 진행률
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-blue-600">
+                    {todayPct ?? 0}%
+                  </p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-blue-50">
+                    <div
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${todayPct ?? 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    남은 일정
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-slate-900">
+                    {remainingToday.length}개
+                  </p>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                <h3 className="mb-4 text-xs font-bold text-slate-900">오늘 할 일</h3>
+              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-900">오늘 할 일</h3>
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                    {remainingToday.length} left
+                  </span>
+                </div>
 
                 {todaySchedules.length === 0 ? (
-                  <div className="rounded-xl border-2 border-dashed border-slate-100 p-6 text-center">
-                    <p className="text-xs font-medium text-slate-400">오늘은 비어 있습니다</p>
+                  <div className="rounded-2xl border-2 border-dashed border-blue-100 bg-blue-50/40 p-6 text-center">
+                    <p className="text-xs font-medium text-slate-400">
+                      오늘은 비어 있습니다
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -476,62 +568,89 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                       <button
                         key={s.id}
                         onClick={() => handleToggleComplete(s)}
-                        className="flex w-full items-center gap-3 rounded-xl border border-slate-100 p-3 text-left hover:bg-slate-50"
+                        className="flex w-full items-center gap-3 rounded-xl border border-blue-50 p-3 text-left transition hover:bg-blue-50/50"
                       >
-                      <span
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2"
-                        style={{
-                          background: s.is_completed ? '#16a34a' : '#fff',
-                          borderColor: s.is_completed ? '#16a34a' : '#cbd5e1',
-                        }}
-                      >
-                        {s.is_completed && <MaterialIcon icon="check" size={13} color="#fff" />}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold text-slate-900">{s.title}</span>
-                        <span className="text-xs text-slate-400">{s.start_time} - {s.end_time}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                        <span
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2"
+                          style={{
+                            background: s.is_completed ? '#2563eb' : '#fff',
+                            borderColor: s.is_completed ? '#2563eb' : '#bfdbfe',
+                          }}
+                        >
+                          {s.is_completed && (
+                            <MaterialIcon icon="check" size={13} color="#fff" />
+                          )}
+                        </span>
 
-              {unachievedSchedules.length > 0 && (
-                <button
-                  onClick={handleReschedule}
-                  disabled={isRegenerating}
-                  className="mt-4 w-full rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-100 disabled:opacity-60"
-                >
-                  {isRegenerating ? '재배치 중...' : '밀린 일정 AI 재배치'}
-                </button>
-              )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-slate-900">
+                            {s.title}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {s.start_time} - {s.end_time}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {unachievedSchedules.length > 0 && (
+                  <button
+                    onClick={handleReschedule}
+                    disabled={isRegenerating}
+                    className="mt-4 w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-600 transition hover:bg-blue-100 disabled:opacity-60"
+                  >
+                    {isRegenerating ? '재배치 중...' : '밀린 일정 AI 재배치'}
+                  </button>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <h3 className="mb-4 text-xs font-black text-slate-900">
+                  우선순위 패널
+                </h3>
+
+                {upcomingExam ? (
+                  <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                    <p className="text-xs font-black text-blue-600">
+                      다가오는 시험
+                    </p>
+                    <p className="mt-2 text-sm font-black text-slate-900">
+                      {upcomingExam.title}
+                    </p>
+                    <p className="text-xs font-bold text-slate-500">
+                      {upcomingExam.exam_date} · D-{daysUntilExam}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/40 p-4 text-center">
+                    <p className="text-[10px] font-bold text-slate-400">
+                      등록된 예정 시험이 없습니다
+                    </p>
+                  </div>
+                )}
+
+                <SmartAlertPanel
+                  exams={exams}
+                  schedules={schedules}
+                  currentWeekStart={weekStart}
+                />
+              </div>
             </div>
+          </aside>
+        </main>
+      </div>
 
-            <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-bold text-slate-900">우선순위 패널</h3>
+      <ClassForm />
 
-              {upcomingExam ? (
-                <div className="mb-4 rounded-xl border border-green-100 bg-green-50 p-4">
-                  <p className="text-xs font-bold text-green-600">다가오는 시험</p>
-                  <p className="mt-2 text-sm font-black text-slate-900">{upcomingExam.title}</p>
-                  <p className="text-xs font-bold text-slate-500">
-                    {upcomingExam.exam_date} · D-{daysUntilExam}
-                  </p>
-                </div>
-              ) : (
-                <div className="mb-4 rounded-xl border border-slate-100 bg-slate-50 p-4 text-center">
-                  <p className="text-[10px] font-bold text-slate-400">
-                    등록된 예정 시험이 없습니다
-                  </p>
-                </div>
-              )}
-
-              <SmartAlertPanel exams={exams} schedules={schedules} currentWeekStart={weekStart} />
-            </div>
-          </div>
-        </aside>
-      </main>
-    </div>
-  </>
+      <ShareDialog
+        open={isShareModalOpen}
+        onClose={closeShareModal}
+        shareUrl={shareUrl}
+        isGeneratingShare={isGeneratingShare}
+        onCopy={copyShareUrl}
+      />
+    </>
   );
 }
