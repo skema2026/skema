@@ -50,10 +50,10 @@ const DAY_SHORTCUTS = [
   { label: '매일', days: [0, 1, 2, 3, 4, 5, 6] },
 ] as const;
 const TIME_PRESETS = [
-  { label: '아침 루틴', icon: 'wb_twilight', start: '07:00', duration: 60, tone: '#f59e0b' },
-  { label: '점심 틈새', icon: 'lunch_dining', start: '12:30', duration: 60, tone: '#0f766e' },
-  { label: '저녁 고정', icon: 'nightlife', start: '18:00', duration: 120, tone: '#2563eb' },
-  { label: '밤 집중', icon: 'dark_mode', start: '21:00', duration: 90, tone: '#7c3aed' },
+  { label: '아침', icon: 'wb_twilight', start: '07:00', duration: 60, tone: '#f59e0b' },
+  { label: '점심', icon: 'lunch_dining', start: '12:30', duration: 60, tone: '#0f766e' },
+  { label: '저녁', icon: 'nightlife', start: '18:00', duration: 120, tone: '#2563eb' },
+  { label: '밤', icon: 'dark_mode', start: '21:00', duration: 90, tone: '#7c3aed' },
 ] as const;
 const DURATION_OPTIONS = [30, 60, 90, 120, 180, 240] as const;
 const TIME_BLOCK_START = 6 * 60;
@@ -1396,7 +1396,7 @@ export default function OnboardingPage() {
               <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #eef4ff 100%)', border: '1px solid #cbd5e1' }}>
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
-                    <p className="text-xs font-bold" style={{ color: '#334155' }}>타임 블록 편집</p>
+                    <p className="text-xs font-bold" style={{ color: '#334155' }}>집중 시간 설정</p>
                     <p className="text-[11px]" style={{ color: '#64748b' }}>하루 막대 위에 일정을 얹고, 15분 단위로 움직여요</p>
                   </div>
                   <div className="px-3 py-2 rounded-xl text-right" style={{ background: '#fff', border: '1px solid #c3d0ff' }}>

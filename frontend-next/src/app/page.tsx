@@ -245,12 +245,15 @@ export default function LandingPage() {
           <div>
             <p className="mb-3 text-sm font-extrabold uppercase tracking-[0.2em] text-[#0ea5e9]">소개</p>
             <h2 className="skema-headline text-3xl font-extrabold leading-tight text-slate-950 sm:text-5xl">
-              계획을 세우는 앱이 아니라, 계획을 실행하게 만드는 작업 공간.
+              계획을 세우는 앱이 아니라,
+              <br />
+              계획을 실행하게 만드는
+              <br />
+              나만의 작업 공간.
             </h2>
           </div>
-          <p className="text-base leading-8 text-slate-600">
-            SKEMA는 반복 수업과 단기 시험, 개인 일정을 같은 시간 축에서 다룹니다.
-            시간 충돌을 줄이고, 완료 여부와 시험 준비도를 함께 보여주어 오늘 무엇을 해야 하는지 빠르게 판단할 수 있습니다.
+          <p className="max-w-3xl text-base text-slate-600 break-keep">
+            SKEMA는 반복 수업과 단기 시험, 개인 일정을 같은 시간 축에서 다룰 수 있습니다.
           </p>
         </div>
       </section>
@@ -262,7 +265,7 @@ export default function LandingPage() {
               <p className="mb-3 text-sm font-extrabold uppercase tracking-[0.2em] text-[#0ea5e9]">미리보기</p>
               <h2 className="skema-headline text-3xl font-extrabold text-slate-950 sm:text-4xl">대시보드의 핵심만 먼저 보입니다</h2>
             </div>
-            <p className="max-w-lg text-sm leading-7 text-slate-600">
+            <p className="max-w-3xl text-sm leading-7 text-slate-600">
               오늘 할 일, 주간 시간표, 시험 경보, 리포트를 탭과 패널로 분리해 반복 사용에 맞췄습니다.
             </p>
           </div>
