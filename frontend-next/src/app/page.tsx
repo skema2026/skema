@@ -155,85 +155,114 @@ export default function LandingPage() {
       </header>
 
       <section className="relative isolate min-h-[92vh] overflow-hidden pt-16 text-[#0f172a]">
-        <div className="absolute inset-0 -z-10 bg-[url('/register-bg.jpg')] bg-cover bg-center" />
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(246,248,252,.96),rgba(246,248,252,.88)_48%,rgba(232,243,255,.74))]" />
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(37,99,235,.08)_1px,transparent_1px),linear-gradient(rgba(14,165,233,.07)_1px,transparent_1px)] bg-[length:28px_28px]" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-[#eef9ff] via-white to-[#dbeafe]" />
+        <div className="absolute right-[-120px] top-16 -z-10 h-[520px] w-[520px] rounded-full bg-blue-300/40 blur-3xl" />
+        <div className="absolute left-[-160px] bottom-[-120px] -z-10 h-[420px] w-[420px] rounded-full bg-sky-200/50 blur-3xl" />
 
-        <div className="mx-auto grid min-h-[calc(92vh-4rem)] max-w-7xl items-center gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(520px,1.1fr)] lg:px-8">
+        <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-7xl items-center gap-12 px-4 py-12 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
           <div className="max-w-2xl">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-lg border border-[#bae6fd] bg-white px-3 py-1.5 text-sm font-bold text-[#075985] shadow-sm">
-              <MaterialIcon icon="auto_awesome" size={16} color="#0ea5e9" filled />
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-3 py-1.5 text-xs font-extrabold text-blue-600 shadow-sm">
+              <MaterialIcon icon="auto_awesome" size={15} color="#2563eb" filled />
               AI 기반 스마트 시간표
             </div>
-            <h1 className="skema-headline text-5xl font-extrabold leading-[1.04] tracking-normal sm:text-6xl lg:text-7xl">
+
+            <h1 className="text-5xl font-black leading-[1.08] tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
               SKEMA
+              <br />
+              <span className="bg-gradient-to-r from-blue-700 to-sky-500 bg-clip-text text-transparent">
+                AI가 설계하는 
+                <br />
+                나만의 
+                <br/>
+                스마트 시간표
+              </span>
             </h1>
-            <p className="mt-5 max-w-xl text-lg font-medium leading-8 text-[#334155]">
-              수업, 시험, 공부 블록, 개인 일정을 한 화면에서 정리하고 AI로 빈 시간을 재배치합니다.
-              계획을 입력하는 시간을 줄이고 실행에 집중하세요.
+
+            <p className="mt-7 max-w-xl text-base font-medium leading-8 text-slate-600 sm:text-lg">
+              수업, 시험, 공부, 개인 일정을 한 화면에서 정리하고
+              <br />
+              AI로 빈 시간을 재배치합니다.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+
+            <p className="mt-4 text-sm font-semibold text-slate-500">
+              계획을 입력하는 시간은 줄이고 실행에 집중하세요.
+            </p>
+
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/register"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-[#2563eb] px-6 text-sm font-extrabold text-white shadow-lg shadow-blue-900/20 transition hover:bg-[#1d4ed8]"
+                className="inline-flex h-12 items-center justify-center rounded-xl bg-blue-600 px-7 text-sm font-extrabold text-white shadow-lg shadow-blue-900/20 transition hover:bg-blue-700"
               >
                 무료로 시작하기
-                <MaterialIcon icon="arrow_forward" size={17} color="#fff" />
               </Link>
+
               <a
                 href="#preview"
                 onClick={(event) => scrollTo(event, '#preview')}
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[#c7d2e2] bg-white px-6 text-sm font-bold text-[#2563eb] shadow-sm transition hover:bg-[#eaf1ff]"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-blue-100 bg-white/80 px-7 text-sm font-bold text-blue-600 shadow-sm transition hover:bg-blue-50"
               >
                 화면 미리보기
-                <MaterialIcon icon="expand_more" size={18} color="#2563eb" />
+                <MaterialIcon icon="arrow_forward" size={16} color="#2563eb" />
               </a>
+            </div>
+
+            <div className="mt-10 flex items-center gap-4">
+              <div className="flex -space-x-2">
+                {['A', 'B', 'C'].map((item) => (
+                  <div
+                    key={item}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-200 text-xs font-black text-slate-600"
+                  >
+                   {item}
+                  </div>
+                ))}
+              </div>
+              <div className="text-xs font-bold text-slate-500">
+                ⭐⭐⭐⭐⭐ &nbsp; Trustpilot
+              </div>
             </div>
           </div>
 
-          <div className="landing-reveal hidden lg:block">
-            <div className="rounded-lg border border-[#d8e2ef] bg-white/94 p-4 text-[#0f172a] shadow-2xl shadow-[#0f172a]/15 backdrop-blur-xl">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#2563eb]">Live Preview</p>
-                  <h2 className="mt-1 text-xl font-extrabold">이번 주 시간표</h2>
-                </div>
-                <div className="rounded-lg bg-emerald-50 px-3 py-2 text-right">
-                  <p className="text-[11px] font-semibold text-emerald-700">오늘 수행률</p>
-                  <p className="text-lg font-extrabold text-emerald-800">78%</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-5 gap-2">
-                {PRODUCT_DAYS.map((column) => (
-                  <div key={column.day} className="min-h-[330px] rounded-xl border border-slate-200 bg-slate-50 p-2">
-                    <div className="mb-2 rounded-lg bg-white py-2 text-center text-sm font-extrabold text-slate-700 shadow-sm">
-                      {column.day}
-                    </div>
-                    <div className="space-y-2">
-                      {column.items.map((item) => (
-                        <div key={`${column.day}-${item.title}`} className={`rounded-lg border p-3 ${toneClass[item.tone]}`}>
-                          <p className="text-sm font-extrabold">{item.title}</p>
-                          <p className="mt-1 text-xs font-semibold opacity-75">{item.time}</p>
-                        </div>
-                      ))}
-                    </div>
+          <div className="landing-reveal hidden lg:flex justify-end flex-1">
+            <div className="relative w-full max-w-[620px]">
+              <div className="absolute -left-16 top-32 z-20 w-48 rounded-2xl border border-blue-100 bg-white/95 p-4 shadow-2xl shadow-blue-900/20 backdrop-blur">
+                <p className="mb-3 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Select Time
+                </p>
+                {['9:00 AM', '10:30 AM', '1:00 PM'].map((time, index) => (
+                  <div
+                    key={time}
+                    className={`mb-2 rounded-lg px-4 py-2 text-center text-xs font-black ${
+                      index === 0
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-50 text-slate-500'
+                    }`}
+                  >
+                    {time}
                   </div>
                 ))}
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {[
-                  ['시험 경보', 'D-5', 'warning', 'text-red-700 bg-red-50'],
-                  ['복습 자동화', '3개', 'history', 'text-violet-700 bg-violet-50'],
-                  ['충돌 확인', '정상', 'check_circle', 'text-emerald-700 bg-emerald-50'],
-                ].map(([label, value, icon, klass]) => (
-                  <div key={label} className={`rounded-xl p-3 ${klass}`}>
-                    <MaterialIcon icon={icon} size={18} filled />
-                    <p className="mt-2 text-xs font-bold opacity-75">{label}</p>
-                    <p className="text-lg font-extrabold">{value}</p>
-                  </div>
-                ))}
+              <div className="rounded-lg border border-[#d8e2ef] bg-white p-4 shadow-sm">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-extrabold text-slate-950">주간 시간표</p>
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#2563eb]">이번 주</span>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {PRODUCT_DAYS.map((column) => (
+                    <div key={column.day} className="rounded-lg bg-slate-50 p-2">
+                      <p className="mb-2 text-center text-xs font-extrabold text-slate-500">{column.day}</p>
+                      <div className="space-y-2">
+                        {column.items.map((item) => (
+                          <div key={item.title} className={`rounded-lg border px-2 py-3 text-xs font-bold ${toneClass[item.tone]}`}>
+                            {item.title}
+                            <p className="mt-1 font-semibold opacity-70">{item.time}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -245,12 +274,15 @@ export default function LandingPage() {
           <div>
             <p className="mb-3 text-sm font-extrabold uppercase tracking-[0.2em] text-[#0ea5e9]">소개</p>
             <h2 className="skema-headline text-3xl font-extrabold leading-tight text-slate-950 sm:text-5xl">
-              계획을 세우는 앱이 아니라, 계획을 실행하게 만드는 작업 공간.
+              계획을 세우는 앱이 아니라,
+              <br />
+              계획을 실행하게 만드는
+              <br />
+              나만의 작업 공간.
             </h2>
           </div>
-          <p className="text-base leading-8 text-slate-600">
-            SKEMA는 반복 수업과 단기 시험, 개인 일정을 같은 시간 축에서 다룹니다.
-            시간 충돌을 줄이고, 완료 여부와 시험 준비도를 함께 보여주어 오늘 무엇을 해야 하는지 빠르게 판단할 수 있습니다.
+          <p className="max-w-3xl text-base text-slate-600 break-keep">
+            SKEMA는 반복 수업과 단기 시험, 개인 일정을 같은 시간 축에서 다룰 수 있습니다.
           </p>
         </div>
       </section>
@@ -262,7 +294,7 @@ export default function LandingPage() {
               <p className="mb-3 text-sm font-extrabold uppercase tracking-[0.2em] text-[#0ea5e9]">미리보기</p>
               <h2 className="skema-headline text-3xl font-extrabold text-slate-950 sm:text-4xl">대시보드의 핵심만 먼저 보입니다</h2>
             </div>
-            <p className="max-w-lg text-sm leading-7 text-slate-600">
+            <p className="max-w-3xl text-sm leading-7 text-slate-600">
               오늘 할 일, 주간 시간표, 시험 경보, 리포트를 탭과 패널로 분리해 반복 사용에 맞췄습니다.
             </p>
           </div>
