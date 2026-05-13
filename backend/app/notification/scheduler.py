@@ -40,7 +40,7 @@ def _get_db():
 def _push(db, user_id: int, ntype: str, title: str, body: str, related_id: int | None = None):
     """알림 1건 저장. 중복(같은 날 같은 type+title) 방지."""
     from app.notification.models import Notification
-    from app.notification.push import send_push_to_user
+    from app.notification.push_service import send_push_to_user
 
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     exists = (

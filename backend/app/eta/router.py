@@ -6,14 +6,14 @@ POST /eta/save-schedules : 확정된 항목을 Schedule DB에 저장
 POST /eta/parse-image-v2 : 위치 기반 파서 결과 반환
 """
 
+import json
 import logging
 import os
 import re
 import tempfile
-from typing import List, Optional, Tuple
+from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
@@ -22,39 +22,18 @@ from app.core.llm import (
     LLMEmptyResponseError,
     LLMProviderUnavailableError,
     LLMRateLimitedError,
+    call_llm_vision,
 )
 from app.schedule.service import stage_schedule_record
+from app.utils.text_validation import normalize_korean_field
+
 from app.utils.time_utils import DAY_NAMES as KR_DAYS
 
 from .location_utils import normalize_location
-from .positional_parser import NAME_TO_DOW, parse_image_positional
-
-
-# ── 스키마 ────────────────────────────────────────────────────────────────────
-
-class ParsedEntry(BaseModel):
-    subject_name: str
-    day_of_week: int  # 0=월 ... 6=일
-    start_time: str  # HH:MM
-    end_time: str  # HH:MM
-    location: Optional[str] = None
-    raw_text: Optional[str] = None
-    source: str = "eta_image"
-    requires_review: bool = False
-
-
-class SaveSchedulesRequest(BaseModel):
-    entries: list[ParsedEntry]
-
-
-class NormalizedEntryModel(BaseModel):
-    title: str
-    day: str
-    startTime: str
-    endTime: str
-    location: str = ""
-    bbox: tuple[int, int, int, int]
-
+from .positional_parser import parse_image_positional
+from .positional_types import NAME_TO_DOW
+from .schemas import NormalizedEntryModel, ParsedEntry, SaveSchedulesRequest
+from .time_utils import parse_time_range, parse_time_token
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +41,40 @@ router = APIRouter(prefix="/eta", tags=["eta"])
 
 _ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 _MAX_BYTES = 20 * 1024 * 1024  # 20 MB
+
+
+_PARSE_PROMPT = """
+IMPORTANT TEXT RULES:
+- 한국어 텍스트는 그대로 보존한다.
+- 한국어를 번역하지 않는다.
+- 한국어를 한자()로 치환하지 않는다.
+- 원문이 한국어라면 결과도 한국어로 작성한다.
+- 과목명/장소 등 고유명사는 원문 그대로 유지한다.
+
+입력은 Everytime 등 대학 시간표 스크린샷이다.
+전체 모바일 화면 캡처일 수 있으므로 상단 앱바/학기 탭/하단 여백/플로팅 버튼은 무시하고,
+요일 헤더와 왼쪽 시간 숫자 칸이 있는 실제 시간표 격자를 먼저 찾는다. 화면 특징:
+- 위쪽에 요일 컬럼(월~일)이 가로로 표시됨.
+- 왼쪽에 시간대(9,10,11,12,1,2,3,4,5,6,7,8)가 세로로 표시됨.
+- 24시간 표기. 예: 2:30 → 14:30 으로 정규화.
+
+출력: JSON 배열. 각 항목은 다음 필드를 포함한다.
+- subject_name: string (과목/제목)
+- day_of_week: integer (0=월, 1=화, …, 6=일)
+- start_time: "HH:MM" (24h)
+- end_time:   "HH:MM" (24h)
+- location:   강의실/장소. 읽을 수 없으면 빈 문자열
+- raw_text:   원본에서 읽은 한 줄(가능하면)
+- requires_review: boolean
+
+규칙:
+- 시간은 반드시 HH:MM(24h)로 표준화한다.
+- 동일 제목이 여러 요일/시간에 반복되면 각 항목으로 분리한다.
+- 강의실은 원문을 보존하되, 한글 건물명+숫자 형식에 임의 영문자를 끼워넣지 않는다.
+  예: 소프트102는 소프트102로 출력하고, 소프트E102로 출력하지 않는다.
+- 모호하거나 해석이 어려우면 requires_review=true 로 표시한다.
+- JSON 배열만 출력한다. 마크다운 코드블록은 사용하지 않는다.
+"""
 
 
 def _time_to_minutes(t: str) -> int:
@@ -87,7 +100,7 @@ def _time_duration(start: str, end: str) -> int:
     return max(0, e - s)
 
 
-def _time_edge_distance(text: "ParsedEntry", geom: "ParsedEntry") -> float:
+def _time_edge_distance(text: ParsedEntry, geom: ParsedEntry) -> float:
     ts = _time_to_minutes(text.start_time)
     te = _time_to_minutes(text.end_time)
     gs = _time_to_minutes(geom.start_time)
@@ -114,6 +127,7 @@ def _is_valid_subject_name(subject: str) -> bool:
         return False
     if s.count("(") != s.count(")") or s.count("[") != s.count("]"):
         return False
+    # OCR/LLM이 줄바꿈 조각만 뽑은 경우: "강의)", "(영어" 같은 파편 제거.
     if s.startswith((")", "]")) or s.endswith(("(", "[")):
         return False
     return True
@@ -166,7 +180,7 @@ def _parse_via_positional(image_bytes: bytes) -> list[ParsedEntry]:
 
 
 def _parse_via_refined_llm(image_bytes: bytes, content_type: str) -> list[ParsedEntry]:
-    """정교한 LLM Vision 파서를 사용해 과목명/강의실을 추출한다."""
+    """정교한 LLM Vision 파서를 사용해 과목명/강의실 후보를 추출한다."""
     from app.eta.parser import parse_timetable_image
 
     suffix = {
@@ -204,6 +218,108 @@ def _parse_via_refined_llm(image_bytes: bytes, content_type: str) -> list[Parsed
     return out
 
 
+def _parse_via_easyocr_text(image_bytes: bytes) -> list[ParsedEntry]:
+    """EasyOCR + 위치 파서 결과를 ParsedEntry로 변환한다."""
+    from app.eta.easyocr_parser import parse_timetable_easyocr
+
+    out: list[ParsedEntry] = []
+    for item in parse_timetable_easyocr(image_bytes):
+        subject = str(item.get("subject_name", "")).strip()
+        dow = int(item.get("day_of_week", 0))
+        st = str(item.get("start_time", ""))
+        et = str(item.get("end_time", ""))
+        if not (0 <= dow <= 6) or not st or not et or st >= et:
+            continue
+        if subject:
+            subject, review_flag = normalize_korean_field(subject, "")
+        else:
+            review_flag = True
+        out.append(
+            ParsedEntry(
+                subject_name=subject,
+                day_of_week=dow,
+                start_time=st,
+                end_time=et,
+                location=normalize_location(str(item.get("location") or "").strip()) or None,
+                raw_text=None,
+                source="eta_easyocr",
+                requires_review=review_flag or not bool(subject),
+            )
+        )
+    return out
+
+
+def _best_text_match(base: ParsedEntry, candidates: list[ParsedEntry], used: set[int]) -> tuple[int, ParsedEntry] | None:
+    best_idx = -1
+    best_score = -1
+    for idx, cand in enumerate(candidates):
+        if idx in used or cand.day_of_week != base.day_of_week:
+            continue
+        overlap_mins = _ranges_overlap(base.start_time, base.end_time, cand.start_time, cand.end_time)
+        if overlap_mins <= 0:
+            continue
+        score = overlap_mins
+        if base.start_time == cand.start_time:
+            score += 30
+        if base.end_time == cand.end_time:
+            score += 30
+        if cand.subject_name.strip():
+            score += 10
+        if score > best_score:
+            best_idx = idx
+            best_score = score
+    if best_idx < 0:
+        return None
+    return best_idx, candidates[best_idx]
+
+
+def _merge_geometry_and_text(
+    geometry_entries: list[ParsedEntry],
+    text_entries: list[ParsedEntry],
+) -> list[ParsedEntry]:
+    """
+    위치 기반 요일/시간을 기준으로 삼고, LLM/OCR 결과에서는 과목명/강의실만 가져온다.
+    위치 파서가 놓친 LLM/OCR 항목은 review 필요 상태로 함께 반환한다.
+    """
+    if not geometry_entries:
+        return [_to_review(e, e.source) for e in text_entries]
+    if not text_entries:
+        return [_to_review(e, "eta_image_positional") for e in geometry_entries]
+
+    used: set[int] = set()
+    merged: list[ParsedEntry] = []
+
+    for base in geometry_entries:
+        match = _best_text_match(base, text_entries, used)
+        if not match:
+            merged.append(_to_review(base, "eta_image_positional"))
+            continue
+
+        idx, text = match
+        used.add(idx)
+        text_time_mismatch = base.start_time != text.start_time or base.end_time != text.end_time
+        subject = text.subject_name.strip() or base.subject_name.strip()
+        location = normalize_location(text.location or base.location)
+        merged.append(
+            ParsedEntry(
+                subject_name=subject,
+                day_of_week=base.day_of_week,
+                start_time=base.start_time,
+                end_time=base.end_time,
+                location=location,
+                raw_text=text.raw_text or base.raw_text,
+                source=f"eta_hybrid:{base.source}+{text.source}",
+                requires_review=text.requires_review or text_time_mismatch or not bool(subject),
+            )
+        )
+
+    for idx, text in enumerate(text_entries):
+        if idx not in used:
+            merged.append(_to_review(text, text.source))
+
+    return _dedup_entries(merged)
+
+
 def _time_distance_score(text: ParsedEntry, geom: ParsedEntry) -> float:
     avg_edge_distance = _time_edge_distance(text, geom)
     if avg_edge_distance >= 9999:
@@ -218,8 +334,11 @@ def _correct_text_with_geometry(
     geometry_entries: list[ParsedEntry],
 ) -> list[ParsedEntry]:
     """
-    LLM이 과목명은 잘 읽지만 블록 높이를 짧게 잡는 경우,
-    위치 기반 블록과 1:1 매칭해 요일/시간을 보정한다.
+    정교한 LLM 파서가 과목명은 잘 읽지만 블록 높이를 짧게 잡는 경우가 있다.
+    위치 기반 블록과 전역 1:1 매칭하여 요일/시간을 보정한다.
+
+    같은 요일 매칭을 우선하지만, LLM이 요일을 잘못 잡은 경우도 있으므로
+    아직 매칭되지 않은 색상 블록에는 시간 유사도 기준으로 교정한다.
     """
     if not text_entries or not geometry_entries:
         return text_entries
@@ -241,6 +360,8 @@ def _correct_text_with_geometry(
                 base = max(1.0, 60.0 - edge_distance / 3.0)
 
             if not same_day and overlap < 60:
+                # LLM이 요일을 잘못 읽으면 시간이 한 칸(30분~1시간) 밀린 후보가 남는다.
+                # 이 경우 색상 블록 좌표를 더 신뢰하되, 전혀 먼 블록과는 매칭하지 않는다.
                 if edge_distance > 75 or duration_delta > 90:
                     continue
 
@@ -298,6 +419,112 @@ def _correct_text_with_geometry(
     return _dedup_entries(corrected)
 
 
+def _fallback_positional(image_bytes: bytes) -> list[ParsedEntry]:
+    try:
+        _grid, norm = parse_image_positional(image_bytes)
+
+        out: list[ParsedEntry] = []
+        for e in norm:
+            try:
+                day_map = {
+                    "MONDAY": 0,
+                    "TUESDAY": 1,
+                    "WEDNESDAY": 2,
+                    "THURSDAY": 3,
+                    "FRIDAY": 4,
+                    "SATURDAY": 5,
+                    "SUNDAY": 6,
+                }
+                dow = day_map.get(e["day"], 0)
+                subj = (e.get("title") or "").strip()
+                if subj == "수업":
+                    subj = ""
+
+                rt = f"{KR_DAYS[dow]} {e['startTime']}~{e['endTime']}"
+
+                out.append(
+                    ParsedEntry(
+                        subject_name=subj,
+                        day_of_week=dow,
+                        start_time=e["startTime"],
+                        end_time=e["endTime"],
+                        location=normalize_location(e.get("location") or ""),
+                        raw_text=rt,
+                        source="eta_image_positional",
+                    )
+                )
+            except Exception:
+                continue
+
+        return out
+    except Exception as exc:
+        logger.warning(f"ETA positional fallback failed: {exc}")
+        return []
+
+
+def _apply_everytime_pm(t: str) -> str:
+    """
+    Everytime 스타일 시간 표기 보정:
+    1~8시는 오후 시간으로 해석해 +12 처리한다.
+    """
+    if not t:
+        return t
+
+    t = t.strip()
+    parts = t.split(":")
+    if len(parts) < 2:
+        return t
+
+    try:
+        h = int(parts[0])
+        m = int(parts[1][:2])
+    except ValueError:
+        return t
+
+    if 1 <= h <= 8:
+        h += 12
+
+    return f"{h:02d}:{m:02d}"
+
+
+def _normalize_time(t: str) -> str:
+    """
+    시간 문자열을 HH:MM 24시간제 + 30분 단위로 정규화.
+    """
+    if not t:
+        return "00:00"
+
+    t = t.strip()
+
+    range_m = re.match(r"(\d{1,2}:\d{2})\s*[~\-]\s*\d{1,2}:\d{2}", t)
+    if range_m:
+        t = range_m.group(1)
+
+    parts = t.split(":")
+    if len(parts) >= 2:
+        try:
+            h, m = int(parts[0]), int(parts[1])
+            if not (0 <= h <= 23 and 0 <= m <= 59):
+                return "00:00"
+
+            if m < 15:
+                m = 0
+            elif m < 45:
+                m = 30
+            else:
+                m = 0
+                h += 1
+
+            if h > 23:
+                return "23:30"
+
+            return f"{h:02d}:{m:02d}"
+        except ValueError:
+            pass
+
+    return "00:00"
+
+
 async def _read_image_file(file: UploadFile) -> tuple[bytes, str]:
     """이미지 파일 유효성 검사 후 (bytes, content_type) 반환."""
     content_type = file.content_type or ""
@@ -325,6 +552,133 @@ def _dedup_entries(entries: List[ParsedEntry]) -> List[ParsedEntry]:
     return result
 
 
+def _extract_json(text: str) -> list:
+    """
+    모델 응답 텍스트에서 JSON 배열만 추출한다.
+    """
+    text = re.sub(r"```(?:json)?\s*", "", text)
+    text = text.replace("```", "").strip()
+
+    start = text.find("[")
+    end = text.rfind("]") + 1
+
+    if start == -1 or end == 0:
+        return []
+
+    try:
+        return json.loads(text[start:end])
+    except json.JSONDecodeError as exc:
+        logger.warning(f"ETA JSON decode error: {exc} | snippet={text[start:start+300]}")
+        return []
+
+
+def _parse_via_llm(image_bytes: bytes, content_type: str) -> List[ParsedEntry]:
+    """LLM Vision으로 이미지에서 시간표 항목을 추출한다."""
+    suffix = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/gif": ".gif",
+    }.get(content_type, ".jpg")
+
+    tmp_path = None
+    llm_result = None
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(image_bytes)
+            tmp_path = tmp.name
+
+        llm_result = call_llm_vision(
+            tmp_path,
+            content_type,
+            _PARSE_PROMPT,
+            temperature=0.1,
+        )
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+    if llm_result is None or not llm_result.content:
+        logger.warning("ETA: vision LLM returned empty response")
+        return []
+
+    raw_text = llm_result.content
+
+    if llm_result.status == "fallback_used":
+        logger.info(
+            f"ETA vision used fallback: provider={llm_result.provider} model={llm_result.model}"
+        )
+
+    logger.debug(f"ETA vision response ({len(raw_text)} chars) via {llm_result.provider}")
+
+    data = _extract_json(raw_text)
+
+    if not data and raw_text.strip():
+        logger.info("ETA: no entries on first parse, attempting re-extract")
+        try:
+            cleaned = re.sub(r"```(?:json)?", "", raw_text).strip()
+            data = _extract_json(cleaned)
+        except Exception as exc:
+            logger.warning(f"ETA re-extract failed: {exc}")
+
+    entries: List[ParsedEntry] = []
+
+    for item in data:
+        try:
+            subject = str(item.get("subject_name", "")).strip()
+            subject, review_flag = normalize_korean_field(
+                subject,
+                str(item.get("raw_text", "")),
+            )
+
+            dow = int(item.get("day_of_week", -1))
+            if not (0 <= dow <= 6):
+                logger.debug(f"ETA: invalid day_of_week={dow} for '{subject}', skipping")
+                continue
+
+            st = parse_time_token(str(item.get("start_time", ""))) or (
+                parse_time_range(str(item.get("raw_text", "")))[0] or ""
+            )
+            et = parse_time_token(str(item.get("end_time", ""))) or (
+                parse_time_range(str(item.get("raw_text", "")))[1] or ""
+            )
+
+            st = _apply_everytime_pm(st)
+            et = _apply_everytime_pm(et)
+
+            st = _normalize_time(st)
+            et = _normalize_time(et)
+
+            if st == "00:00" and et == "00:00":
+                logger.debug(f"ETA: could not parse times for '{subject}', skipping")
+                continue
+
+            if st >= et:
+                logger.debug(f"ETA: start_time >= end_time for '{subject}' ({st}~{et}), skipping")
+                continue
+
+            entries.append(
+                ParsedEntry(
+                    subject_name=subject,
+                    day_of_week=dow,
+                    start_time=st,
+                    end_time=et,
+                    location=normalize_location(str(item.get("location") or "").strip()) or None,
+                    raw_text=item.get("raw_text") or None,
+                    source="eta_image",
+                    requires_review=bool(item.get("requires_review", False) or review_flag),
+                )
+            )
+        except (ValueError, TypeError) as exc:
+            logger.debug(f"ETA: malformed entry {item} | {exc}")
+            continue
+
+    result = _dedup_entries(entries)
+    logger.info(f"ETA: extracted {len(result)} unique entries from image")
+    return result
+
+
 @router.post("/parse-image", response_model=List[ParsedEntry])
 async def parse_eta_image(
     file: UploadFile = File(...),
@@ -333,11 +687,32 @@ async def parse_eta_image(
     """
     이미지 기반 시간표 파싱.
 
-    - 1순위: LLM Vision 파서 (과목명 + 시간 추출)
-    - 보정: 위치 기반 파서로 LLM 시간 오류 교정
-    - fallback: LLM 실패 시 위치 기반 결과만 반환 (requires_review=true)
+    - 1순위: 정교한 LLM Vision 파서
+    - 2순위: 위치 기반 색상 블록 파서 + EasyOCR 병합
+    - 3순위: 기존 간단 LLM 프롬프트 fallback
     """
     image_bytes, content_type = await _read_image_file(file)
+
+    text_entries: list[ParsedEntry] = []
+    try:
+        text_entries = _filter_entries(_parse_via_refined_llm(image_bytes, content_type))
+    except (LLMRateLimitedError, LLMProviderUnavailableError, LLMEmptyResponseError) as exc:
+        logger.warning(f"ETA parse: refined LLM unavailable: {exc}")
+    except Exception as exc:
+        logger.warning(f"ETA parse: refined LLM failed (user={current_user.id}): {exc}", exc_info=True)
+
+    if text_entries:
+        geometry_entries: list[ParsedEntry] = []
+        try:
+            geometry_entries = _filter_entries(_parse_via_positional(image_bytes), allow_empty_subject=True)
+            text_entries = _correct_text_with_geometry(text_entries, geometry_entries)
+        except Exception as exc:
+            logger.warning(f"ETA parse: time correction failed (user={current_user.id}): {exc}")
+        logger.info(
+            "ETA refined LLM parse: geometry=%d returned=%d user=%s",
+            len(geometry_entries), len(text_entries), current_user.id,
+        )
+        return text_entries
 
     geometry_entries: list[ParsedEntry] = []
     try:
@@ -345,21 +720,35 @@ async def parse_eta_image(
     except Exception as exc:
         logger.warning(f"ETA parse: positional parser failed (user={current_user.id}): {exc}")
 
-    text_entries: list[ParsedEntry] = []
+    entries = _merge_geometry_and_text(geometry_entries, text_entries)
+    needs_text_fallback = not text_entries or any(not e.subject_name.strip() for e in entries)
+    if needs_text_fallback:
+        try:
+            ocr_entries = _filter_entries(_parse_via_easyocr_text(image_bytes))
+            if ocr_entries:
+                text_entries = text_entries + ocr_entries
+                entries = _merge_geometry_and_text(geometry_entries, text_entries)
+        except ImportError as exc:
+            logger.info(f"ETA parse: EasyOCR unavailable: {exc}")
+        except Exception as exc:
+            logger.warning(f"ETA parse: EasyOCR fallback failed (user={current_user.id}): {exc}", exc_info=True)
+
+    if entries:
+        logger.info(
+            "ETA hybrid parse: geometry=%d text=%d returned=%d user=%s",
+            len(geometry_entries), len(text_entries), len(entries), current_user.id,
+        )
+        return entries
+
+    # 마지막 안전망: 기존 간단 LLM 프롬프트를 유지해 예외 케이스를 흡수한다.
     try:
-        text_entries = _filter_entries(_parse_via_refined_llm(image_bytes, content_type))
-    except (LLMRateLimitedError, LLMProviderUnavailableError, LLMEmptyResponseError) as exc:
-        logger.warning(f"ETA parse: LLM unavailable: {exc}")
+        legacy_entries = _parse_via_llm(image_bytes, content_type)
+        if legacy_entries:
+            return legacy_entries
     except Exception as exc:
-        logger.warning(f"ETA parse: LLM failed (user={current_user.id}): {exc}", exc_info=True)
+        logger.warning(f"ETA parse: legacy LLM fallback failed: {exc}")
 
-    if text_entries:
-        result = _correct_text_with_geometry(text_entries, geometry_entries)
-        logger.info("ETA parse: geometry=%d returned=%d user=%s", len(geometry_entries), len(result), current_user.id)
-        return result
-
-    logger.info("ETA parse: LLM failed, positional only: geometry=%d user=%s", len(geometry_entries), current_user.id)
-    return [_to_review(e, "eta_image_positional") for e in geometry_entries]
+    return []
 
 
 @router.post("/save-schedules")
@@ -421,3 +810,64 @@ async def parse_eta_image_v2(
         return []
 
     return entries
+
+
+@router.post("/parse-image-easyocr", response_model=List[ParsedEntry])
+async def parse_eta_image_easyocr(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    EasyOCR + OpenCV 위치 기반 파서.
+    API 키 없이 동작. 첫 호출 시 모델 로딩으로 수 초 소요될 수 있음.
+    """
+    image_bytes, _ = await _read_image_file(file)
+
+    try:
+        from app.eta.easyocr_parser import parse_timetable_easyocr
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="easyocr가 설치되지 않았습니다. 서버 관리자에게 문의하세요.",
+        )
+
+    try:
+        entries_raw = parse_timetable_easyocr(image_bytes)
+    except Exception as exc:
+        logger.error(f"EasyOCR parse error (user={current_user.id}): {exc}", exc_info=True)
+        fb = _fallback_positional(image_bytes)
+        return fb if fb else []
+
+    entries: List[ParsedEntry] = []
+    for item in entries_raw:
+        try:
+            subject = str(item.get("subject_name", "")).strip()
+            dow = int(item.get("day_of_week", 0))
+            st = str(item.get("start_time", ""))
+            et = str(item.get("end_time", ""))
+            if not (0 <= dow <= 6) or not st or not et or st >= et:
+                continue
+            if subject:
+                subject, _ = normalize_korean_field(subject, "")
+            entries.append(
+                ParsedEntry(
+                    subject_name=subject,
+                    day_of_week=dow,
+                    start_time=st,
+                    end_time=et,
+                    location=normalize_location(str(item.get("location") or "").strip()) or None,
+                    raw_text=None,
+                    source="eta_easyocr",
+                    requires_review=not bool(subject),
+                )
+            )
+        except Exception:
+            continue
+
+    if not entries:
+        fb = _fallback_positional(image_bytes)
+        return fb if fb else []
+
+    result = _dedup_entries(entries)
+    logger.info(f"EasyOCR: {len(result)} entries for user {current_user.id}")
+    return result

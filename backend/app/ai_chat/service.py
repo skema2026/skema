@@ -57,9 +57,13 @@ def run_ai_agent(
 사용자가 학습 계획·시간표 생성을 요청하면 아래 순서를 따르라:
 
 1. **컨텍스트 수집** (반드시 먼저 호출)
+   - list_syllabus_analyses → 강의계획서 분석 결과 확인
    - list_exam_schedules → 등록된 시험 일정 확인
 
-2. **일정 생성 방식 결정**
+2. **시험 연동**
+   - 강의계획서에 시험 날짜가 있고 exam_schedules에 없으면 → import_syllabus_exams 제안
+
+3. **일정 생성 방식 결정**
    - 시험이 있으면 → generate_exam_prep_schedule
    - 시험이 없으면 → generate_study_schedule
 

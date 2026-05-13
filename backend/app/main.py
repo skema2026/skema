@@ -23,9 +23,10 @@ from app.admin.router import router as admin_router
 from app.schedule.router import router as schedule_router
 from app.share.router import router as share_router
 from app.ai_chat.router import router as ai_chat_router
+from app.syllabus.router import router as syllabus_router
 from app.eta.router import router as eta_router
 from app.notification.router import router as notification_router
-from app.notification.push import router as push_router
+from app.notification.push_router import router as push_router
 from app.kakao.router import router as kakao_router
 from app.core.config import settings
 
@@ -109,6 +110,7 @@ app.include_router(admin_router)        # /admin/*
 app.include_router(schedule_router)     # /schedules/*, /exam-schedules/*
 app.include_router(share_router)        # /share-tokens/*, /share/{token}
 app.include_router(ai_chat_router)      # /ai/chat, /ai-chat-logs/*
+app.include_router(syllabus_router)     # /syllabi/*
 app.include_router(eta_router)          # /eta/parse-image, /eta/save-schedules
 app.include_router(notification_router) # /notifications/*
 app.include_router(push_router)         # /push/*
