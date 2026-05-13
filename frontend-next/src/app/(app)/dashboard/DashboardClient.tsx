@@ -18,7 +18,7 @@ import { api } from '@/lib/api';
 import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 import { timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
-import { Schedule, UserProfile, ExamSchedule } from '@/types';
+import { Schedule, UserProfile } from '@/types';
 import {
   DashboardHeader,
   DashboardStyles,
@@ -301,10 +301,13 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   return (
     <>
       <DashboardStyles />
-      <div className="skema-dashboard-shell flex h-screen flex-col">
+      <div className="flex h-screen flex-col bg-[#f8fbff]">
         <NotificationBanner
           notification={notification}
-          onOpen={(schedule) => { openClassForm(schedule); setNotification(null); }}
+          onOpen={(schedule) => {
+            openClassForm(schedule);
+            setNotification(null);
+          }}
           onDismiss={() => setNotification(null)}
         />
 
@@ -321,250 +324,333 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
           onLogout={handleLogout}
         />
 
-        {/* Main Content */}
-        <div className="skema-dash-scroll flex-1">
-          <section className="skema-command-grid">
-            <div className="skema-panel skema-focus-panel">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: '#2563eb' }}>{todayLabel}</p>
-                  <h1 className="mt-2 text-2xl font-black tracking-normal text-[#0f172a] sm:text-3xl">
-                    오늘은 이것만 놓치지 마세요
-                  </h1>
-                  <p className="mt-2 max-w-xl text-sm font-medium leading-7 text-[#516078]">
-                    다음 일정, 밀린 일정, 시험 경보를 먼저 처리하고 시간표에서 주간 흐름을 조정하세요.
-                  </p>
+        <main className="flex min-h-0 flex-1 gap-5 overflow-hidden bg-[#f8fbff] p-5">
+          <section className="flex min-w-0 flex-[3] flex-col overflow-hidden rounded-[28px] border border-blue-100/60 bg-white/90 p-7 shadow-[0_8px_30px_rgba(37,99,235,0.08)] backdrop-blur-sm">
+            <div className="mb-7 flex items-end justify-between">
+              <div>
+                <h1 className="text-4xl font-black tracking-tight text-slate-900">
+                  주간 시간표
+                </h1>
+                <p className="mt-2 text-sm font-medium text-slate-400">
+                  {weekLabel} · 이번 주는 {weekTotal}개의 일정이 있습니다
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex rounded-xl border border-blue-100 bg-blue-50/70 p-1 shadow-sm">
+                  <button
+                    className="rounded-lg p-2 transition hover:bg-white"
+                    onClick={() => setWeekOffset((o) => o - 1)}
+                  >
+                    <MaterialIcon icon="chevron_left" size={18} color="#2563eb" />
+                  </button>
+
+                  <button
+                    className="px-4 py-1 text-xs font-black text-blue-700"
+                    onClick={() => setWeekOffset(0)}
+                  >
+                    이번 주
+                  </button>
+
+                  <button
+                    className="rounded-lg p-2 transition hover:bg-white"
+                    onClick={() => setWeekOffset((o) => o + 1)}
+                  >
+                    <MaterialIcon icon="chevron_right" size={18} color="#2563eb" />
+                  </button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button className="skema-primary-action" onClick={() => openClassForm()}>
-                    <MaterialIcon icon="add" size={16} color="#fff" />
-                    일정 추가
-                  </button>
-                  <button className="skema-secondary-action" onClick={handleShare}>
-                    <MaterialIcon icon="share" size={16} color="#334155" />
-                    공유
-                  </button>
+
+                <button
+                  className="rounded-xl border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-50"
+                  onClick={() =>
+                    setActiveTypes(
+                      activeTypes.size === ALL_TYPES.length
+                        ? new Set()
+                        : new Set(ALL_TYPES)
+                    )
+                  }
+                >
+                  {activeTypes.size === ALL_TYPES.length ? '필터 해제' : '전체 표시'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-6 flex gap-4">
+              <div className="flex flex-1 items-center justify-between rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-sky-50 p-5 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-md">
+                    <MaterialIcon icon="event_upcoming" size={20} color="#fff" />
+                  </div>
+
+                  <div>
+                    <p className="mb-1 text-[11px] font-black uppercase tracking-wider text-blue-600">
+                      오늘의 포커스
+                    </p>
+                    <h2 className="text-sm font-bold text-slate-900">
+                      오늘은 이것만 놓치지 마세요:{' '}
+                      {nextSchedule ? nextSchedule.title : '남은 일정이 없습니다'}
+                    </h2>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
-                <div className="rounded-lg border border-[#d8e3ff] bg-[#f7faff] p-4">
-                  <div className="flex items-center gap-2">
-                    <span className="skema-sticker h-9 w-9">
-                      <MaterialIcon icon="flag" size={18} color="#2563eb" filled />
-                    </span>
-                    <div>
-                      <p className="text-xs font-black text-[#2563eb]">다음 액션</p>
-                      <p className="text-lg font-black text-[#0f172a]">
-                        {nextSchedule ? nextSchedule.title : '오늘 남은 일정이 없습니다'}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm font-semibold text-[#3f4b61]">
-                    {nextSchedule
-                      ? `${nextSchedule.start_time} - ${nextSchedule.end_time}${nextSchedule.location ? ` · ${nextSchedule.location}` : ''}`
-                      : '새 일정을 추가하거나 주간 리포트를 확인해보세요.'}
+              <div className="flex w-48 flex-col justify-center rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  남은 일정
+                </p>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <p className="text-3xl font-black text-blue-600">
+                    {remainingToday.length}
                   </p>
-                </div>
-                <div className="rounded-lg border border-[#f4c9dd] bg-[#fff6fa] p-4">
-                  <p className="text-xs font-black text-[#0ea5e9]">오늘 진행률</p>
-                  <div className="mt-3 flex items-end gap-2">
-                    <span className="text-4xl font-black text-[#0f172a]">{todayPct ?? 0}%</span>
-                    <span className="pb-1 text-xs font-bold text-[#516078]">{todayDone}/{todayTotal} 완료</span>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
-                    <div className="h-full rounded-full bg-[#0ea5e9]" style={{ width: `${todayPct ?? 0}%` }} />
-                  </div>
+                  <p className="text-xs font-bold text-slate-500">개</p>
                 </div>
               </div>
             </div>
 
-            <div className="skema-kpi-grid">
+            <div className="mb-6 flex flex-wrap gap-2">
               {[
-                { label: '남은 오늘 일정', value: `${remainingToday.length}개`, icon: 'checklist', color: '#2563eb', bg: '#eaf1ff' },
-                { label: '미완료/지난 일정', value: `${unachievedSchedules.length}개`, icon: 'update', color: '#b45309', bg: '#eef6ff' },
-                { label: '시간 충돌', value: `${conflicts.length}건`, icon: 'warning', color: '#dc2626', bg: '#fff1f2' },
-                { label: '다가오는 시험', value: upcomingExam ? `D-${daysUntilExam}` : '없음', icon: 'quiz', color: '#087f5b', bg: '#e9fff7' },
-              ].map((item) => (
-                <div key={item.label} className="skema-kpi">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-[#516078]">{item.label}</span>
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: item.bg }}>
-                      <MaterialIcon icon={item.icon} size={17} color={item.color} filled />
-                    </span>
-                  </div>
-                  <p className="mt-3 text-2xl font-black text-[#0f172a]">{item.value}</p>
-                </div>
-              ))}
+                { type: 'class', label: '수업', color: '#2563eb' },
+                { type: 'study', label: '자율학습', color: '#0ea5e9' },
+                { type: 'assignment', label: '과제', color: '#0284c7' },
+                { type: 'activity', label: '활동', color: '#1d4ed8' },
+                { type: 'personal', label: '개인', color: '#38bdf8' },
+              ].map(({ type, label, color }) => {
+                const active = activeTypes.has(type as ScheduleTypeFilter);
+
+                return (
+                  <button
+                    key={type}
+                    onClick={() => toggleType(type as ScheduleTypeFilter)}
+                    className="rounded-full border px-4 py-1.5 text-xs font-black transition-all"
+                    style={{
+                      background: active ? `${color}15` : '#ffffff',
+                      color: active ? color : '#64748b',
+                      borderColor: active ? `${color}40` : '#e2e8f0',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
+
+            <Tabs defaultValue="timetable" className="flex min-h-0 flex-1 flex-col">
+              <TabsList className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-1">
+                <TabsTrigger value="timetable">시간표</TabsTrigger>
+                <TabsTrigger value="exams">시험 일정</TabsTrigger>
+                <TabsTrigger value="report">리포트</TabsTrigger>
+                <TabsTrigger value="type-analysis">분석</TabsTrigger>
+              </TabsList>
+
+              <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-white">
+                <TabsContent value="timetable" className="h-full">
+                  <Timetable schedules={filteredSchedules} exams={exams} weekStart={weekStart} />
+                </TabsContent>
+
+                <TabsContent value="exams">
+                  <ExamList />
+                </TabsContent>
+
+                <TabsContent value="report">
+                  <WeeklyReport schedules={schedules} />
+                </TabsContent>
+
+                <TabsContent value="type-analysis">
+                  <TypeAnalysis schedules={schedules} weekStart={weekStart} />
+                </TabsContent>
+              </div>
+            </Tabs>
           </section>
 
-          <section className="skema-work-grid">
-            <aside className="skema-panel p-4">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="skema-section-title">오늘 할 일</p>
-                  <p className="skema-muted">클릭하면 완료 상태가 바뀝니다</p>
-                </div>
-                <span className="rounded-lg bg-[#eaf1ff] px-2.5 py-1 text-xs font-black text-[#2563eb]">
-                  {remainingToday.length} left
-                </span>
-              </div>
-              {todaySchedules.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-[#c7d2e2] bg-[#f8fbff] p-5 text-center">
-                  <MaterialIcon icon="weekend" size={24} color="#087f5b" filled />
-                  <p className="mt-2 text-sm font-bold text-[#3f4b61]">오늘은 비어 있습니다</p>
-                </div>
-              ) : (
-                <div>
-                  {todaySchedules.map((s) => (
-                    <button key={s.id} className="skema-task-row w-full text-left" onClick={() => handleToggleComplete(s)}>
-                      <span
-                        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2"
-                        style={{
-                          background: s.is_completed ? '#087f5b' : '#fff',
-                          borderColor: s.is_completed ? '#087f5b' : '#b8c5d6',
-                        }}
-                      >
-                        {s.is_completed && <MaterialIcon icon="check" size={13} color="#fff" />}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className="block truncate text-sm font-extrabold"
-                          style={{ color: s.is_completed ? '#64748b' : '#0f172a', textDecoration: s.is_completed ? 'line-through' : 'none' }}
-                        >
-                          {s.title}
-                        </span>
-                        <span className="mt-0.5 block text-xs font-semibold text-[#516078]">
-                          {s.start_time} - {s.end_time}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {unachievedSchedules.length > 0 && (
-                <button
-                  onClick={handleReschedule}
-                  disabled={isRegenerating}
-                  className="mt-4 w-full rounded-lg border border-[#fed7aa] bg-[#eef6ff] px-3 py-2 text-xs font-black text-[#9a5b00]"
-                >
-                  {isRegenerating ? '재배치 중...' : '밀린 일정 AI 재배치'}
-                </button>
-              )}
-            </aside>
+          <aside className="flex-1 max-w-sm overflow-y-auto pr-1">
+            <div className="space-y-4">
+              {/*작은 달력*/}
+              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 text-xs font-black text-slate-900">
+                    <MaterialIcon icon="calendar_today" size={16} color="#2563eb" />
+                    {todayLabel}
+                  </h3>
 
-            <section className="min-w-0">
-              <div className="skema-panel mb-3 p-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="skema-section-title">주간 시간표</p>
-                    <p className="skema-muted">{weekLabel}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button className="skema-icon-btn h-9 w-9" onClick={() => setWeekOffset((o) => o - 1)} aria-label="이전 주">
-                      <MaterialIcon icon="chevron_left" size={18} color="#334155" />
-                    </button>
-                    <button className="skema-secondary-action" onClick={() => setWeekOffset(0)}>
-                      이번 주
-                    </button>
-                    <button className="skema-icon-btn h-9 w-9" onClick={() => setWeekOffset((o) => o + 1)} aria-label="다음 주">
-                      <MaterialIcon icon="chevron_right" size={18} color="#334155" />
+                  <div className="flex gap-1">
+                    <button
+                      className="rounded-lg p-1 transition hover:bg-blue-50"
+                      onClick={() => setWeekOffset((o) => o - 1)}
+                    >
+                      <MaterialIcon icon="chevron_left" size={18} color="#94a3b8" />
                     </button>
                     <button
-                      className="skema-secondary-action"
-                      onClick={() => setActiveTypes(activeTypes.size === ALL_TYPES.length ? new Set() : new Set(ALL_TYPES))}
+                      className="rounded-lg p-1 transition hover:bg-blue-50"
+                      onClick={() => setWeekOffset((o) => o + 1)}
                     >
-                      {activeTypes.size === ALL_TYPES.length ? '필터 해제' : '전체 표시'}
+                      <MaterialIcon icon="chevron_right" size={18} color="#94a3b8" />
                     </button>
                   </div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {(
-                    [
-                      { type: 'class', label: '수업', color: '#4F46E5' },
-                      { type: 'study', label: '자율학습', color: '#087f5b' },
-                      { type: 'assignment', label: '과제', color: '#b45309' },
-                      { type: 'activity', label: '활동', color: '#7c3aed' },
-                      { type: 'personal', label: '개인', color: '#0ea5e9' },
-                    ] as { type: ScheduleTypeFilter; label: string; color: string }[]
-                  ).map(({ type, label, color }) => {
-                    const active = activeTypes.has(type);
+
+                <div className="grid grid-cols-7 gap-y-2 text-center">
+                  {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+                    <div
+                      key={day}
+                      className="text-[10px] font-black uppercase text-slate-400"
+                    >
+                      {day}
+                    </div>
+                  ))}
+
+                  {Array.from({ length: 35 }).map((_, index) => {
+                    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+                    const date = index - firstDay + 1;
+                    const lastDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                    const isCurrentMonth = date >= 1 && date <= lastDate;
+                    const isToday = isCurrentMonth && date === now.getDate();
+
                     return (
-                      <button
-                        key={type}
-                        onClick={() => toggleType(type)}
-                        className="rounded-lg border px-2.5 py-1.5 text-xs font-black"
-                        style={{
-                          borderColor: active ? color : '#d8e2ef',
-                          background: active ? `${color}16` : '#fff',
-                          color: active ? color : '#516078',
-                        }}
+                      <div
+                        key={index}
+                        className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                          isToday
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : isCurrentMonth
+                            ? 'text-slate-700'
+                            : 'text-transparent'
+                        }`}
                       >
-                        {label}
-                      </button>
+                        {isCurrentMonth ? date : ''}
+                      </div>
                     );
                   })}
                 </div>
               </div>
-              <Tabs defaultValue="timetable" className="skema-dashboard-main">
-                <TabsList className="mb-3 w-full sm:w-fit">
-                  <TabsTrigger value="timetable">시간표</TabsTrigger>
-                  <TabsTrigger value="exams">시험</TabsTrigger>
-                  <TabsTrigger value="report">리포트</TabsTrigger>
-                  <TabsTrigger value="type-analysis">분석</TabsTrigger>
-                </TabsList>
-                <TabsContent value="timetable">
-                  <Timetable schedules={filteredSchedules} exams={exams} weekStart={weekStart} />
-                </TabsContent>
-                <TabsContent value="exams">
-                  <ExamList />
-                </TabsContent>
-                <TabsContent value="report">
-                  <WeeklyReport schedules={schedules} />
-                </TabsContent>
-                <TabsContent value="type-analysis">
-                  <TypeAnalysis schedules={schedules} weekStart={weekStart} />
-                </TabsContent>
-              </Tabs>
-            </section>
-
-            <aside className="skema-panel p-4">
-              <div className="mb-4">
-                <p className="skema-section-title">우선순위 패널</p>
-                <p className="skema-muted">시험과 위험 신호를 먼저 봅니다</p>
-              </div>
-              {upcomingExam ? (
-                <div className="mb-4 rounded-lg border border-[#c7f3df] bg-[#effdf7] p-3">
-                  <div className="flex items-center gap-2">
-                    <MaterialIcon icon="quiz" size={18} color="#087f5b" filled />
-                    <p className="text-xs font-black text-[#087f5b]">다가오는 시험</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    오늘 진행률
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-blue-600">
+                    {todayPct ?? 0}%
+                  </p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-blue-50">
+                    <div
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${todayPct ?? 0}%` }}
+                    />
                   </div>
-                  <p className="mt-2 text-lg font-black text-[#0f172a]">{upcomingExam.title}</p>
-                  <p className="text-xs font-bold text-[#516078]">
-                    {upcomingExam.exam_date} · D-{daysUntilExam}
+                </div>
+
+                <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    남은 일정
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-slate-900">
+                    {remainingToday.length}개
                   </p>
                 </div>
-              ) : (
-                <div className="mb-4 rounded-lg border border-[#d8e2ef] bg-[#f8fbff] p-3">
-                  <p className="text-sm font-bold text-[#3f4b61]">등록된 예정 시험이 없습니다</p>
-                </div>
-              )}
-              <SmartAlertPanel exams={exams} schedules={schedules} currentWeekStart={weekStart} />
-            </aside>
-          </section>
-        </div>
+              </div>
 
-        <ClassForm />
-        <SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-        <ShareDialog
-          open={isShareModalOpen}
-          isGeneratingShare={isGeneratingShare}
-          shareUrl={shareUrl}
-          onClose={closeShareModal}
-          onCopy={copyShareUrl}
-        />
+              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-900">오늘 할 일</h3>
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                    {remainingToday.length} left
+                  </span>
+                </div>
+
+                {todaySchedules.length === 0 ? (
+                  <div className="rounded-2xl border-2 border-dashed border-blue-100 bg-blue-50/40 p-6 text-center">
+                    <p className="text-xs font-medium text-slate-400">
+                      오늘은 비어 있습니다
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {todaySchedules.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleToggleComplete(s)}
+                        className="flex w-full items-center gap-3 rounded-xl border border-blue-50 p-3 text-left transition hover:bg-blue-50/50"
+                      >
+                        <span
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2"
+                          style={{
+                            background: s.is_completed ? '#2563eb' : '#fff',
+                            borderColor: s.is_completed ? '#2563eb' : '#bfdbfe',
+                          }}
+                        >
+                          {s.is_completed && (
+                            <MaterialIcon icon="check" size={13} color="#fff" />
+                          )}
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-slate-900">
+                            {s.title}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {s.start_time} - {s.end_time}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {unachievedSchedules.length > 0 && (
+                  <button
+                    onClick={handleReschedule}
+                    disabled={isRegenerating}
+                    className="mt-4 w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-600 transition hover:bg-blue-100 disabled:opacity-60"
+                  >
+                    {isRegenerating ? '재배치 중...' : '밀린 일정 AI 재배치'}
+                  </button>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <h3 className="mb-4 text-xs font-black text-slate-900">
+                  우선순위 패널
+                </h3>
+
+                {upcomingExam ? (
+                  <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                    <p className="text-xs font-black text-blue-600">
+                      다가오는 시험
+                    </p>
+                    <p className="mt-2 text-sm font-black text-slate-900">
+                      {upcomingExam.title}
+                    </p>
+                    <p className="text-xs font-bold text-slate-500">
+                      {upcomingExam.exam_date} · D-{daysUntilExam}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/40 p-4 text-center">
+                    <p className="text-[10px] font-bold text-slate-400">
+                      등록된 예정 시험이 없습니다
+                    </p>
+                  </div>
+                )}
+
+                <SmartAlertPanel
+                  exams={exams}
+                  schedules={schedules}
+                  currentWeekStart={weekStart}
+                />
+              </div>
+            </div>
+          </aside>
+        </main>
       </div>
+
+      <ClassForm />
+
+      <ShareDialog
+        open={isShareModalOpen}
+        onClose={closeShareModal}
+        shareUrl={shareUrl}
+        isGeneratingShare={isGeneratingShare}
+        onCopy={copyShareUrl}
+      />
     </>
   );
 }

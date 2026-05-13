@@ -76,16 +76,22 @@ export default function RegisterPage() {
           position: relative;
           overflow-x: hidden;
           overflow-y: auto;
-          background: #f6f8fc url('/register-bg.jpg') center/cover no-repeat;
+          background:
+          radial-gradient(circle at 18% 20%, rgba(56,189,248,0.28), transparent 32%),
+          radial-gradient(circle at 82% 18%, rgba(37,99,235,0.22), transparent 34%),
+          linear-gradient(135deg, #f8fbff 0%, #eaf4ff 48%, #dbeafe 100%);
           font-family: inherit;
         }
+
         .rp-overlay {
-          position: absolute; inset: 0; pointer-events: none;
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
           background:
-            linear-gradient(90deg, rgba(37,99,235,0.08) 1px, transparent 1px),
-            linear-gradient(rgba(14,165,233,0.07) 1px, transparent 1px),
-            linear-gradient(110deg, rgba(246,248,252,0.96) 0%, rgba(246,248,252,0.88) 46%, rgba(232,243,255,0.72) 100%);
-          background-size: 28px 28px, 28px 28px, auto;
+          linear-gradient(90deg, rgba(37,99,235,0.07) 1px, transparent 1px),
+          linear-gradient(rgba(14,165,233,0.06) 1px, transparent 1px);
+          background-size: 28px 28px;
+          mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.15));
         }
 
         /* ── Navbar ── */
@@ -147,15 +153,16 @@ export default function RegisterPage() {
 
         /* ── Card ── */
         .rp-card {
-          width: 100%; max-width: 455px; flex-shrink: 0;
-          background: rgba(255,255,255,0.96);
-          backdrop-filter: blur(22px) saturate(125%);
-          -webkit-backdrop-filter: blur(22px) saturate(125%);
-          border: 1px solid rgba(255,255,255,0.70);
-          border-radius: 8px;
+          width: 100%; max-width: 420px; flex-shrink: 0;
+          background: rgba(255,255,255,0.58);
+          backdrop-filter: blur(28px) saturate(145%);
+          -webkit-backdrop-filter: blur(28px) saturate(145%);
+          border: 1px solid rgba(255,255,255,0.78);
+          border-radius: 24px;
           box-shadow:
-            0 24px 70px rgba(15,23,42,0.16),
-            inset 0 1px 0 rgba(255,255,255,0.85);
+            0 30px 90px rgba(15,23,42,0.16),
+            0 12px 36px rgba(15,23,42,0.08);
+            inset 0 1px 0 rgba(255,255,255,0.95);
           padding: 34px 30px 28px;
         }
         .rp-card-title { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0 0 3px; }
@@ -184,12 +191,14 @@ export default function RegisterPage() {
 
         /* Fields */
         .rp-field {
-          display: flex; align-items: center;
-          background: #fff;
-          border: 1px solid #b8c5d6;
-          border-radius: 8px; overflow: hidden;
+          display: flex;
+          align-items: center;
+          background: rgba(255,255,255,0.68);
+          border: 1px solid rgba(191,219,254,0.9);
+          border-radius: 14px;
+          overflow: hidden;
           margin-bottom: 7px;
-          transition: box-shadow .2s, border-color .2s;
+          transition: box-shadow .2s, border-color .2s, background .2s;
         }
         .rp-field:focus-within {
           border-color: #2563eb;
@@ -197,11 +206,18 @@ export default function RegisterPage() {
         }
         .rp-field.err { border-color: rgba(220,38,38,0.55); }
         .rp-label {
-          display: flex; align-items: center; gap: 6px;
-          padding: 0 11px; min-width: 90px; height: 46px;
-          border-right: 1px solid rgba(19,63,124,0.10);
-          background: #eaf1ff;
-          font-size: 13px; font-weight: 700; color: #0f172a; flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 0 11px;
+          min-width: 80px;
+          height: 46px;
+          border-right: 1px solid rgba(37,99,235,0.10);
+          background: rgba(239,246,255,0.72);
+          font-size: 13px;
+          font-weight: 700;
+          color: #0f172a;
+          flex-shrink: 0;
         }
         .rp-field input {
           flex: 1; height: 46px; padding: 0 13px;

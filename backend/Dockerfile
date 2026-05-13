@@ -16,9 +16,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 소스 복사
 COPY . .
 
-# 업로드 디렉토리 생성
-RUN mkdir -p /app/uploads/syllabi
-
 # entrypoint 실행 권한 + CRLF 제거 (Windows 클론 대비)
 RUN sed -i 's/\r//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
