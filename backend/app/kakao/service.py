@@ -108,7 +108,6 @@ def build_schedule_summary(db: Session, user_id: int) -> str:
             Schedule.user_id == user_id,
             Schedule.recurring_day == today_day,
             Schedule.date.is_(None),
-            Schedule.deleted_by_user.is_not(True),
         )
         .all()
     )
@@ -117,7 +116,6 @@ def build_schedule_summary(db: Session, user_id: int) -> str:
         .filter(
             Schedule.user_id == user_id,
             Schedule.date == today_str,
-            Schedule.deleted_by_user.is_not(True),
         )
         .all()
     )

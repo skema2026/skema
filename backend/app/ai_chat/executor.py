@@ -71,11 +71,6 @@ def _dow(date_str: str) -> int:
     return datetime.strptime(date_str, "%Y-%m-%d").weekday()
 
 
-def _not_deleted_filter():
-    """사용자가 소프트 삭제하지 않은 일정만 조회하는 SQLAlchemy 필터."""
-    from sqlalchemy import or_
-    return or_(Schedule.deleted_by_user.is_(None), Schedule.deleted_by_user == False)
-
 
 def _day_schedules(db: Session, user_id: int, dow: int, date_str: str | None) -> list:
     """특정 날짜의 일정 목록 반환.
@@ -83,18 +78,17 @@ def _day_schedules(db: Session, user_id: int, dow: int, date_str: str | None) ->
     매주 반복되는 일정(date=None, day_of_week만 있는 것)과
     날짜가 고정된 일정을 합산해 반환한다.
     """
-    _nd = _not_deleted_filter()
     # 매주 반복 일정
     recurring = (
         db.query(Schedule)
-        .filter(Schedule.user_id == user_id, Schedule.day_of_week == dow, Schedule.date.is_(None), _nd)
+        .filter(Schedule.user_id == user_id, Schedule.day_of_week == dow, Schedule.date.is_(None))
         .all()
     )
     if date_str:
         # 해당 날짜 고정 일정 추가 (중복 ID 제거)
         specific = (
             db.query(Schedule)
-            .filter(Schedule.user_id == user_id, Schedule.date == date_str, _nd)
+            .filter(Schedule.user_id == user_id, Schedule.date == date_str)
             .all()
         )
         seen = {s.id for s in recurring}
@@ -182,7 +176,6 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             "color": tool_input.get("color") or _subject_color(title_str),
             "priority": tool_input.get("priority", 0),
             "schedule_type": tool_input.get("schedule_type", "event"),
-            "schedule_source": "user_created",
         })
         label = date_str if date_str else f"매주 {DAY_NAMES[dow]}"
         loc = f"  📍 {s.location}" if s.location else ""
@@ -201,8 +194,6 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                 setattr(s, f, tool_input[f])
         if "date" in tool_input and tool_input["date"]:
             s.day_of_week = _dow(tool_input["date"])
-        # user_override=True: 이후 AI 재계획 시 이 일정을 덮어쓰지 않음
-        s.user_override = True
         db.commit()
         db.refresh(s)
         label = s.date if s.date else f"매주 {DAY_NAMES[s.day_of_week]}"
@@ -214,20 +205,12 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         if not s:
             return f"❌ ID {sid} 일정을 찾을 수 없습니다."
         title = s.title
-        if s.schedule_source == "ai_generated":
-            # AI 생성 일정: 소프트 삭제 — original_generated_title을 보존해야
-            # 재계획 시 같은 task가 다시 만들어지는 것을 막을 수 있음
-            s.deleted_by_user = True
-            db.commit()
-        else:
-            db.delete(s)
-            db.commit()
+        db.delete(s)
+        db.commit()
         return f"🗑️ '{title}' 삭제 완료!"
 
     elif tool_name == "list_schedules":
-        schedules = db.query(Schedule).filter(
-            Schedule.user_id == user_id, _not_deleted_filter()
-        ).all()
+        schedules = db.query(Schedule).filter(Schedule.user_id == user_id).all()
         ft = tool_input.get("filter_type", "all")
         fd = tool_input.get("filter_date")
         if ft and ft != "all":
@@ -305,8 +288,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             return f"❌ ID {sid} 일정을 찾을 수 없습니다."
         s.is_completed = True
         db.commit()
-        # 완료 처리된 task는 generate_exam_prep_schedule 재실행 시 재생성하지 않음
-        return f"✅ '{s.title}' 완료 처리! 이 task는 이후 재계획에서 다시 생성되지 않습니다."
+        return f"✅ '{s.title}' 완료 처리!"
 
     elif tool_name == "postpone_schedule":
         sid = tool_input["schedule_id"]
@@ -322,7 +304,6 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         new_date_str = new_date.strftime("%Y-%m-%d")
         s.date = new_date_str
         s.day_of_week = new_date.weekday()
-        s.user_override = True  # 연기한 일정도 이후 재계획에서 덮어쓰지 않음
         db.commit()
         return f"📅 '{s.title}' → {new_date_str}({DAY_NAMES[s.day_of_week]})로 연기 완료!"
 
@@ -453,20 +434,8 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         if not e:
             return f"❌ ID {eid} 시험 일정을 찾을 수 없습니다."
         exam_title = e.title
-        # 이 시험을 위해 AI가 생성한 학습 일정도 함께 소프트 삭제
-        linked_study = db.query(Schedule).filter(
-            Schedule.user_id == user_id,
-            Schedule.linked_exam_id == eid,
-            Schedule.schedule_source == "ai_generated",
-        ).all()
-        cleaned = 0
-        for ls in linked_study:
-            if not ls.deleted_by_user:
-                ls.deleted_by_user = True
-                cleaned += 1
         db.delete(e)
         db.commit()
-        cleaned_msg = f"\n🧹 연관 학습 일정 {cleaned}개 자동 정리" if cleaned > 0 else ""
-        return f"🗑️ 시험 '{exam_title}' 삭제 완료!{cleaned_msg}"
+        return f"🗑️ 시험 '{exam_title}' 삭제 완료!"
 
     return f"❌ 알 수 없는 도구: {tool_name}"

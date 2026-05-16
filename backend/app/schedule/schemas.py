@@ -171,10 +171,6 @@ class ScheduleResponse(BaseModel):
     is_completed: bool = False
     schedule_type: str = "class"
     schedule_source: Optional[str] = None
-    linked_exam_id: Optional[int] = None
-    user_override: Optional[bool] = None
-    deleted_by_user: Optional[bool] = None
-    original_generated_title: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

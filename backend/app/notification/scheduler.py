@@ -90,7 +90,7 @@ def job_weekly_report():
         for user in users:
             schedules = db.query(Schedule).filter(
                 Schedule.user_id == user.id,
-                Schedule.deleted_by_user == False,  # noqa: E712
+                
             ).all()
 
             last_week_schedules = [
@@ -169,7 +169,7 @@ def job_reminders():
         for user in users:
             schedules = db.query(Schedule).filter(
                 Schedule.user_id == user.id,
-                Schedule.deleted_by_user == False,  # noqa: E712
+                
             ).all()
 
             for s in schedules:
@@ -229,7 +229,7 @@ def job_comparison():
                 Schedule.user_id == user.id,
                 Schedule.date >= last_mon.isoformat(),
                 Schedule.date <= last_sun.isoformat(),
-                Schedule.deleted_by_user == False,  # noqa: E712
+                
             ).all()
             total = len(schedules)
             done = sum(1 for s in schedules if s.is_completed)

@@ -36,17 +36,12 @@ def upgrade() -> None:
         sa.Column("is_completed", sa.Boolean(), nullable=True, server_default=sa.text("0")),
         sa.Column("schedule_type", sa.String(length=30), nullable=True, server_default="class"),
         sa.Column("schedule_source", sa.String(length=30), nullable=True, server_default="user_created"),
-        sa.Column("linked_exam_id", sa.Integer(), nullable=True),
-        sa.Column("user_override", sa.Boolean(), nullable=True, server_default=sa.text("0")),
-        sa.Column("deleted_by_user", sa.Boolean(), nullable=True, server_default=sa.text("0")),
-        sa.Column("original_generated_title", sa.String(length=250), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_schedules_id", "schedules", ["id"], unique=False)
     op.create_index("ix_schedules_user_id", "schedules", ["user_id"], unique=False)
     op.create_index("ix_schedules_date", "schedules", ["date"], unique=False)
-    op.create_index("ix_schedules_linked_exam_id", "schedules", ["linked_exam_id"], unique=False)
 
     op.create_table(
         "exam_schedules",
@@ -73,15 +68,6 @@ def upgrade() -> None:
     op.create_index("ix_exam_schedules_user_id", "exam_schedules", ["user_id"], unique=False)
     op.create_index("ix_exam_schedules_schedule_id", "exam_schedules", ["schedule_id"], unique=False)
 
-    op.create_foreign_key(
-        "fk_schedules_linked_exam_id",
-        "schedules",
-        "exam_schedules",
-        ["linked_exam_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
-
     op.create_table(
         "events",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -102,7 +88,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("events")
-    op.drop_constraint("fk_schedules_linked_exam_id", "schedules", type_="foreignkey")
     op.drop_table("exam_schedules")
     op.drop_table("schedules")
     if op.get_bind().dialect.name == "postgresql":
