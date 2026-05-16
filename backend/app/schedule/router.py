@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.core.deps import get_current_user, get_db
+from app.core.security import get_current_user, get_db
 from app.schedule import repository, service
 from app.schedule.schemas import (
     EventCreate,

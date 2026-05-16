@@ -15,7 +15,7 @@ from app.ai_chat.models import (
 from app.ai_chat.service import run_ai_agent
 from app.auth.models import User
 from app.core.config import settings
-from app.core.deps import get_current_user, get_db
+from app.core.security import get_current_user, get_db
 
 router = APIRouter(tags=["ai"])
 

@@ -34,8 +34,7 @@ from app.auth.models import (
 )
 from app.auth.service import OAUTH_CONFIGS
 from app.core.config import settings
-from app.core.deps import get_current_user, get_db, is_admin_email
-from app.core.security import create_access_token
+from app.core.security import create_access_token, get_current_user, get_db, is_admin_email
 
 router = APIRouter(tags=["auth"])
 logger = logging.getLogger(__name__)

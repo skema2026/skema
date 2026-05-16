@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.core.deps import get_current_user, get_db
+from app.core.security import get_current_user, get_db
 from app.syllabus import repository, service
 from app.syllabus.schemas import SyllabusAnalysisResponse, SyllabusResponse
 

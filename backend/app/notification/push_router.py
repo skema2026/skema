@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.core.deps import get_current_user, get_db
+from app.core.security import get_current_user, get_db
 from app.notification.models import PushSubscription
 from app.notification import push_service
 

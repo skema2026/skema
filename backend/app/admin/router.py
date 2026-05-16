@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import service as auth_service
 from app.auth.models import User
-from app.core.deps import get_current_admin_user, get_db
+from app.core.security import get_current_admin_user, get_db
 
 
 class LoginLogUserResponse(BaseModel):
