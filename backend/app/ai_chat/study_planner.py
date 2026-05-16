@@ -1,8 +1,35 @@
-"""학습 task 생성 및 phase 분석."""
+"""학습 task 생성 및 phase 분석.
+
+phase 시스템:
+  early (D-11~)  → 개념/기초 이해
+  mid   (D-4~10) → 문제풀이/심화
+  late  (D-0~3)  → 실전 모의고사/총정리
+"""
+import json
 import logging
 import re
 
-from app.ai_chat.llm_client import call_llm, extract_json_array
+from openai import OpenAI
+
+from app.core.config import settings
+
+
+# ── LLM 호출 헬퍼 ─────────────────────────────────────────────────────────────
+
+def call_llm(prompt: str, temperature: float = 0.2) -> str:
+    """단순 텍스트 프롬프트 → 응답 문자열."""
+    from app.core.llm import call_llm as _call_llm
+    result = _call_llm(prompt, temperature=temperature)
+    return result.content
+
+
+def extract_json_array(text: str) -> list:
+    """LLM 응답에서 JSON 배열만 파싱해 반환."""
+    start = text.find("[")
+    end = text.rfind("]") + 1
+    if start == -1 or end == 0:
+        return []
+    return json.loads(text[start:end])
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,9 @@
+"""AI 채팅 DB 모델 + API 스키마."""
 import enum
+from datetime import datetime
+from typing import List
 
+from pydantic import BaseModel
 from sqlalchemy import Column, DateTime, Enum as SAEnum, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -7,19 +11,15 @@ from sqlalchemy.sql import func
 from app.db.database import Base
 
 
+# ── DB 모델 ───────────────────────────────────────────────────────────────────
+
 class ChatRole(str, enum.Enum):
-    """AI 채팅 역할. DB enum(chatrole)은 대문자 저장."""
     USER = "USER"
     ASSISTANT = "ASSISTANT"
     SYSTEM = "SYSTEM"
 
 
 class AIChatLog(Base):
-    """
-    AI 채팅 로그.
-    대화 세션은 별도로 관리하지 않고 created_at 순서로 정렬.
-    role: user(사용자 입력) | assistant(AI 응답) | system(시스템 프롬프트)
-    """
     __tablename__ = "ai_chat_logs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -29,3 +29,46 @@ class AIChatLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user = relationship("User", back_populates="ai_chat_logs")
+
+
+# ── Pydantic 스키마 ───────────────────────────────────────────────────────────
+
+class AIChatLogCreate(BaseModel):
+    role: ChatRole
+    message: str
+
+
+class AIChatLogResponse(BaseModel):
+    id: int
+    user_id: int
+    role: ChatRole
+    message: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChatMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    message: str
+    messages: List[ChatMessage] = []  # 대화 히스토리
+
+
+class ChatResponse(BaseModel):
+    reply: str
+
+
+class ReadinessSummaryRequest(BaseModel):
+    exam_title: str
+    readiness_pct: int
+    days_left: int
+    available_hrs: float
+    remaining: int
+
+
+class ReadinessSummaryResponse(BaseModel):
+    summary: str

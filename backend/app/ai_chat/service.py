@@ -1,18 +1,41 @@
-"""AI 에이전트 진입점."""
+"""AI 에이전트 진입점.
+
+전체 흐름:
+  1. 시스템 프롬프트 + 대화 히스토리 구성
+  2. OpenAI 호출 → tool_calls 있으면 executor로 실행
+  3. 실행 결과를 메시지에 추가하고 다시 OpenAI 호출
+  4. tool_calls 없는 응답이 오면 최종 텍스트 반환 (최대 15회 반복)
+"""
 import json
 import logging
 from datetime import date, timedelta
 
+from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.ai_chat.tools import build_tools
-from app.ai_chat.llm_client import create_chat_completion
 from app.ai_chat.executor import _execute_tool
 from app.utils.time_utils import DAY_NAMES
 
 logger = logging.getLogger(__name__)
 
+
+# ── OpenAI 호출 ───────────────────────────────────────────────────────────────
+
+def _chat_completion(messages: list, tools: list):
+    """tool calling 방식으로 OpenAI chat completion을 생성한다."""
+    from app.core.llm import OPENAI_MODEL
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    return client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+    )
+
+
+# ── AI 에이전트 ───────────────────────────────────────────────────────────────
 
 def run_ai_agent(
     db: Session,
@@ -78,7 +101,7 @@ def run_ai_agent(
 
     for _ in range(15):
         try:
-            response = create_chat_completion(messages, tools)
+            response = _chat_completion(messages, tools)
         except Exception as exc:
             logger.error(f"run_ai_agent completion error: {exc}")
             return "AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
