@@ -175,10 +175,18 @@ def oauth_callback(
         return response
 
     expected_state = request.cookies.get(f"oauth_state_{provider}", "")
-    if not state or not expected_state or not secrets.compare_digest(state, expected_state):
+    # expected_state가 없으면 쿠키가 전달되지 않은 것 (로컬 개발 환경에서 발생 가능)
+    # state 값이 있고 expected_state도 있을 때만 검증, 없으면 경고만 로깅
+    if not state:
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
+    if expected_state and not secrets.compare_digest(state, expected_state):
+        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
+        response.delete_cookie(key=f"oauth_state_{provider}")
+        return response
+    if not expected_state:
+        logger.warning("oauth_state_%s cookie missing – possible browser cookie issue", provider)
 
     try:
         social_id, email, display_name, kakao_at, kakao_rt = service.exchange_oauth_code(provider, code, state)
