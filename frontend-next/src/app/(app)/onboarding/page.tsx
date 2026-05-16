@@ -1125,24 +1125,34 @@ export default function OnboardingPage() {
           {externalExams.length > 0 && (
             <div className="rounded-2xl p-5 mb-5" style={{ background: '#fff', border: '1px solid #d1fae5', boxShadow: '0 2px 12px rgba(5,150,105,0.06)' }}>
               <p className="font-bold text-sm mb-1" style={{ color: '#065f46' }}>📖 공부 일정 자동 배치</p>
-              <p className="text-xs mb-4" style={{ color: '#3f4b61' }}>캘린더 빈 시간에 공부 블록을 자동으로 넣어드려요</p>
+              <p className="text-xs mb-3" style={{ color: '#3f4b61' }}>캘린더 빈 시간에 공부 블록을 자동으로 넣어드려요</p>
+
+              {/* 실시간 미리보기 */}
+              <div className="rounded-xl px-4 py-3 mb-4 flex items-center gap-2" style={{ background: '#ecfdf5', border: '1px solid #6ee7b7' }}>
+                <span style={{ fontSize: 18 }}>📅</span>
+                <p className="text-sm font-bold" style={{ color: '#065f46', lineHeight: 1.5 }}>
+                  시험 {studyStartDays === 0 ? '당일' : `${studyStartDays}일 전`}부터&nbsp;
+                  {studyDaysPerWeek === 7 ? '매일' : `일주일에 ${studyDaysPerWeek}일`},&nbsp;
+                  하루 {fmtHours(studyHoursPerSession)}씩 공부 일정이 만들어져요
+                </p>
+              </div>
 
               <div className="space-y-4">
                 <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>몇 일 전부터</p>
+                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>시험 몇 일 전부터 공부를 시작할까요?</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DAYS_OPTIONS.map((d) => (
                       <button key={d} type="button"
                         onClick={() => setStudyStartDays(d)}
                         className="py-2 text-xs font-semibold rounded-lg border-2 transition-colors"
                         style={{ minWidth: 52, padding: '6px 10px', borderColor: studyStartDays === d ? '#059669' : '#ebeef1', background: studyStartDays === d ? '#d1fae5' : '#fff', color: studyStartDays === d ? '#059669' : '#3f4b61' }}>
-                        {d === 0 ? '오늘부터' : `D-${d}`}
+                        {d === 0 ? '당일' : `${d}일 전`}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>주 몇 일</p>
+                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>일주일에 며칠 공부할까요?</p>
                   <div className="flex gap-1.5">
                     {DAYS_PER_WEEK_OPTIONS.map((d) => (
                       <button key={d} type="button"
@@ -1155,7 +1165,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>회당 공부 시간</p>
+                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>하루에 몇 시간 공부할까요?</p>
                   <select
                     value={studyHoursPerSession}
                     onChange={(e) => setStudyHoursPerSession(Number(e.target.value))}
@@ -1167,9 +1177,6 @@ export default function OnboardingPage() {
                     ))}
                   </select>
                 </div>
-                <p className="text-xs" style={{ color: '#64748b', lineHeight: 1.6 }}>
-                  각 시험 {studyStartDays === 0 ? '오늘' : `D-${studyStartDays}`}부터 주 {studyDaysPerWeek === 7 ? '매일' : `${studyDaysPerWeek}일`}, 19:00 기준 빈 시간에 {fmtHours(studyHoursPerSession)}씩 자동 배치됩니다
-                </p>
               </div>
             </div>
           )}
