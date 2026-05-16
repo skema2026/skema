@@ -1,3 +1,5 @@
+# backend/app/notification/service.py
+# Web Push 발송 로직 (VAPID / pywebpush)
 from __future__ import annotations
 
 import json
