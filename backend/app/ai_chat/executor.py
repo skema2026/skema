@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import UserProfile
 from app.schedule.models import ExamSchedule, Schedule
 from app.schedule.service import create_exam_record, create_schedule_record
-from app.utils.time_utils import DAY_NAMES, minutes_to_time, overlap, time_to_minutes
+from app.core.time_utils import DAY_NAMES, minutes_to_time, overlap, time_to_minutes
 
 logger = logging.getLogger(__name__)
 

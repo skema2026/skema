@@ -28,7 +28,7 @@ from app.core.llm import (
 )
 from app.schedule.service import stage_schedule_record
 
-from app.utils.time_utils import DAY_NAMES as KR_DAYS
+from app.core.time_utils import DAY_NAMES as KR_DAYS
 
 from .location_utils import normalize_location
 from .positional_parser import parse_image_positional

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.ai_chat.tools import build_tools
 from app.ai_chat.executor import _execute_tool
-from app.utils.time_utils import DAY_NAMES
+from app.core.time_utils import DAY_NAMES
 
 logger = logging.getLogger(__name__)
 

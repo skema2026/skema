@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.schedule import repository
 from app.schedule.models import DayOfWeek, ExamSchedule, Event, Schedule
 from app.schedule.schemas import ExamScheduleUpdate, EventUpdate, ScheduleCreate, ScheduleUpdate
-from app.utils.time_utils import overlap
+from app.core.time_utils import overlap
 
 
 _DAY_CODES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]

@@ -16,7 +16,7 @@ import logging
 import random
 from datetime import date, datetime, timedelta
 
-from app.utils.time_utils import time_to_minutes
+from app.core.time_utils import time_to_minutes
 
 logger = logging.getLogger(__name__)
 
