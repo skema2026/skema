@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.core.security import get_current_user, get_db
-from app.schedule import service
-from app.schedule.models import (
+from app.schedule import repository, service
+from app.schedule.schemas import (
     EventCreate, EventResponse, EventUpdate,
     ExamScheduleCreate, ExamScheduleResponse, ExamScheduleUpdate,
     ScheduleCreate, ScheduleResponse, ScheduleUpdate,
@@ -22,7 +22,7 @@ def list_schedules(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_schedules(db, current_user.id)
+    return repository.get_schedules(db, current_user.id)
 
 
 @router.post("/schedules", response_model=List[ScheduleResponse], status_code=status.HTTP_201_CREATED)
@@ -69,7 +69,7 @@ def list_exams(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_exams(db, current_user.id)
+    return repository.get_exams(db, current_user.id)
 
 
 @router.post("/exam-schedules", response_model=ExamScheduleResponse, status_code=status.HTTP_201_CREATED)
@@ -78,7 +78,7 @@ def create_exam(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.create_exam_row(db, current_user.id, data.model_dump())
+    return repository.create_exam(db, current_user.id, data.model_dump())
 
 
 @router.get("/exam-schedules/{exam_id}", response_model=ExamScheduleResponse)
@@ -116,7 +116,7 @@ def list_events(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_events(db, current_user.id)
+    return repository.get_events(db, current_user.id)
 
 
 @router.post("/events", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
@@ -125,7 +125,7 @@ def create_event(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.create_event_row(db, current_user.id, data.model_dump())
+    return repository.create_event(db, current_user.id, data.model_dump())
 
 
 @router.get("/events/{event_id}", response_model=EventResponse)

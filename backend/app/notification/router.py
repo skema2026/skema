@@ -3,11 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, get_db
 from app.auth.models import User
-from app.notification.models import (
-    Notification, PushSubscription,
-    NotificationResponse, NotificationUnreadCount,
-    PushSubscriptionIn,
-)
+from app.notification.models import Notification, PushSubscription
+from app.notification.schemas import NotificationResponse, NotificationUnreadCount, PushSubscriptionIn
 from app.notification import service as push_service
 
 router = APIRouter()

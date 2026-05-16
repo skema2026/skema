@@ -21,15 +21,15 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.auth import service
-from app.auth.models import (
+from app.auth import repository, service
+from app.auth.models import User
+from app.auth.schemas import (
     LoginRequest,
     ProfileCreate,
     ProfileResponse,
     ProfileUpdate,
     SignupRequest,
     TokenResponse,
-    User,
     UserResponse,
 )
 from app.auth.service import OAUTH_CONFIGS
@@ -113,12 +113,12 @@ def create_profile(
     current_user: User = Depends(get_current_user),
 ):
     """프로필을 생성합니다. 이미 존재하면 409를 반환합니다."""
-    if service.get_profile_by_user_id(db, current_user.id):
+    if repository.get_profile_by_user_id(db, current_user.id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="이미 프로필이 존재합니다. PUT /profiles 로 수정하세요.",
         )
-    return service.create_profile(db, current_user.id, data.model_dump(exclude_none=True))
+    return repository.create_profile(db, current_user.id, data.model_dump(exclude_none=True))
 
 
 @router.put("/profiles", response_model=ProfileResponse)
