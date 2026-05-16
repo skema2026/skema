@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,7 +11,7 @@ class NotificationResponse(BaseModel):
     body: str
     is_read: bool
     created_at: datetime
-    related_schedule_id: Optional[int] = None
+    related_schedule_id: int | None = None
 
     model_config = {"from_attributes": True}
 

@@ -1,5 +1,3 @@
-from typing import List
-
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -17,7 +15,7 @@ router = APIRouter(tags=["schedules"])
 
 # ── 수업 시간표 ───────────────────────────────────────────────────────────────
 
-@router.get("/schedules", response_model=List[ScheduleResponse])
+@router.get("/schedules", response_model=list[ScheduleResponse])
 def list_schedules(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -25,7 +23,7 @@ def list_schedules(
     return repository.get_schedules(db, current_user.id)
 
 
-@router.post("/schedules", response_model=List[ScheduleResponse], status_code=status.HTTP_201_CREATED)
+@router.post("/schedules", response_model=list[ScheduleResponse], status_code=status.HTTP_201_CREATED)
 def create_schedule(
     data: ScheduleCreate,
     db: Session = Depends(get_db),
@@ -64,7 +62,7 @@ def delete_schedule(
 
 # ── 시험 일정 ─────────────────────────────────────────────────────────────────
 
-@router.get("/exam-schedules", response_model=List[ExamScheduleResponse])
+@router.get("/exam-schedules", response_model=list[ExamScheduleResponse])
 def list_exams(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -111,7 +109,7 @@ def delete_exam(
 
 # ── 이벤트 ───────────────────────────────────────────────────────────────────
 
-@router.get("/events", response_model=List[EventResponse])
+@router.get("/events", response_model=list[EventResponse])
 def list_events(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

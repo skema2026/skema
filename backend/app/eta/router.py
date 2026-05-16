@@ -27,7 +27,6 @@ from app.core.llm import (
     call_llm_vision,
 )
 from app.schedule.service import stage_schedule_record
-from app.utils.text_validation import normalize_korean_field
 
 from app.utils.time_utils import DAY_NAMES as KR_DAYS
 
@@ -115,6 +114,45 @@ def _time_to_minutes(t: str) -> int:
         return int(h) * 60 + int(m)
     except Exception:
         return -1
+
+
+def _contains_codepoint_range(text: str, ranges: Sequence[tuple[int, int]]) -> bool:
+    for ch in text or "":
+        codepoint = ord(ch)
+        if any(start <= codepoint <= end for start, end in ranges):
+            return True
+    return False
+
+
+def _contains_hangul(text: str) -> bool:
+    return _contains_codepoint_range(text, [(0x1100, 0x11FF), (0x3130, 0x318F), (0xAC00, 0xD7A3)])
+
+
+def _contains_cjk_ideograph(text: str) -> bool:
+    return _contains_codepoint_range(text, [(0x3400, 0x4DBF), (0x4E00, 0x9FFF), (0xF900, 0xFAFF)])
+
+
+def _normalize_korean_field(text: str, raw_text: str) -> tuple[str, bool]:
+    """Restore Korean text when Vision unexpectedly replaces Hangul with CJK ideographs."""
+    original = (text or "").strip()
+    if not original:
+        return original, False
+
+    suspicious_cjk = (
+        _contains_cjk_ideograph(original)
+        and not _contains_cjk_ideograph(raw_text or "")
+        and _contains_hangul(raw_text or "")
+    )
+    if not suspicious_cjk:
+        return original, False
+
+    candidates = re.findall(r"[\uAC00-\uD7A3\sA-Za-z0-9\-_/()]+", raw_text or "")
+    candidates = sorted((candidate.strip() for candidate in candidates if candidate.strip()), key=len, reverse=True)
+    for candidate in candidates:
+        if _contains_hangul(candidate):
+            return candidate, True
+
+    return original, True
 
 
 def _to_review(e: ParsedEntry, source: str | None = None) -> ParsedEntry:
@@ -335,7 +373,7 @@ def _parse_block_text_via_llm(
             continue
 
         subject = str(item.get("subject_name") or "").strip()
-        subject, review_flag = normalize_korean_field(subject, str(item))
+        subject, review_flag = _normalize_korean_field(subject, str(item))
         location = normalize_location(str(item.get("location") or "").strip())
         subject, location = _split_location_from_subject(subject, location)
         base, _bbox = positional_items[item_id - 1]
@@ -573,7 +611,7 @@ def _parse_via_llm(image_bytes: bytes, content_type: str) -> list[ParsedEntry]:
     for item in data:
         try:
             subject = str(item.get("subject_name", "")).strip()
-            subject, review_flag = normalize_korean_field(
+            subject, review_flag = _normalize_korean_field(
                 subject,
                 str(item.get("raw_text", "")),
             )

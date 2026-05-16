@@ -1,6 +1,4 @@
-from typing import List
-
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
@@ -13,15 +11,13 @@ from app.share.schemas import ShareTokenCreate, ShareTokenResponse
 router = APIRouter(tags=["share-tokens"])
 
 
-@router.get("/share-tokens", response_model=List[ShareTokenResponse])
+@router.get("/share-tokens", response_model=list[ShareTokenResponse])
 def list_tokens(
-    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """내 공유 토큰 전체 목록을 반환합니다."""
     tokens = service.list_tokens(db, current_user.id)
-    base = str(request.base_url).rstrip("/")
     result = []
     for t in tokens:
         data = ShareTokenResponse.model_validate(t)
@@ -33,7 +29,6 @@ def list_tokens(
 @router.post("/share-tokens", response_model=ShareTokenResponse, status_code=status.HTTP_201_CREATED)
 def create_token(
     data: ShareTokenCreate,
-    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -69,7 +64,7 @@ def delete_token(
 
 # ── 공개 공유 뷰 (인증 불필요) ────────────────────────────────────────────────
 
-@router.get("/share/{token}", response_model=List[ScheduleResponse])
+@router.get("/share/{token}", response_model=list[ScheduleResponse])
 def get_shared_timetable(token: str, db: Session = Depends(get_db)):
     """
     공유 토큰으로 수업 시간표를 공개 조회합니다.
