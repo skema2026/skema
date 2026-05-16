@@ -1,5 +1,4 @@
-# backend/app/notification/router.py
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, get_db
@@ -7,7 +6,7 @@ from app.auth.models import User
 from app.notification.models import (
     Notification, PushSubscription,
     NotificationResponse, NotificationUnreadCount,
-    PushSubscriptionIn, PushKeys,
+    PushSubscriptionIn,
 )
 from app.notification import service as push_service
 
@@ -16,9 +15,19 @@ router = APIRouter()
 
 # ── /notifications/* ──────────────────────────────────────────
 
+def _get_notification_or_404(db: Session, notification_id: int, user_id: int) -> Notification:
+    n = db.query(Notification).filter(
+        Notification.id == notification_id,
+        Notification.user_id == user_id,
+    ).first()
+    if not n:
+        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+    return n
+
+
 @router.get("/notifications", response_model=list[NotificationResponse])
 def list_notifications(
-    skip: int = 0, limit: int = 50,
+    limit: int = 30,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -26,7 +35,7 @@ def list_notifications(
         db.query(Notification)
         .filter(Notification.user_id == current_user.id)
         .order_by(Notification.created_at.desc())
-        .offset(skip).limit(limit)
+        .limit(limit)
         .all()
     )
 
@@ -38,27 +47,23 @@ def unread_count(
 ):
     count = (
         db.query(Notification)
-        .filter(Notification.user_id == current_user.id, Notification.is_read == False)
+        .filter(Notification.user_id == current_user.id, Notification.is_read == False)  # noqa: E712
         .count()
     )
-    return {"unread_count": count}
+    return {"unread": count}
 
 
-@router.patch("/notifications/{notification_id}/read")
+@router.patch("/notifications/{notification_id}/read", response_model=NotificationResponse)
 def mark_read(
     notification_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    n = db.query(Notification).filter(
-        Notification.id == notification_id,
-        Notification.user_id == current_user.id,
-    ).first()
-    if not n:
-        raise HTTPException(status_code=404, detail="Notification not found")
+    n = _get_notification_or_404(db, notification_id, current_user.id)
     n.is_read = True
     db.commit()
-    return {"ok": True}
+    db.refresh(n)
+    return n
 
 
 @router.patch("/notifications/read-all")
@@ -68,90 +73,91 @@ def mark_all_read(
 ):
     db.query(Notification).filter(
         Notification.user_id == current_user.id,
-        Notification.is_read == False,
+        Notification.is_read == False,  # noqa: E712
     ).update({"is_read": True})
     db.commit()
     return {"ok": True}
 
 
-@router.delete("/notifications/{notification_id}")
+@router.delete("/notifications/{notification_id}", status_code=204)
 def delete_notification(
     notification_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    n = db.query(Notification).filter(
-        Notification.id == notification_id,
-        Notification.user_id == current_user.id,
-    ).first()
-    if not n:
-        raise HTTPException(status_code=404, detail="Notification not found")
+    n = _get_notification_or_404(db, notification_id, current_user.id)
     db.delete(n)
     db.commit()
-    return {"ok": True}
 
 
 # ── /push/* ───────────────────────────────────────────────────
 
-@router.get("/push/public-key", response_model=PushKeys)
+@router.get("/push/public-key")
 def get_public_key():
-    if not push_service.push_enabled():
-        raise HTTPException(status_code=503, detail="Push not configured")
-    return {"public_key": push_service.public_key()}
+    return {
+        "enabled": push_service.push_enabled(),
+        "publicKey": push_service.public_key(),
+    }
 
 
-@router.post("/push/subscribe")
+@router.post("/push/subscriptions")
 def upsert_subscription(
     body: PushSubscriptionIn,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    user_agent = request.headers.get("user-agent", "")[:512]
     sub = db.query(PushSubscription).filter(
-        PushSubscription.user_id == current_user.id,
         PushSubscription.endpoint == body.endpoint,
     ).first()
     if sub:
-        sub.p256dh     = body.p256dh
-        sub.auth       = body.auth
-        sub.user_agent = body.user_agent
+        sub.user_id = current_user.id
+        sub.p256dh = body.keys.p256dh
+        sub.auth = body.keys.auth
+        sub.user_agent = user_agent
         sub.fail_count = 0
     else:
         sub = PushSubscription(
-            user_id    = current_user.id,
-            endpoint   = body.endpoint,
-            p256dh     = body.p256dh,
-            auth       = body.auth,
-            user_agent = body.user_agent,
+            user_id=current_user.id,
+            endpoint=body.endpoint,
+            p256dh=body.keys.p256dh,
+            auth=body.keys.auth,
+            user_agent=user_agent,
         )
         db.add(sub)
     db.commit()
     return {"ok": True}
 
 
-@router.delete("/push/subscribe")
+@router.delete("/push/subscriptions")
 def delete_subscription(
     endpoint: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    db.query(PushSubscription).filter(
+    sub = db.query(PushSubscription).filter(
         PushSubscription.user_id == current_user.id,
         PushSubscription.endpoint == endpoint,
-    ).delete()
-    db.commit()
+    ).first()
+    if sub:
+        db.delete(sub)
+        db.commit()
     return {"ok": True}
 
 
 @router.post("/push/test")
-async def test_push(
-    current_user: User = Depends(get_current_user),
+def send_test_push(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    if not push_service.push_enabled():
-        raise HTTPException(status_code=503, detail="Push not configured")
-    await push_service.send_push_to_user(
-        db, current_user.id,
-        title="테스트 알림",
-        body="푸시 알림이 정상 작동합니다.",
+    result = push_service.send_push_to_user(
+        db,
+        current_user.id,
+        "SKEMA 알림 테스트",
+        "휴대폰 푸시 알림이 정상적으로 연결되었습니다.",
+        "/dashboard",
+        "test",
     )
-    return {"ok": True}
+    db.commit()
+    return result
