@@ -1,7 +1,7 @@
 """
 Everytime 등에서 캡처한 시간표 이미지를 파싱하고 결과를 일정으로 저장하는 엔드포인트.
 
-POST /eta/parse-image    : 이미지 업로드 → LLM Vision + 위치 보정 파싱 결과 반환
+POST /eta/parse-image    : 이미지 업로드 → 위치 알고리즘 + 블록 텍스트 보조 인식 결과 반환
 POST /eta/save-schedules : 확정된 항목을 Schedule DB에 저장
 POST /eta/parse-image-v2 : 위치 기반 파서 결과 반환
 """
@@ -11,8 +11,10 @@ import logging
 import os
 import re
 import tempfile
-from typing import List
+from collections.abc import Sequence
 
+import cv2
+import numpy as np
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
@@ -41,6 +43,33 @@ router = APIRouter(prefix="/eta", tags=["eta"])
 
 _ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 _MAX_BYTES = 20 * 1024 * 1024  # 20 MB
+
+_BLOCK_TEXT_PROMPT = """
+You are reading cropped class blocks from a Korean university timetable.
+
+The image is a contact sheet. Each tile has an ID label outside the colored block.
+For each ID, read ONLY the text visibly printed inside that same colored block.
+
+Return ONLY a JSON array. No markdown.
+
+Fields:
+- id: integer ID shown on the tile
+- subject_name: exact Korean class title visible in that crop, or "" if unreadable
+- location: room/location visible inside that same crop, or "" if absent
+- requires_review: true if uncertain
+
+Rules:
+- Do not infer weekday, start time, or end time.
+- Do not copy room codes from another ID.
+- Do not fill missing rooms from neighboring crops or similar subjects.
+- Subject names often wrap across multiple lines. Join all visible title lines completely.
+- Do not omit short title suffix lines such as "방법론", "프로젝트", or "분석".
+- Do not include instructor/professor names in subject_name. Instructor names are usually
+  2-3 Korean syllables below the title and above the room code.
+- If the crop shows only a subject name and no separate room text, location must be "".
+- A building name alone such as "소프트" without a room number is not a room code.
+- Preserve Korean text exactly. Do not translate or romanize.
+"""
 
 
 _PARSE_PROMPT = """
@@ -72,6 +101,9 @@ IMPORTANT TEXT RULES:
 - 동일 제목이 여러 요일/시간에 반복되면 각 항목으로 분리한다.
 - 강의실은 원문을 보존하되, 한글 건물명+숫자 형식에 임의 영문자를 끼워넣지 않는다.
   예: 소프트102는 소프트102로 출력하고, 소프트E102로 출력하지 않는다.
+- 같은 색상 블록 안에 강의실 텍스트가 따로 보이지 않으면 location은 빈 문자열로 둔다.
+- 옆 칸, 같은 시간대, 비슷한 과목의 강의실을 추측해서 채우지 않는다.
+- "소프트"처럼 건물명만 있고 숫자 호수가 없으면 강의실로 보지 않고 빈 문자열로 둔다.
 - 모호하거나 해석이 어려우면 requires_review=true 로 표시한다.
 - JSON 배열만 출력한다. 마크다운 코드블록은 사용하지 않는다.
 """
@@ -83,31 +115,6 @@ def _time_to_minutes(t: str) -> int:
         return int(h) * 60 + int(m)
     except Exception:
         return -1
-
-
-def _ranges_overlap(a_start: str, a_end: str, b_start: str, b_end: str) -> int:
-    a0, a1, b0, b1 = map(_time_to_minutes, (a_start, a_end, b_start, b_end))
-    if min(a0, a1, b0, b1) < 0:
-        return 0
-    return max(0, min(a1, b1) - max(a0, b0))
-
-
-def _time_duration(start: str, end: str) -> int:
-    s = _time_to_minutes(start)
-    e = _time_to_minutes(end)
-    if min(s, e) < 0:
-        return -1
-    return max(0, e - s)
-
-
-def _time_edge_distance(text: ParsedEntry, geom: ParsedEntry) -> float:
-    ts = _time_to_minutes(text.start_time)
-    te = _time_to_minutes(text.end_time)
-    gs = _time_to_minutes(geom.start_time)
-    ge = _time_to_minutes(geom.end_time)
-    if min(ts, te, gs, ge) < 0:
-        return 9999.0
-    return (abs(ts - gs) + abs(te - ge)) / 2.0
 
 
 def _to_review(e: ParsedEntry, source: str | None = None) -> ParsedEntry:
@@ -155,28 +162,211 @@ def _filter_entries(entries: list[ParsedEntry], *, allow_empty_subject: bool = F
     return _dedup_entries(filtered)
 
 
-def _parse_via_positional(image_bytes: bytes) -> list[ParsedEntry]:
-    """색상 블록 위치로 요일/시간을 추출한다. 과목명은 비어 있을 수 있다."""
+def _parse_positional_items(image_bytes: bytes) -> list[tuple[ParsedEntry, tuple[int, int, int, int]]]:
+    """색상 블록 위치로 요일/시간과 bbox를 추출한다. 과목명은 비어 있을 수 있다."""
     _grid, norm = parse_image_positional(image_bytes)
-    out: list[ParsedEntry] = []
+    out: list[tuple[ParsedEntry, tuple[int, int, int, int]]] = []
+    seen: set[tuple[int, str, str]] = set()
     for e in norm:
         dow = NAME_TO_DOW.get(e["day"], 0)
         title = (e.get("title") or "").strip()
         if title == "수업":
             title = ""
+        start_time = e["startTime"]
+        end_time = e["endTime"]
+        if not (0 <= dow <= 6) or not _valid_time_range(start_time, end_time):
+            continue
+
+        key = (dow, start_time, end_time)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        bbox = tuple(int(v) for v in e.get("bbox", (0, 0, 0, 0)))
         out.append(
-            ParsedEntry(
-                subject_name=title,
-                day_of_week=dow,
-                start_time=e["startTime"],
-                end_time=e["endTime"],
-                location=normalize_location(e.get("location") or ""),
-                raw_text=f"{KR_DAYS[dow]} {e['startTime']}~{e['endTime']}",
-                source="eta_image_positional",
-                requires_review=not bool(title),
+            (
+                ParsedEntry(
+                    subject_name=title,
+                    day_of_week=dow,
+                    start_time=start_time,
+                    end_time=end_time,
+                    location=normalize_location(e.get("location") or ""),
+                    raw_text=f"{KR_DAYS[dow]} {start_time}~{end_time}",
+                    source="eta_image_positional",
+                    requires_review=not bool(title),
+                ),
+                bbox,
             )
         )
     return out
+
+
+def _build_block_contact_sheet(
+    image_bytes: bytes,
+    bboxes: Sequence[tuple[int, int, int, int]],
+) -> np.ndarray:
+    """
+    감지된 블록 crop들을 ID가 붙은 contact sheet로 만든다.
+
+    OpenAI에는 전체 시간표가 아니라 이 sheet만 전달해 텍스트 읽기 역할로 제한한다.
+    """
+    arr = np.frombuffer(image_bytes, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Invalid image bytes")
+
+    h, w = img.shape[:2]
+    tile_w = 480
+    tile_h = 380
+    label_h = 34
+    pad = 10
+    cols = 2
+    rows = int(np.ceil(len(bboxes) / cols))
+    sheet = np.full((rows * tile_h, cols * tile_w, 3), 255, dtype=np.uint8)
+
+    for idx, bbox in enumerate(bboxes, start=1):
+        x0, y0, x1, y1 = bbox
+        x0 = max(0, min(w - 1, x0 - 6))
+        x1 = max(x0 + 1, min(w, x1 + 6))
+        y0 = max(0, min(h - 1, y0 - 6))
+        y1 = max(y0 + 1, min(h, y1 + 6))
+
+        block_h = y1 - y0
+        # 짧은 블록은 강의실이 하단에 붙는 경우가 있어 전체를 넣는다.
+        # 긴 블록만 상단 텍스트 영역 중심으로 잘라 텍스트가 지나치게 작아지는 것을 막는다.
+        if block_h <= 260:
+            text_y1 = y1
+        else:
+            text_y1 = min(y1, y0 + max(220, int(block_h * 0.78)))
+        crop = img[y0:text_y1, x0:x1]
+        if crop.size == 0:
+            continue
+
+        max_content_w = tile_w - pad * 2
+        max_content_h = tile_h - label_h - pad * 2
+        scale = min(max_content_w / crop.shape[1], max_content_h / crop.shape[0])
+        scale = min(max(scale, 0.1), 3.0)
+        resized = cv2.resize(
+            crop,
+            (max(1, int(crop.shape[1] * scale)), max(1, int(crop.shape[0] * scale))),
+            interpolation=cv2.INTER_CUBIC,
+        )
+
+        tile = np.full((tile_h, tile_w, 3), 255, dtype=np.uint8)
+        cv2.putText(
+            tile,
+            f"ID {idx}",
+            (pad, 24),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.75,
+            (0, 0, 0),
+            2,
+            cv2.LINE_AA,
+        )
+        cy = label_h + pad
+        cx = pad + (max_content_w - resized.shape[1]) // 2
+        tile[cy:cy + resized.shape[0], cx:cx + resized.shape[1]] = resized
+        cv2.rectangle(tile, (pad, label_h), (tile_w - pad, tile_h - pad), (210, 210, 210), 1)
+
+        row = (idx - 1) // cols
+        col = (idx - 1) % cols
+        sheet[row * tile_h:(row + 1) * tile_h, col * tile_w:(col + 1) * tile_w] = tile
+
+    return sheet
+
+
+def _coerce_int_id(raw: object) -> int | None:
+    if isinstance(raw, int):
+        return raw
+    match = re.search(r"\d+", str(raw or ""))
+    return int(match.group(0)) if match else None
+
+
+def _split_location_from_subject(subject: str, location: str) -> tuple[str, str]:
+    """
+    Vision sometimes appends a room line to subject_name even when location is empty.
+    If the last title line is a valid room code, move it to location.
+    """
+    subject = (subject or "").strip()
+    location = normalize_location(location)
+    if not subject or location:
+        return subject, location
+
+    lines = [line.strip() for line in subject.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return subject, location
+
+    candidate = normalize_location(lines[-1])
+    if not candidate:
+        return subject, location
+
+    return "\n".join(lines[:-1]).strip(), candidate
+
+
+def _parse_block_text_via_llm(
+    image_bytes: bytes,
+    positional_items: Sequence[tuple[ParsedEntry, tuple[int, int, int, int]]],
+) -> dict[int, ParsedEntry]:
+    """OpenAI Vision으로 crop된 블록 내부 텍스트만 읽는다."""
+    if not positional_items:
+        return {}
+
+    sheet = _build_block_contact_sheet(image_bytes, [bbox for _entry, bbox in positional_items])
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp_path = tmp.name
+        ok = cv2.imwrite(tmp_path, sheet)
+        if not ok:
+            raise ValueError("Failed to write block contact sheet")
+
+        llm_result = call_llm_vision(tmp_path, "image/png", _BLOCK_TEXT_PROMPT, temperature=0.0)
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+    data = _extract_json(llm_result.content)
+    parsed: dict[int, ParsedEntry] = {}
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        item_id = _coerce_int_id(item.get("id"))
+        if item_id is None or item_id < 1 or item_id > len(positional_items):
+            continue
+
+        subject = str(item.get("subject_name") or "").strip()
+        subject, review_flag = normalize_korean_field(subject, str(item))
+        location = normalize_location(str(item.get("location") or "").strip())
+        subject, location = _split_location_from_subject(subject, location)
+        base, _bbox = positional_items[item_id - 1]
+        parsed[item_id] = ParsedEntry(
+            subject_name=subject,
+            day_of_week=base.day_of_week,
+            start_time=base.start_time,
+            end_time=base.end_time,
+            location=location or None,
+            raw_text=f"{subject} {location}".strip() or base.raw_text,
+            source="eta_positional_openai_block_text",
+            requires_review=bool(item.get("requires_review", False) or review_flag or not subject),
+        )
+
+    return parsed
+
+
+def _enrich_positional_with_block_text(
+    image_bytes: bytes,
+    positional_items: Sequence[tuple[ParsedEntry, tuple[int, int, int, int]]],
+) -> list[ParsedEntry]:
+    text_by_id = _parse_block_text_via_llm(image_bytes, positional_items)
+    enriched: list[ParsedEntry] = []
+    for idx, (base, _bbox) in enumerate(positional_items, start=1):
+        text = text_by_id.get(idx)
+        if text is None:
+            base.requires_review = True
+            enriched.append(base)
+            continue
+        enriched.append(text)
+    return _dedup_entries(enriched)
 
 
 def _parse_via_refined_llm(image_bytes: bytes, content_type: str) -> list[ParsedEntry]:
@@ -216,176 +406,6 @@ def _parse_via_refined_llm(image_bytes: bytes, content_type: str) -> list[Parsed
             )
         )
     return out
-
-
-def _best_text_match(base: ParsedEntry, candidates: list[ParsedEntry], used: set[int]) -> tuple[int, ParsedEntry] | None:
-    best_idx = -1
-    best_score = -1
-    for idx, cand in enumerate(candidates):
-        if idx in used or cand.day_of_week != base.day_of_week:
-            continue
-        overlap_mins = _ranges_overlap(base.start_time, base.end_time, cand.start_time, cand.end_time)
-        if overlap_mins <= 0:
-            continue
-        score = overlap_mins
-        if base.start_time == cand.start_time:
-            score += 30
-        if base.end_time == cand.end_time:
-            score += 30
-        if cand.subject_name.strip():
-            score += 10
-        if score > best_score:
-            best_idx = idx
-            best_score = score
-    if best_idx < 0:
-        return None
-    return best_idx, candidates[best_idx]
-
-
-def _merge_geometry_and_text(
-    geometry_entries: list[ParsedEntry],
-    text_entries: list[ParsedEntry],
-) -> list[ParsedEntry]:
-    """
-    위치 기반 요일/시간을 기준으로 삼고, LLM/OCR 결과에서는 과목명/강의실만 가져온다.
-    위치 파서가 놓친 LLM/OCR 항목은 review 필요 상태로 함께 반환한다.
-    """
-    if not geometry_entries:
-        return [_to_review(e, e.source) for e in text_entries]
-    if not text_entries:
-        return [_to_review(e, "eta_image_positional") for e in geometry_entries]
-
-    used: set[int] = set()
-    merged: list[ParsedEntry] = []
-
-    for base in geometry_entries:
-        match = _best_text_match(base, text_entries, used)
-        if not match:
-            merged.append(_to_review(base, "eta_image_positional"))
-            continue
-
-        idx, text = match
-        used.add(idx)
-        text_time_mismatch = base.start_time != text.start_time or base.end_time != text.end_time
-        subject = text.subject_name.strip() or base.subject_name.strip()
-        location = normalize_location(text.location or base.location)
-        merged.append(
-            ParsedEntry(
-                subject_name=subject,
-                day_of_week=base.day_of_week,
-                start_time=base.start_time,
-                end_time=base.end_time,
-                location=location,
-                raw_text=text.raw_text or base.raw_text,
-                source=f"eta_hybrid:{base.source}+{text.source}",
-                requires_review=text.requires_review or text_time_mismatch or not bool(subject),
-            )
-        )
-
-    for idx, text in enumerate(text_entries):
-        if idx not in used:
-            merged.append(_to_review(text, text.source))
-
-    return _dedup_entries(merged)
-
-
-def _time_distance_score(text: ParsedEntry, geom: ParsedEntry) -> float:
-    avg_edge_distance = _time_edge_distance(text, geom)
-    if avg_edge_distance >= 9999:
-        return -1.0
-    overlap = _ranges_overlap(text.start_time, text.end_time, geom.start_time, geom.end_time)
-    closeness = max(0.0, 90.0 - avg_edge_distance)
-    return overlap * 2.0 + closeness
-
-
-def _correct_text_with_geometry(
-    text_entries: list[ParsedEntry],
-    geometry_entries: list[ParsedEntry],
-) -> list[ParsedEntry]:
-    """
-    정교한 LLM 파서가 과목명은 잘 읽지만 블록 높이를 짧게 잡는 경우가 있다.
-    위치 기반 블록과 전역 1:1 매칭하여 요일/시간을 보정한다.
-
-    같은 요일 매칭을 우선하지만, LLM이 요일을 잘못 잡은 경우도 있으므로
-    아직 매칭되지 않은 색상 블록에는 시간 유사도 기준으로 교정한다.
-    """
-    if not text_entries or not geometry_entries:
-        return text_entries
-
-    candidates: list[tuple[float, int, int]] = []
-    for ti, text in enumerate(text_entries):
-        for gi, geom in enumerate(geometry_entries):
-            base = _time_distance_score(text, geom)
-            same_day = text.day_of_week == geom.day_of_week
-            overlap = _ranges_overlap(text.start_time, text.end_time, geom.start_time, geom.end_time)
-            edge_distance = _time_edge_distance(text, geom)
-            duration_delta = abs(
-                _time_duration(text.start_time, text.end_time)
-                - _time_duration(geom.start_time, geom.end_time)
-            )
-            if base <= 0:
-                if not same_day or edge_distance > 180 or duration_delta > 120:
-                    continue
-                base = max(1.0, 60.0 - edge_distance / 3.0)
-
-            if not same_day and overlap < 60:
-                # LLM이 요일을 잘못 읽으면 시간이 한 칸(30분~1시간) 밀린 후보가 남는다.
-                # 이 경우 색상 블록 좌표를 더 신뢰하되, 전혀 먼 블록과는 매칭하지 않는다.
-                if edge_distance > 75 or duration_delta > 90:
-                    continue
-
-            score = base
-            if same_day:
-                score += 120
-            elif overlap == 0 and edge_distance <= 75 and duration_delta <= 30:
-                score += 25
-            if text.start_time == geom.start_time:
-                score += 25
-            if text.end_time == geom.end_time:
-                score += 25
-            candidates.append((score, ti, gi))
-
-    candidates.sort(reverse=True)
-    assigned_text: dict[int, int] = {}
-    used_geom: set[int] = set()
-    for score, ti, gi in candidates:
-        if ti in assigned_text or gi in used_geom:
-            continue
-        if score < 45:
-            continue
-        assigned_text[ti] = gi
-        used_geom.add(gi)
-
-    corrected: list[ParsedEntry] = []
-    for ti, text in enumerate(text_entries):
-        gi = assigned_text.get(ti)
-        if gi is None:
-            corrected.append(text)
-            continue
-
-        geom = geometry_entries[gi]
-        if (
-            text.day_of_week == geom.day_of_week
-            and text.start_time == geom.start_time
-            and text.end_time == geom.end_time
-        ):
-            corrected.append(text)
-            continue
-
-        corrected.append(
-            ParsedEntry(
-                subject_name=text.subject_name,
-                day_of_week=geom.day_of_week,
-                start_time=geom.start_time,
-                end_time=geom.end_time,
-                location=normalize_location(text.location),
-                raw_text=text.raw_text,
-                source=f"{text.source}+time_corrected",
-                requires_review=True,
-            )
-        )
-
-    return _dedup_entries(corrected)
 
 
 def _apply_everytime_pm(t: str) -> str:
@@ -464,9 +484,9 @@ async def _read_image_file(file: UploadFile) -> tuple[bytes, str]:
     return image_bytes, content_type
 
 
-def _dedup_entries(entries: List[ParsedEntry]) -> List[ParsedEntry]:
+def _dedup_entries(entries: list[ParsedEntry]) -> list[ParsedEntry]:
     seen: set = set()
-    result: List[ParsedEntry] = []
+    result: list[ParsedEntry] = []
 
     for e in entries:
         key = (e.subject_name.strip(), e.day_of_week, e.start_time, e.end_time)
@@ -498,7 +518,7 @@ def _extract_json(text: str) -> list:
         return []
 
 
-def _parse_via_llm(image_bytes: bytes, content_type: str) -> List[ParsedEntry]:
+def _parse_via_llm(image_bytes: bytes, content_type: str) -> list[ParsedEntry]:
     """LLM Vision으로 이미지에서 시간표 항목을 추출한다."""
     suffix = {
         "image/jpeg": ".jpg",
@@ -548,7 +568,7 @@ def _parse_via_llm(image_bytes: bytes, content_type: str) -> List[ParsedEntry]:
         except Exception as exc:
             logger.warning(f"ETA re-extract failed: {exc}")
 
-    entries: List[ParsedEntry] = []
+    entries: list[ParsedEntry] = []
 
     for item in data:
         try:
@@ -605,7 +625,7 @@ def _parse_via_llm(image_bytes: bytes, content_type: str) -> List[ParsedEntry]:
     return result
 
 
-@router.post("/parse-image", response_model=List[ParsedEntry])
+@router.post("/parse-image", response_model=list[ParsedEntry])
 async def parse_eta_image(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
@@ -613,46 +633,48 @@ async def parse_eta_image(
     """
     이미지 기반 시간표 파싱.
 
-    - 1순위: 정교한 LLM Vision 파서
-    - 2순위: 위치 기반 색상 블록 파서
-    - 3순위: 기존 간단 LLM 프롬프트 fallback
+    - 1순위: 위치 기반 색상 블록 파서로 요일/시간 확정
+    - 2순위: OpenAI Vision은 crop된 블록 내부 텍스트만 보조 추출
+    - 3순위: 위치 파서 실패 시에만 기존 전체 이미지 LLM fallback
     """
     image_bytes, content_type = await _read_image_file(file)
 
-    text_entries: list[ParsedEntry] = []
+    positional_items: list[tuple[ParsedEntry, tuple[int, int, int, int]]] = []
+    try:
+        positional_items = _parse_positional_items(image_bytes)
+    except Exception as exc:
+        logger.warning(f"ETA parse: positional parser failed (user={current_user.id}): {exc}", exc_info=True)
+
+    if positional_items:
+        try:
+            entries = _enrich_positional_with_block_text(image_bytes, positional_items)
+            logger.info(
+                "ETA algorithm-first parse: geometry=%d returned=%d user=%s",
+                len(positional_items), len(entries), current_user.id,
+            )
+            return entries
+        except (LLMRateLimitedError, LLMProviderUnavailableError, LLMEmptyResponseError) as exc:
+            logger.warning(f"ETA parse: block text LLM unavailable: {exc}")
+        except Exception as exc:
+            logger.warning(f"ETA parse: block text LLM failed (user={current_user.id}): {exc}", exc_info=True)
+
+        geometry_entries = [entry for entry, _bbox in positional_items]
+        logger.info(
+            "ETA positional-only parse: geometry=%d user=%s",
+            len(geometry_entries), current_user.id,
+        )
+        return [_to_review(e, "eta_image_positional") for e in geometry_entries]
+
+    # 위치 파서가 실패한 이미지에서만 전체 이미지 LLM 파서를 마지막 안전망으로 사용한다.
     try:
         text_entries = _filter_entries(_parse_via_refined_llm(image_bytes, content_type))
+        if text_entries:
+            logger.info("ETA refined LLM fallback returned=%d user=%s", len(text_entries), current_user.id)
+            return [_to_review(e, e.source) for e in text_entries]
     except (LLMRateLimitedError, LLMProviderUnavailableError, LLMEmptyResponseError) as exc:
-        logger.warning(f"ETA parse: refined LLM unavailable: {exc}")
+        logger.warning(f"ETA parse: refined LLM fallback unavailable: {exc}")
     except Exception as exc:
-        logger.warning(f"ETA parse: refined LLM failed (user={current_user.id}): {exc}", exc_info=True)
-
-    if text_entries:
-        geometry_entries: list[ParsedEntry] = []
-        try:
-            geometry_entries = _filter_entries(_parse_via_positional(image_bytes), allow_empty_subject=True)
-            text_entries = _correct_text_with_geometry(text_entries, geometry_entries)
-        except Exception as exc:
-            logger.warning(f"ETA parse: time correction failed (user={current_user.id}): {exc}")
-        logger.info(
-            "ETA refined LLM parse: geometry=%d returned=%d user=%s",
-            len(geometry_entries), len(text_entries), current_user.id,
-        )
-        return text_entries
-
-    geometry_entries: list[ParsedEntry] = []
-    try:
-        geometry_entries = _filter_entries(_parse_via_positional(image_bytes), allow_empty_subject=True)
-    except Exception as exc:
-        logger.warning(f"ETA parse: positional parser failed (user={current_user.id}): {exc}")
-
-    entries = _merge_geometry_and_text(geometry_entries, text_entries)
-    if entries:
-        logger.info(
-            "ETA hybrid parse: geometry=%d text=%d returned=%d user=%s",
-            len(geometry_entries), len(text_entries), len(entries), current_user.id,
-        )
-        return entries
+        logger.warning(f"ETA parse: refined LLM fallback failed (user={current_user.id}): {exc}", exc_info=True)
 
     # 마지막 안전망: 기존 간단 LLM 프롬프트를 유지해 예외 케이스를 흡수한다.
     try:
@@ -725,7 +747,7 @@ def save_eta_schedules(
     return {"saved": saved_count, "skipped": skipped_count}
 
 
-@router.post("/parse-image-v2", response_model=List[NormalizedEntryModel])
+@router.post("/parse-image-v2", response_model=list[NormalizedEntryModel])
 async def parse_eta_image_v2(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),

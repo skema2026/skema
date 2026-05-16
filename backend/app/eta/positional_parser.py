@@ -73,8 +73,18 @@ def _detect_header_bottom(h_proj: np.ndarray, img_h: int) -> int:
         return default_header_y
 
     clusters = _cluster_line_positions(strong_ys, min_gap=3)
-    # 가장 하단 클러스터의 끝 + 2 = 헤더 경계
-    header_bottom = clusters[-1][1] + 2
+
+    # 전체 화면 캡처에서는 상단 앱바/요일 헤더 아래에 09:00, 10:00
+    # 시간선이 함께 search 영역에 들어온다. 마지막 strong line을 쓰면
+    # 10:00 라인을 헤더로 오인해 전체 시간이 앞으로 밀린다.
+    # 요일 헤더 하단은 보통 이미지 높이의 7~16% 구간에 있으므로 그
+    # 구간의 가장 아래 strong line을 우선 사용한다.
+    header_candidates = [
+        c for c in clusters
+        if int(img_h * 0.07) <= (c[0] + c[1]) / 2 <= int(img_h * 0.16)
+    ]
+    selected = header_candidates[-1] if header_candidates else clusters[-1]
+    header_bottom = selected[1] + 2
     # 너무 크거나 작으면 기본값 사용
     if header_bottom < 10 or header_bottom > int(img_h * 0.25):
         header_bottom = default_header_y
@@ -93,29 +103,26 @@ def _detect_gutter_x(v_proj: np.ndarray, w: int) -> int:
     if region.max() <= 0:
         return max(20, int(w * 0.10))
 
-    thresh = 0.35 * float(region.max())
+    # The rounded left card border can be much stronger than the actual time
+    # gutter separator. Use a lower threshold, then explicitly skip that outer
+    # border below instead of letting it hide the gutter line.
+    thresh = 0.10 * float(region.max())
     strong_xs = [x for x, val in enumerate(region) if val >= thresh]
     if not strong_xs:
         return max(20, int(w * 0.10))
 
     clusters = _cluster_line_positions(strong_xs)
 
-    # 에브리타임 격자는 보통
-    #   왼쪽 외곽선 → 시간 숫자 칸 오른쪽 선 → 월/화 경계선 ...
-    # 순서로 세로선이 나온다. 전체 화면 캡처에서는 첫 요일 경계선까지
-    # search 영역에 들어와서 기존 "마지막 선" 방식이 gutter를 과하게 잡았다.
-    leftish = [
-        c for c in clusters
-        if int(w * 0.015) <= (c[0] + c[1]) / 2 <= int(w * 0.14)
-    ]
-    if len(leftish) >= 2:
-        gutter_cluster = leftish[1]
-    elif leftish:
-        gutter_cluster = leftish[-1]
-    elif len(clusters) >= 2:
-        gutter_cluster = clusters[1]
+    # 에브리타임 격자는 보통 시간 거터 오른쪽 경계가 전체 폭의 10~18%에 있다.
+    # 일부 캡처에는 왼쪽 외곽선이 없어서 첫 번째 강한 세로선이 곧 gutter이고,
+    # 일부 캡처에는 x≈0 외곽선이 먼저 잡혀 두 번째 선이 gutter다.
+    centers = [((c[0] + c[1]) / 2, c) for c in clusters]
+    if len(centers) >= 2 and centers[0][0] <= w * 0.06:
+        # 왼쪽 외곽선이 먼저 잡힌 케이스.
+        gutter_cluster = centers[1][1]
     else:
-        gutter_cluster = clusters[-1]
+        # 왼쪽 외곽선이 없으면 첫 번째 강한 선이 시간칸/월요일 경계다.
+        gutter_cluster = centers[0][1]
 
     gutter_x = gutter_cluster[1] + 1
     if gutter_x < 10 or gutter_x > int(w * 0.30):
@@ -343,19 +350,26 @@ def detect_grid(image_bytes: bytes) -> GridModel:
         hour_diffs = np.diff(gutter_time_lines)
         hour_px = float(np.median(hour_diffs))
         pixels_per_slot = hour_px / 2.0
-        row_bounds: List[int] = []
-        for i, y in enumerate(gutter_time_lines):
-            row_bounds.append(int(y))
-            if i + 1 < len(gutter_time_lines):
-                row_bounds.append(int(y + pixels_per_slot))
-        row_bounds.append(int(gutter_time_lines[-1] + pixels_per_slot))
 
-        row_bounds = sorted(set(row_bounds))
-        grid_origin_y = int(gutter_time_lines[0])
+        # gutter에서 10:00부터 잡히는 캡처가 있다. header_bottom과 첫
+        # 시간선 간격을 슬롯 단위로 역산해 09:00 origin을 복구한다.
+        first_line = int(gutter_time_lines[0])
+        if pixels_per_slot > 0:
+            skipped_slots = max(0, int((first_line - header_bottom) / pixels_per_slot + 0.5))
+        else:
+            skipped_slots = 0
+        grid_origin_y = int(first_line - skipped_slots * pixels_per_slot)
+
+        last_y = int(gutter_time_lines[-1] + pixels_per_slot)
+        slot_count = max(1, int((last_y - grid_origin_y) / pixels_per_slot + 0.5))
+        row_bounds = [
+            int(grid_origin_y + idx * pixels_per_slot)
+            for idx in range(slot_count + 1)
+        ]
         header_bottom = grid_origin_y
         logger.debug(
-            "detect_grid: using gutter time lines origin=%d pps=%.2f rows=%d",
-            grid_origin_y, pixels_per_slot, len(row_bounds),
+            "detect_grid: using gutter time lines origin=%d pps=%.2f rows=%d skipped_slots=%d",
+            grid_origin_y, pixels_per_slot, len(row_bounds), skipped_slots,
         )
         return GridModel(
             column_bounds=column_bounds,
@@ -606,8 +620,10 @@ def detect_blocks(image_bytes: bytes, grid: GridModel) -> List[DetectedBlock]:
                     ratio = 0.0
                     color = None
                 else:
-                    # grid/background sat≈0~7, pastel blocks sat≈10~45.
-                    occ_mask = (crop[:, :, 1] >= 9) & (crop[:, :, 2] >= 180)
+                    # grid/background sat≈0~7. Some JPEG exports darken teal
+                    # timetable blocks to V≈175, so keep the value threshold low
+                    # and rely primarily on saturation to distinguish blocks.
+                    occ_mask = (crop[:, :, 1] >= 9) & (crop[:, :, 2] >= 120)
                     ratio = float(np.mean(occ_mask))
                     color = np.median(crop[occ_mask][:, :3], axis=0) if np.any(occ_mask) else None
                 ratios.append(ratio)

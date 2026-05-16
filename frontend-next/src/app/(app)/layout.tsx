@@ -19,8 +19,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isInitialized.current = true;
 
     if (!token) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setChecking(false);
       router.replace('/login');
       return;
     }
@@ -35,7 +33,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.replace('/login');
       })
       .finally(() => {
-        setChecking(false);
+        if (useAuthStore.getState().token) {
+          setChecking(false);
+        }
       });
   }, [_hasHydrated, token, router, setUser, logout]);
 

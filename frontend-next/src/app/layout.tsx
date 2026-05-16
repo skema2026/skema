@@ -41,6 +41,7 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
+      data-scroll-behavior="smooth"
       className={`${manrope.variable} ${inter.variable} h-full antialiased light`}
     >
       <head>

@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 
 _COMPACT_KOREAN_ROOM_PREFIXES = ("소프트", "미디어")
+_BUILDING_ONLY_NAMES = ("소프트", "미디어", "상경", "사범", "2공")
 
 
 def normalize_location(raw: str | None) -> str:
@@ -22,6 +23,12 @@ def normalize_location(raw: str | None) -> str:
     value = re.sub(r"\s+", "", str(raw).strip())
     if not value:
         return ""
+
+    if value in _BUILDING_ONLY_NAMES:
+        return ""
+
+    # Everytime screenshots often render "2공" compactly enough for OCR/Vision to read it incorrectly.
+    value = re.sub(r"^(?:2호|이공|공동)(\d{3,4})$", r"2공\1", value)
 
     prefixes = "|".join(re.escape(prefix) for prefix in _COMPACT_KOREAN_ROOM_PREFIXES)
 

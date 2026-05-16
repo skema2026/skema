@@ -220,9 +220,12 @@ STEP 4 — EXTRACT SUBJECT NAME AND LOCATION
 For each block:
   • subject_name = the LARGEST / topmost text inside the block (Korean characters, exact)
   • location = the smaller text below the subject name (room code), or "" if absent
+  • If there is no separate room/location text inside the SAME colored block, output "".
+    Never copy a room code from a neighboring block, adjacent weekday, or same time row.
   • Room codes can be compact Korean building name + digits, e.g. "소프트102", "미디어509".
     Do NOT insert a stray Latin letter between them. If the image says "소프트102",
     output "소프트102", not "소프트E102".
+  • A building name alone, e.g. "소프트" without digits, is NOT a room code. Output "".
   • PRESERVE Korean text exactly — do NOT translate, romanize, or abbreviate
   • Do NOT use "수업", "class", "강의", "Unknown", or any generic placeholder
   • If you cannot read a block's subject name at all → OMIT that block

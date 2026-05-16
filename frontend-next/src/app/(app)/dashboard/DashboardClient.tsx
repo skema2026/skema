@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Timetable, getWeekStart } from '@/components/timetable/Timetable';
 import { ClassForm } from '@/components/class-form/ClassForm';
 import { ExamList } from '@/components/exam/ExamList';
@@ -34,6 +33,8 @@ interface Props {
   initialProfile: UserProfile | null;
 }
 
+type SecondaryPanel = 'exams' | 'report' | 'analysis' | 'ai' | null;
+
 export default function DashboardClient({ initialSchedules, initialProfile }: Props) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
@@ -53,23 +54,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [notification, setNotification] = useState<Schedule | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
-  const ALL_TYPES = ['class', 'study', 'assignment', 'activity', 'personal'] as const;
-  type ScheduleTypeTuple = typeof ALL_TYPES;
-  type ScheduleTypeFilter = ScheduleTypeTuple[number];
-  const [activeTypes, setActiveTypes] = useState<Set<ScheduleTypeFilter>>(new Set(ALL_TYPES));
-  const toggleType = (t: ScheduleTypeFilter) =>
-    setActiveTypes(prev => {
-      const next = new Set(prev);
-      if (next.has(t)) {
-        next.delete(t);
-      } else {
-        next.add(t);
-      }
-      return next;
-    });
-  const filteredSchedules = schedules.filter(s =>
-    activeTypes.has((s.schedule_type as ScheduleTypeFilter) ?? 'personal')
-  );
+  const [secondaryPanel, setSecondaryPanel] = useState<SecondaryPanel>(null);
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
   const queryClient = useQueryClient();
 
@@ -195,17 +180,6 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const todayDone  = todaySchedules.filter((s) => s.is_completed).length;
   const todayPct   = todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : null;
 
-  // 이번 주 수행률 (현재 실제 주, weekOffset 무관)
-  const currentWeekStart = getWeekStart(now);
-  const currentWeekEnd   = currentWeekStart.getTime() + 7 * 24 * 3600 * 1000;
-  const weekSchedules = schedules.filter((s) => {
-    if (!s.date) return true; // 반복 일정: 요일 기준으로 이번 주에 존재
-    const [y, m, d] = s.date.split('-').map(Number);
-    const t = new Date(y, m - 1, d).getTime();
-    return t >= currentWeekStart.getTime() && t < currentWeekEnd;
-  });
-  const weekTotal = weekSchedules.length;
-
   // 미달성 일정 (오늘 + 이미 지난 시간 + 미완료)
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const unachievedSchedules = todaySchedules.filter((s) => {
@@ -214,17 +188,19 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   });
   const remainingToday = todaySchedules.filter((s) => !s.is_completed);
   const nextSchedule = remainingToday.find((s) => timeToMinutes(s.start_time) >= nowMin) ?? remainingToday[0] ?? null;
-  const upcomingExam = exams
+  const upcomingExams = exams
     .filter((e) => {
       const [y, m, d] = e.exam_date.split('-').map(Number);
       const examDate = new Date(y, m - 1, d);
       examDate.setHours(23, 59, 59, 999);
       return examDate >= now;
     })
-    .sort((a, b) => a.exam_date.localeCompare(b.exam_date))[0] ?? null;
-  const daysUntilExam = upcomingExam
-    ? Math.ceil((new Date(`${upcomingExam.exam_date}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000)
-    : null;
+    .sort((a, b) => a.exam_date.localeCompare(b.exam_date))
+    .slice(0, 3);
+  const upcomingExam = upcomingExams[0] ?? null;
+  const getDaysUntil = (date: string) =>
+    Math.ceil((new Date(`${date}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000);
+  const formatDday = (days: number) => (days <= 0 ? 'D-day' : `D-${days}`);
   const todayLabel = new Intl.DateTimeFormat('ko-KR', {
     month: 'long',
     day: 'numeric',
@@ -324,329 +300,281 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
           onLogout={handleLogout}
         />
 
-        <main className="flex min-h-0 flex-1 gap-5 overflow-hidden bg-[#f8fbff] p-5">
-          <section className="flex min-w-0 flex-[3] flex-col overflow-hidden rounded-[28px] border border-blue-100/60 bg-white/90 p-7 shadow-[0_8px_30px_rgba(37,99,235,0.08)] backdrop-blur-sm">
-            <div className="mb-7 flex items-end justify-between">
-              <div>
-                <h1 className="text-4xl font-black tracking-tight text-slate-900">
-                  주간 시간표
-                </h1>
-                <p className="mt-2 text-sm font-medium text-slate-400">
-                  {weekLabel} · 이번 주는 {weekTotal}개의 일정이 있습니다
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex rounded-xl border border-blue-100 bg-blue-50/70 p-1 shadow-sm">
-                  <button
-                    className="rounded-lg p-2 transition hover:bg-white"
-                    onClick={() => setWeekOffset((o) => o - 1)}
-                  >
-                    <MaterialIcon icon="chevron_left" size={18} color="#2563eb" />
-                  </button>
-
-                  <button
-                    className="px-4 py-1 text-xs font-black text-blue-700"
-                    onClick={() => setWeekOffset(0)}
-                  >
-                    이번 주
-                  </button>
-
-                  <button
-                    className="rounded-lg p-2 transition hover:bg-white"
-                    onClick={() => setWeekOffset((o) => o + 1)}
-                  >
-                    <MaterialIcon icon="chevron_right" size={18} color="#2563eb" />
-                  </button>
-                </div>
-
-                <button
-                  className="rounded-xl border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-50"
-                  onClick={() =>
-                    setActiveTypes(
-                      activeTypes.size === ALL_TYPES.length
-                        ? new Set()
-                        : new Set(ALL_TYPES)
-                    )
-                  }
-                >
-                  {activeTypes.size === ALL_TYPES.length ? '필터 해제' : '전체 표시'}
-                </button>
-
-                <button
-                  className="rounded-xl border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-blue-50"
-                  onClick={() => setIsEtaReimportOpen(true)}
-                  title="강의 시간표 이미지 재업로드"
-                >
-                  📷 시간표 업로드
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-6 flex gap-4">
-              <div className="flex flex-1 items-center justify-between rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-sky-50 p-5 shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-md">
-                    <MaterialIcon icon="event_upcoming" size={20} color="#fff" />
-                  </div>
-
+        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f8fbff] p-5">
+          <div className="mx-auto flex max-w-7xl flex-col gap-5">
+            <section className="grid gap-4 lg:grid-cols-[1.45fr_0.9fr]">
+              <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="mb-1 text-[11px] font-black uppercase tracking-wider text-blue-600">
-                      오늘의 포커스
+                    <p className="text-xs font-black text-blue-600">{todayLabel}</p>
+                    <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">
+                      오늘 해야 할 것만 먼저 봅니다
+                    </h1>
+                    <p className="mt-2 text-sm font-medium text-slate-500">
+                      남은 일정 {remainingToday.length}개, 완료 {todayDone}/{todayTotal}
                     </p>
-                    <h2 className="text-sm font-bold text-slate-900">
-                      오늘은 이것만 놓치지 마세요:{' '}
-                      {nextSchedule ? nextSchedule.title : '남은 일정이 없습니다'}
-                    </h2>
                   </div>
-                </div>
-              </div>
 
-              <div className="flex w-48 flex-col justify-center rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  남은 일정
-                </p>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <p className="text-3xl font-black text-blue-600">
-                    {remainingToday.length}
-                  </p>
-                  <p className="text-xs font-bold text-slate-500">개</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-6 flex flex-wrap gap-2">
-              {[
-                { type: 'class', label: '수업', color: '#2563eb' },
-                { type: 'study', label: '자율학습', color: '#0ea5e9' },
-                { type: 'assignment', label: '과제', color: '#0284c7' },
-                { type: 'activity', label: '활동', color: '#1d4ed8' },
-                { type: 'personal', label: '개인', color: '#38bdf8' },
-              ].map(({ type, label, color }) => {
-                const active = activeTypes.has(type as ScheduleTypeFilter);
-
-                return (
-                  <button
-                    key={type}
-                    onClick={() => toggleType(type as ScheduleTypeFilter)}
-                    className="rounded-full border px-4 py-1.5 text-xs font-black transition-all"
-                    style={{
-                      background: active ? `${color}15` : '#ffffff',
-                      color: active ? color : '#64748b',
-                      borderColor: active ? `${color}40` : '#e2e8f0',
-                    }}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <Tabs defaultValue="timetable" className="flex min-h-0 flex-1 flex-col">
-              <TabsList className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-1">
-                <TabsTrigger value="timetable">시간표</TabsTrigger>
-                <TabsTrigger value="exams">시험 일정</TabsTrigger>
-                <TabsTrigger value="report">리포트</TabsTrigger>
-                <TabsTrigger value="type-analysis">분석</TabsTrigger>
-              </TabsList>
-
-              <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-white">
-                <TabsContent value="timetable" className="h-full">
-                  <Timetable schedules={filteredSchedules} exams={exams} weekStart={weekStart} />
-                </TabsContent>
-
-                <TabsContent value="exams">
-                  <ExamList />
-                </TabsContent>
-
-                <TabsContent value="report">
-                  <WeeklyReport schedules={schedules} />
-                </TabsContent>
-
-                <TabsContent value="type-analysis">
-                  <TypeAnalysis schedules={schedules} weekStart={weekStart} />
-                </TabsContent>
-              </div>
-            </Tabs>
-          </section>
-
-          <aside className="flex-1 max-w-sm overflow-y-auto pr-1">
-            <div className="space-y-4">
-              {/*작은 달력*/}
-              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 text-xs font-black text-slate-900">
-                    <MaterialIcon icon="calendar_today" size={16} color="#2563eb" />
-                    {todayLabel}
-                  </h3>
-
-                  <div className="flex gap-1">
-                    <button
-                      className="rounded-lg p-1 transition hover:bg-blue-50"
-                      onClick={() => setWeekOffset((o) => o - 1)}
-                    >
-                      <MaterialIcon icon="chevron_left" size={18} color="#94a3b8" />
-                    </button>
-                    <button
-                      className="rounded-lg p-1 transition hover:bg-blue-50"
-                      onClick={() => setWeekOffset((o) => o + 1)}
-                    >
-                      <MaterialIcon icon="chevron_right" size={18} color="#94a3b8" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-7 gap-y-2 text-center">
-                  {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-                    <div
-                      key={day}
-                      className="text-[10px] font-black uppercase text-slate-400"
-                    >
-                      {day}
+                  <div className="min-w-[140px]">
+                    <div className="text-right text-3xl font-black text-blue-600">
+                      {todayPct ?? 0}%
                     </div>
-                  ))}
-
-                  {Array.from({ length: 35 }).map((_, index) => {
-                    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
-                    const date = index - firstDay + 1;
-                    const lastDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-                    const isCurrentMonth = date >= 1 && date <= lastDate;
-                    const isToday = isCurrentMonth && date === now.getDate();
-
-                    return (
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-blue-50">
                       <div
-                        key={index}
-                        className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                          isToday
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : isCurrentMonth
-                            ? 'text-slate-700'
-                            : 'text-transparent'
-                        }`}
-                      >
-                        {isCurrentMonth ? date : ''}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    오늘 진행률
-                  </p>
-                  <p className="mt-2 text-3xl font-black text-blue-600">
-                    {todayPct ?? 0}%
-                  </p>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-blue-50">
-                    <div
-                      className="h-full rounded-full bg-blue-500"
-                      style={{ width: `${todayPct ?? 0}%` }}
-                    />
+                        className="h-full rounded-full bg-blue-600"
+                        style={{ width: `${todayPct ?? 0}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    남은 일정
-                  </p>
-                  <p className="mt-2 text-3xl font-black text-slate-900">
-                    {remainingToday.length}개
-                  </p>
+                <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-blue-700">다음 일정</p>
+                      <p className="mt-1 truncate text-lg font-black text-slate-950">
+                        {nextSchedule ? nextSchedule.title : '오늘 남은 일정이 없습니다'}
+                      </p>
+                      {nextSchedule && (
+                        <p className="mt-1 text-sm font-bold text-slate-500">
+                          {nextSchedule.start_time} - {nextSchedule.end_time}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => openClassForm()}
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-black text-white transition hover:bg-blue-700"
+                      >
+                        <MaterialIcon icon="add" size={18} color="#fff" />
+                        일정 추가
+                      </button>
+                      <button
+                        onClick={handleReschedule}
+                        disabled={isRegenerating || unachievedSchedules.length === 0}
+                        className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-black text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <MaterialIcon icon="auto_fix_high" size={18} color="#2563eb" />
+                        {isRegenerating ? '재배치 중...' : 'AI 재배치'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+              <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-xs font-black text-slate-900">오늘 할 일</h3>
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
-                    {remainingToday.length} left
+                  <h2 className="text-base font-black text-slate-950">다가오는 시험</h2>
+                  <button
+                    onClick={() => setSecondaryPanel('exams')}
+                    className="text-xs font-black text-blue-600 hover:text-blue-700"
+                  >
+                    전체 보기
+                  </button>
+                </div>
+
+                {upcomingExam ? (
+                  <div className="space-y-2">
+                    {upcomingExams.map((exam) => {
+                      const days = getDaysUntil(exam.exam_date);
+
+                      return (
+                        <button
+                          key={exam.id}
+                          onClick={() => setSecondaryPanel('exams')}
+                          className="flex w-full items-center justify-between gap-3 rounded-lg border border-blue-50 p-3 text-left transition hover:bg-blue-50"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-black text-slate-950">
+                              {exam.title}
+                            </span>
+                            <span className="text-xs font-bold text-slate-500">
+                              {exam.exam_date}
+                            </span>
+                          </span>
+                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
+                            {formatDday(days)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-blue-100 bg-blue-50/40 p-5 text-center">
+                    <p className="text-sm font-bold text-slate-500">등록된 예정 시험이 없습니다</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="grid min-h-[560px] gap-5 xl:grid-cols-[360px_1fr]">
+              <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-base font-black text-slate-950">오늘 할 일</h2>
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
+                    {remainingToday.length}개 남음
                   </span>
                 </div>
 
                 {todaySchedules.length === 0 ? (
-                  <div className="rounded-2xl border-2 border-dashed border-blue-100 bg-blue-50/40 p-6 text-center">
-                    <p className="text-xs font-medium text-slate-400">
-                      오늘은 비어 있습니다
-                    </p>
+                  <div className="rounded-lg border border-dashed border-blue-100 bg-blue-50/40 p-6 text-center">
+                    <p className="text-sm font-bold text-slate-500">오늘은 비어 있습니다</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {todaySchedules.map((s) => (
+                    {todaySchedules.map((schedule) => (
                       <button
-                        key={s.id}
-                        onClick={() => handleToggleComplete(s)}
-                        className="flex w-full items-center gap-3 rounded-xl border border-blue-50 p-3 text-left transition hover:bg-blue-50/50"
+                        key={schedule.id}
+                        onClick={() => handleToggleComplete(schedule)}
+                        className="flex w-full items-center gap-3 rounded-lg border border-blue-50 p-3 text-left transition hover:bg-blue-50/70"
                       >
                         <span
                           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2"
                           style={{
-                            background: s.is_completed ? '#2563eb' : '#fff',
-                            borderColor: s.is_completed ? '#2563eb' : '#bfdbfe',
+                            background: schedule.is_completed ? '#2563eb' : '#fff',
+                            borderColor: schedule.is_completed ? '#2563eb' : '#bfdbfe',
                           }}
                         >
-                          {s.is_completed && (
+                          {schedule.is_completed && (
                             <MaterialIcon icon="check" size={13} color="#fff" />
                           )}
                         </span>
 
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-bold text-slate-900">
-                            {s.title}
+                          <span className="block truncate text-sm font-black text-slate-950">
+                            {schedule.title}
                           </span>
-                          <span className="text-xs text-slate-400">
-                            {s.start_time} - {s.end_time}
+                          <span className="text-xs font-bold text-slate-400">
+                            {schedule.start_time} - {schedule.end_time}
                           </span>
                         </span>
                       </button>
                     ))}
                   </div>
                 )}
+              </div>
 
-                {unachievedSchedules.length > 0 && (
+              <div className="flex min-w-0 flex-col rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-black text-slate-950">주간 시간표</h2>
+                    <p className="mt-1 text-sm font-bold text-slate-400">{weekLabel}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="rounded-lg border border-blue-100 p-2 transition hover:bg-blue-50"
+                      onClick={() => setWeekOffset((o) => o - 1)}
+                      aria-label="이전 주"
+                    >
+                      <MaterialIcon icon="chevron_left" size={18} color="#2563eb" />
+                    </button>
+                    <button
+                      className="rounded-lg border border-blue-100 px-4 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-50"
+                      onClick={() => setWeekOffset(0)}
+                    >
+                      이번 주
+                    </button>
+                    <button
+                      className="rounded-lg border border-blue-100 p-2 transition hover:bg-blue-50"
+                      onClick={() => setWeekOffset((o) => o + 1)}
+                      aria-label="다음 주"
+                    >
+                      <MaterialIcon icon="chevron_right" size={18} color="#2563eb" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="min-h-[480px] flex-1 overflow-hidden rounded-lg border border-blue-50">
+                  <Timetable schedules={schedules} exams={exams} weekStart={weekStart} />
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-black text-slate-950">보조 화면</h2>
+                  <p className="mt-1 text-sm font-bold text-slate-400">
+                    자주 쓰지 않는 분석과 관리 기능은 필요할 때만 엽니다
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={handleReschedule}
-                    disabled={isRegenerating}
-                    className="mt-4 w-full rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-600 transition hover:bg-blue-100 disabled:opacity-60"
+                    onClick={() => setSecondaryPanel(secondaryPanel === 'exams' ? null : 'exams')}
+                    className={`rounded-lg border px-3 py-2 text-xs font-black transition ${
+                      secondaryPanel === 'exams'
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-blue-100 bg-white text-slate-600 hover:bg-blue-50'
+                    }`}
                   >
-                    {isRegenerating ? '재배치 중...' : '밀린 일정 AI 재배치'}
+                    시험 일정
                   </button>
-                )}
+                  <button
+                    onClick={() => setSecondaryPanel(secondaryPanel === 'report' ? null : 'report')}
+                    className={`rounded-lg border px-3 py-2 text-xs font-black transition ${
+                      secondaryPanel === 'report'
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-blue-100 bg-white text-slate-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    리포트
+                  </button>
+                  <button
+                    onClick={() => setSecondaryPanel(secondaryPanel === 'analysis' ? null : 'analysis')}
+                    className={`rounded-lg border px-3 py-2 text-xs font-black transition ${
+                      secondaryPanel === 'analysis'
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-blue-100 bg-white text-slate-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    유형 분석
+                  </button>
+                  <button
+                    onClick={() => setSecondaryPanel(secondaryPanel === 'ai' ? null : 'ai')}
+                    className={`rounded-lg border px-3 py-2 text-xs font-black transition ${
+                      secondaryPanel === 'ai'
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-blue-100 bg-white text-slate-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    AI 패널
+                  </button>
+                  <button
+                    onClick={() => setIsEtaReimportOpen(true)}
+                    className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-blue-50"
+                  >
+                    시간표 업로드
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-blue-50"
+                  >
+                    공유
+                  </button>
+                </div>
               </div>
 
-              <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-                <h3 className="mb-4 text-xs font-black text-slate-900">
-                  우선순위 패널
-                </h3>
-
-                {upcomingExam ? (
-                  <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                    <p className="text-xs font-black text-blue-600">
-                      다가오는 시험
-                    </p>
-                    <p className="mt-2 text-sm font-black text-slate-900">
-                      {upcomingExam.title}
-                    </p>
-                    <p className="text-xs font-bold text-slate-500">
-                      {upcomingExam.exam_date} · D-{daysUntilExam}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/40 p-4 text-center">
-                    <p className="text-[10px] font-bold text-slate-400">
-                      등록된 예정 시험이 없습니다
-                    </p>
-                  </div>
-                )}
-
-                <SmartAlertPanel
-                  exams={exams}
-                  schedules={schedules}
-                  currentWeekStart={weekStart}
-                />
-              </div>
-            </div>
-          </aside>
+              {secondaryPanel && (
+                <div className="mt-5 rounded-lg border border-blue-50 bg-[#fbfdff] p-4">
+                  {secondaryPanel === 'exams' && <ExamList />}
+                  {secondaryPanel === 'report' && <WeeklyReport schedules={schedules} />}
+                  {secondaryPanel === 'analysis' && (
+                    <TypeAnalysis schedules={schedules} weekStart={weekStart} />
+                  )}
+                  {secondaryPanel === 'ai' && (
+                    <SmartAlertPanel
+                      exams={exams}
+                      schedules={schedules}
+                      currentWeekStart={weekStart}
+                    />
+                  )}
+                </div>
+              )}
+            </section>
+          </div>
         </main>
       </div>
 
