@@ -49,42 +49,6 @@ const DAY_SHORTCUTS = [
   { label: '주말', days: [5, 6] },
   { label: '매일', days: [0, 1, 2, 3, 4, 5, 6] },
 ] as const;
-const TIME_PRESETS = [
-  { label: '아침', icon: 'wb_twilight', start: '07:00', duration: 60, tone: '#f59e0b' },
-  { label: '점심', icon: 'lunch_dining', start: '12:30', duration: 60, tone: '#0f766e' },
-  { label: '저녁', icon: 'nightlife', start: '18:00', duration: 120, tone: '#2563eb' },
-  { label: '밤', icon: 'dark_mode', start: '21:00', duration: 90, tone: '#7c3aed' },
-] as const;
-const DURATION_OPTIONS = [30, 60, 90, 120, 180, 240] as const;
-const TIME_BLOCK_START = 6 * 60;
-const TIME_BLOCK_END = 23 * 60 + 30;
-const TIME_BLOCK_RANGE = TIME_BLOCK_END - TIME_BLOCK_START;
-
-const timeToMinutes = (time: string) => {
-  const [h = '0', m = '0'] = time.split(':');
-  return Number(h) * 60 + Number(m);
-};
-
-const minutesToTime = (minutes: number) => {
-  const normalized = ((minutes % 1440) + 1440) % 1440;
-  return `${String(Math.floor(normalized / 60)).padStart(2, '0')}:${String(normalized % 60).padStart(2, '0')}`;
-};
-
-const minutesToLabel = (minutes: number) => {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m === 0 ? `${h}시간` : h === 0 ? `${m}분` : `${h}시간 ${m}분`;
-};
-
-const clockLabel = (time: string) => {
-  const minutes = timeToMinutes(time);
-  const hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  const period = hour < 12 ? '오전' : '오후';
-  const displayHour = hour % 12 || 12;
-  return `${period} ${displayHour}:${String(minute).padStart(2, '0')}`;
-};
-
 const USER_TYPES = [
   { id: 'exam_prep', label: '수험 준비', icon: 'menu_book', desc: '수능/자격/입시 등', color: '#c3d0ff', iconColor: '#2563eb' },
   { id: 'civil_service', label: '공무원', icon: 'account_balance', desc: '공시 등 시험 준비', color: '#ffdcc6', iconColor: '#844000' },

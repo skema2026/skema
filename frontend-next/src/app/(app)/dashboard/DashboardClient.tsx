@@ -9,7 +9,7 @@ import { Timetable, getWeekStart } from '@/components/timetable/Timetable';
 import { ClassForm } from '@/components/class-form/ClassForm';
 import { ExamList } from '@/components/exam/ExamList';
 import { SettingsModal } from '@/components/settings/SettingsModal';
-import { useConflicts, useSchedules, useToggleComplete } from '@/hooks/useSchedules';
+import { useSchedules, useToggleComplete } from '@/hooks/useSchedules';
 import { useExams } from '@/hooks/useExams';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuthStore } from '@/store/authStore';
@@ -41,7 +41,6 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const { data: schedules = [] } = useSchedules(initialSchedules);
   const { data: exams = [] } = useExams();
   const { data: profile } = useProfile(initialProfile ?? undefined);
-  const { data: conflicts = [] } = useConflicts();
   const toggleComplete = useToggleComplete();
 
   const schedulesRef = useRef(schedules);
@@ -206,8 +205,6 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     return t >= currentWeekStart.getTime() && t < currentWeekEnd;
   });
   const weekTotal = weekSchedules.length;
-  const weekDone  = weekSchedules.filter((s) => s.is_completed).length;
-  const weekPct   = weekTotal > 0 ? Math.round((weekDone / weekTotal) * 100) : null;
 
   // 미달성 일정 (오늘 + 이미 지난 시간 + 미완료)
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -654,6 +651,11 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
       </div>
 
       <ClassForm />
+
+      <SettingsModal
+        open={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
 
       <EtaReimportModal
         open={isEtaReimportOpen}
