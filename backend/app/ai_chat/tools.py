@@ -158,34 +158,6 @@ TOOLS_SPEC = [
         },
     },
     {
-        "name": "list_syllabus_analyses",
-        "description": (
-            "업로드된 강의계획서의 AI 분석 결과를 조회합니다. "
-            "과목별 평가 비율(중간/기말/과제/출석), 시험 일정, 과제 마감일, 주차별 주제를 확인할 수 있습니다. "
-            "학습 계획 생성 전에 반드시 호출하여 강의계획서 데이터가 있는지 확인하세요."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subject": {"type": "string", "description": "특정 과목명 필터 (선택, 미지정 시 전체)"},
-            },
-        },
-    },
-    {
-        "name": "import_syllabus_exams",
-        "description": (
-            "강의계획서 분석 결과에 있는 시험·과제 일정을 exam_schedules에 자동 등록합니다. "
-            "사용자가 '강의계획서 일정 등록', '시험 일정 가져오기' 등을 요청할 때 사용하세요."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subject": {"type": "string", "description": "가져올 과목명"},
-            },
-            "required": ["subject"],
-        },
-    },
-    {
         "name": "complete_schedule",
         "description": (
             "일정을 완료 처리합니다. '완료했어', '다 했어', '끝냈어' 등의 표현에 사용하세요. "

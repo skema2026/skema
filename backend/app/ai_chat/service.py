@@ -37,7 +37,7 @@ def run_ai_agent(
 ## 날짜 표현 변환
 "내일"→{tomorrow.isoformat()}, "모레"→{day_after.isoformat()}, "오늘"→{today.isoformat()}
 
-## ⛔ 원문 보존 (최우선 — 절대 위반 금지)
+## 원문 보존 (최우선 — 절대 위반 금지)
 - 사용자가 입력한 과목명/시험명/일정 제목은 절대 수정하지 마라.
 - title 필드에는 사용자가 말한 원문을 그대로 사용할 것.
 
@@ -57,13 +57,9 @@ def run_ai_agent(
 사용자가 학습 계획·시간표 생성을 요청하면 아래 순서를 따르라:
 
 1. **컨텍스트 수집** (반드시 먼저 호출)
-   - list_syllabus_analyses → 강의계획서 분석 결과 확인
    - list_exam_schedules → 등록된 시험 일정 확인
 
-2. **시험 연동**
-   - 강의계획서에 시험 날짜가 있고 exam_schedules에 없으면 → import_syllabus_exams 제안
-
-3. **일정 생성 방식 결정**
+2. **일정 생성 방식 결정**
    - 시험이 있으면 → generate_exam_prep_schedule
    - 시험이 없으면 → generate_study_schedule
 

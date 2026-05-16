@@ -12,10 +12,6 @@ from app.core.config import settings
 from app.schedule.models import ExamSchedule, Schedule
 from app.schedule.service import create_exam_record, create_schedule_record, stage_exam_record, stage_schedule_record
 from app.ai_chat.study_planner import (
-    get_syllabus_context,
-    get_weekly_scope,
-    weekly_topics_to_tasks,
-    scope_to_syllabus_context,
     analyze_exam_requirements,
     get_subject_study_tasks,
     get_personalized_study_tasks,
@@ -278,34 +274,11 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         daily_hours = tool_input.get("daily_study_hours", 2)
         wake, sleep = _get_user_wake_sleep(db, user_id)
 
-        # 강의계획서 주차별 데이터 → 구체적 task 풀 생성
-        syllabus_ctx = get_syllabus_context(db, user_id, subject)
         task_pool: list[dict] = []
 
-        # 1순위: weekly_topics 직접 변환 (LLM 없이 구체적 task 생성)
-        try:
-            from app.syllabus.models import SyllabusAnalysis as _SA
-            _sa = (
-                db.query(_SA)
-                .filter(
-                    _SA.user_id == user_id,
-                    _SA.subject_name.ilike(f"%{subject}%"),
-                    _SA.analysis_status != "failed",
-                )
-                .first()
-            )
-            if _sa and _sa.weekly_topics:
-                _raw = json.loads(_sa.weekly_topics) if isinstance(_sa.weekly_topics, str) else _sa.weekly_topics
-                if isinstance(_raw, list) and _raw:
-                    task_pool = weekly_topics_to_tasks(_raw, subject)
-        except Exception as _e:
-            logger.warning(f"_weekly_topics_to_tasks failed: {_e}")
-
-        # 2순위: LLM 기반 task 생성 (weekly_topics 없는 경우)
-        if not task_pool and settings.OPENAI_API_KEY:
+        if settings.OPENAI_API_KEY:
             task_pool = get_subject_study_tasks(
                 subject=subject,
-                syllabus_context=syllabus_ctx,
                 daily_hours=float(daily_hours),
             )
 
@@ -369,8 +342,7 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         if created:
             return (
                 f"📚 '{subject}' 구체적 학습 일정 {created}개 생성 완료!\n"
-                f"📅 {today.strftime('%Y-%m-%d')} ~ {end_date}  ⏰ 하루 {daily_hours}시간 목표\n"
-                + (f"📋 강의계획서 기반 {len(task_pool)}개 task 풀 사용" if task_pool else "")
+                f"📅 {today.strftime('%Y-%m-%d')} ~ {end_date}  ⏰ 하루 {daily_hours}시간 목표"
             )
         return "😅 여유 시간이 부족하여 학습 일정을 생성하지 못했습니다."
 
@@ -545,32 +517,13 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
             subject = exam.subject or exam.title
             exam_created = 0
 
-            # ── 1. 중간/기말 구분 → 범위 주차 기반 컨텍스트 로드 ────────────
-            title_lower = exam.title.lower()
-            if "중간" in exam.title or "midterm" in title_lower:
-                detected_exam_type = "midterm"
-            elif "기말" in exam.title or "final" in title_lower:
-                detected_exam_type = "final"
-            else:
-                detected_exam_type = None
-
-            scope_items = []
-            if detected_exam_type and (exam.subject or exam.title):
-                scope_items = get_weekly_scope(db, user_id, subject, detected_exam_type)
-
-            if scope_items:
-                syllabus_ctx = scope_to_syllabus_context(scope_items, detected_exam_type)
-            else:
-                syllabus_ctx = get_syllabus_context(db, user_id, subject)
-
-            # ── 2. 시험 종류 분석 → phase별 구체적 컴포넌트 생성 ─────────────
+            # ── 1. 시험 종류 분석 → phase별 구체적 컴포넌트 생성 ─────────────
             #    (한 번만 호출, 결과를 day 루프에서 재사용)
             exam_components: list[dict] = []
             if settings.OPENAI_API_KEY:
                 exam_components = analyze_exam_requirements(
                     exam_title=exam.title,
                     subject=subject,
-                    syllabus_context=syllabus_ctx,
                     days_until_exam=days_until_exam,
                 )
 
@@ -617,7 +570,6 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
                     days_until_exam=days_until_exam,
                     completed_blocks=completed_blocks,
                     total_blocks=total_blocks,
-                    syllabus_context=syllabus_ctx,
                 )
                 for t in fallback_tasks:
                     phase_buckets["mid"].append(t)
@@ -855,117 +807,6 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         db.commit()
         cleaned_msg = f"\n🧹 연관 학습 일정 {cleaned}개 자동 정리" if cleaned > 0 else ""
         return f"🗑️ 시험 '{exam_title}' 삭제 완료!{cleaned_msg}"
-
-    elif tool_name == "list_syllabus_analyses":
-        from app.syllabus.models import SyllabusAnalysis as _SyllabusAnalysis
-        analyses = (
-            db.query(_SyllabusAnalysis)
-            .filter(
-                _SyllabusAnalysis.user_id == user_id,
-                _SyllabusAnalysis.analysis_status != "failed",
-            )
-            .all()
-        )
-        subject_filter = (tool_input.get("subject") or "").strip().lower()
-        if subject_filter:
-            analyses = [a for a in analyses if subject_filter in a.subject_name.lower()]
-        if not analyses:
-            return "📭 분석된 강의계획서가 없습니다. 먼저 강의계획서를 업로드하세요."
-        lines = ["📋 강의계획서 분석 결과:\n"]
-        for a in analyses:
-            lines.append(f"\n📚 **{a.subject_name}** (분석상태: {a.analysis_status})")
-            weights = []
-            if a.midterm_weight is not None:
-                weights.append(f"중간고사 {a.midterm_weight}%")
-            if a.final_weight is not None:
-                weights.append(f"기말고사 {a.final_weight}%")
-            if a.assignment_weight is not None:
-                weights.append(f"과제 {a.assignment_weight}%")
-            if a.attendance_weight is not None:
-                weights.append(f"출석 {a.attendance_weight}%")
-            if a.presentation_weight is not None:
-                weights.append(f"발표 {a.presentation_weight}%")
-            if weights:
-                lines.append(f"  평가비율: {' / '.join(weights)}")
-            if a.exam_dates:
-                try:
-                    for e in json.loads(a.exam_dates):
-                        etype = {"midterm": "중간고사", "final": "기말고사"}.get(e.get("type", ""), e.get("type", "시험"))
-                        lines.append(f"  📝 {etype}: {e.get('date', '?')} {e.get('title', '')}")
-                except Exception:
-                    pass
-            if a.assignment_dates:
-                try:
-                    for ad in json.loads(a.assignment_dates):
-                        lines.append(f"  📌 과제: {ad.get('date', '?')} {ad.get('title', '')}")
-                except Exception:
-                    pass
-            if a.weekly_topics:
-                try:
-                    topics = json.loads(a.weekly_topics)
-                    if topics:
-                        preview_strs = []
-                        for _t in topics[:4]:
-                            if isinstance(_t, dict):
-                                preview_strs.append(f"{_t.get('week','')}주차 {_t.get('topic','')}")
-                            elif isinstance(_t, str):
-                                preview_strs.append(_t)
-                        suffix = " ..." if len(topics) > 4 else ""
-                        lines.append(f"  주차별: {', '.join(preview_strs)}{suffix}")
-                except Exception:
-                    pass
-        return "\n".join(lines)
-
-    elif tool_name == "import_syllabus_exams":
-        from app.syllabus.models import SyllabusAnalysis as _SyllabusAnalysis
-        from datetime import datetime as _dt
-        subject = (tool_input.get("subject") or "").strip()
-        if not subject:
-            return "❌ 과목명을 지정해 주세요."
-        analysis = (
-            db.query(_SyllabusAnalysis)
-            .filter(
-                _SyllabusAnalysis.user_id == user_id,
-                _SyllabusAnalysis.subject_name.ilike(f"%{subject}%"),
-                _SyllabusAnalysis.analysis_status != "failed",
-            )
-            .first()
-        )
-        if not analysis:
-            return f"❌ '{subject}' 강의계획서 분석 결과가 없습니다."
-        imported = []
-        if analysis.exam_dates:
-            try:
-                for e in json.loads(analysis.exam_dates):
-                    date_str = e.get("date")
-                    if not date_str:
-                        continue
-                    try:
-                        exam_date_obj = _dt.strptime(date_str, "%Y-%m-%d").date()
-                    except ValueError:
-                        continue
-                    etype = e.get("type", "exam")
-                    title = e.get("title") or f"{analysis.subject_name} {'중간고사' if etype == 'midterm' else '기말고사' if etype == 'final' else '시험'}"
-                    # 중복 확인
-                    exists = db.query(ExamSchedule).filter(
-                        ExamSchedule.user_id == user_id,
-                        ExamSchedule.exam_date == exam_date_obj,
-                        ExamSchedule.subject == analysis.subject_name,
-                    ).first()
-                    if not exists:
-                        exam = stage_exam_record(db, user_id, {
-                            "title": title,
-                            "exam_date": exam_date_obj,
-                            "subject": analysis.subject_name,
-                            "exam_time": e.get("time"),
-                        })
-                        imported.append(f"  📝 {title} ({date_str})")
-            except Exception as ex:
-                logger.warning(f"import_syllabus_exams exam error: {ex}")
-        db.commit()
-        if not imported:
-            return f"ℹ️ '{subject}' 강의계획서에서 새로 가져올 시험 일정이 없습니다 (이미 등록됐거나 날짜 정보 없음)."
-        return f"✅ '{subject}' 강의계획서에서 시험 {len(imported)}개 등록 완료!\n" + "\n".join(imported)
 
     return f"❌ 알 수 없는 도구: {tool_name}"
 
