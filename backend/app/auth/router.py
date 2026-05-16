@@ -1,3 +1,16 @@
+"""auth API 엔드포인트.
+
+라우트:
+  POST /auth/signup              — 이메일 회원가입
+  POST /auth/login               — JSON 로그인 → JWT
+  POST /auth/token               — form-data 로그인 → JWT (OAuth2 호환)
+  GET  /users/me                 — 내 계정 정보
+  GET  /profiles                 — 내 프로필 조회
+  POST /profiles                 — 프로필 생성
+  PUT  /profiles                 — 프로필 수정
+  GET  /auth/{provider}/authorize — 소셜 로그인 리다이렉트
+  GET  /auth/{provider}/callback  — 소셜 로그인 콜백
+"""
 import logging
 import secrets
 
@@ -9,14 +22,14 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import service
-from app.auth.models import User
-from app.auth.schemas import (
+from app.auth.models import (
     LoginRequest,
     ProfileCreate,
     ProfileResponse,
     ProfileUpdate,
     SignupRequest,
     TokenResponse,
+    User,
     UserResponse,
 )
 from app.auth.service import OAUTH_CONFIGS
@@ -101,13 +114,12 @@ def create_profile(
     current_user: User = Depends(get_current_user),
 ):
     """프로필을 생성합니다. 이미 존재하면 409를 반환합니다."""
-    from app.auth import repository as auth_repo
-    if auth_repo.get_profile_by_user_id(db, current_user.id):
+    if service.get_profile_by_user_id(db, current_user.id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="이미 프로필이 존재합니다. PUT /profiles 로 수정하세요.",
         )
-    return auth_repo.create_profile(db, current_user.id, data.model_dump(exclude_none=True))
+    return service.create_profile(db, current_user.id, data.model_dump(exclude_none=True))
 
 
 @router.put("/profiles", response_model=ProfileResponse)
@@ -175,8 +187,6 @@ def oauth_callback(
         return response
 
     expected_state = request.cookies.get(f"oauth_state_{provider}", "")
-    # expected_state가 없으면 쿠키가 전달되지 않은 것 (로컬 개발 환경에서 발생 가능)
-    # state 값이 있고 expected_state도 있을 때만 검증, 없으면 경고만 로깅
     if not state:
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
         response.delete_cookie(key=f"oauth_state_{provider}")

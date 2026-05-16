@@ -6,7 +6,7 @@ Kakao REST API: POST https://kapi.kakao.com/v2/api/talk/memo/default/send
 """
 import requests as http_requests
 from app.auth.models import User
-from app.auth import repository
+from app.auth import service as auth_service
 from app.core.config import settings
 from sqlalchemy.orm import Session
 
@@ -37,7 +37,7 @@ def _refresh_kakao_token(db: Session, user: User) -> str | None:
     if not new_access:
         return None
 
-    repository.update_kakao_tokens(db, user, new_access, new_refresh or user.kakao_refresh_token)
+    auth_service.update_kakao_tokens(db, user, new_access, new_refresh or user.kakao_refresh_token)
     return new_access
 
 
