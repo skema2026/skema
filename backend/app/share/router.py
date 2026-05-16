@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.core.config import settings
 from app.core.security import get_current_user, get_db
-from app.schedule.schemas import ScheduleResponse
+from app.schedule.models import ScheduleResponse
 from app.share import service
 from app.share.schemas import ShareTokenCreate, ShareTokenResponse
 

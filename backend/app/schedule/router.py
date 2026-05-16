@@ -5,17 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.core.security import get_current_user, get_db
-from app.schedule import repository, service
-from app.schedule.schemas import (
-    EventCreate,
-    EventResponse,
-    EventUpdate,
-    ExamScheduleCreate,
-    ExamScheduleResponse,
-    ExamScheduleUpdate,
-    ScheduleCreate,
-    ScheduleResponse,
-    ScheduleUpdate,
+from app.schedule import service
+from app.schedule.models import (
+    EventCreate, EventResponse, EventUpdate,
+    ExamScheduleCreate, ExamScheduleResponse, ExamScheduleUpdate,
+    ScheduleCreate, ScheduleResponse, ScheduleUpdate,
 )
 
 router = APIRouter(tags=["schedules"])
@@ -28,8 +22,7 @@ def list_schedules(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """내 수업 시간표 전체 목록을 반환합니다."""
-    return repository.get_schedules(db, current_user.id)
+    return service.get_schedules(db, current_user.id)
 
 
 @router.post("/schedules", response_model=List[ScheduleResponse], status_code=status.HTTP_201_CREATED)
@@ -38,7 +31,6 @@ def create_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """수업을 추가합니다. days로 여러 요일을 선택하면 각 요일별로 생성됩니다."""
     return service.create_schedule(db, current_user.id, data)
 
 
@@ -48,7 +40,6 @@ def get_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """특정 수업 상세 정보를 반환합니다."""
     return service.get_schedule_or_404(db, schedule_id, current_user.id)
 
 
@@ -59,7 +50,6 @@ def update_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """수업을 수정합니다."""
     return service.update_schedule(db, schedule_id, current_user.id, data)
 
 
@@ -69,7 +59,6 @@ def delete_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """수업을 삭제합니다."""
     service.delete_schedule(db, schedule_id, current_user.id)
 
 
@@ -80,8 +69,7 @@ def list_exams(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """내 시험 일정 전체 목록을 반환합니다."""
-    return repository.get_exams(db, current_user.id)
+    return service.get_exams(db, current_user.id)
 
 
 @router.post("/exam-schedules", response_model=ExamScheduleResponse, status_code=status.HTTP_201_CREATED)
@@ -90,8 +78,7 @@ def create_exam(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """시험 일정을 추가합니다."""
-    return repository.create_exam(db, current_user.id, data.model_dump())
+    return service.create_exam_row(db, current_user.id, data.model_dump())
 
 
 @router.get("/exam-schedules/{exam_id}", response_model=ExamScheduleResponse)
@@ -100,7 +87,6 @@ def get_exam(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """특정 시험 일정 상세 정보를 반환합니다."""
     return service.get_exam_or_404(db, exam_id, current_user.id)
 
 
@@ -111,7 +97,6 @@ def update_exam(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """시험 일정을 수정합니다."""
     return service.update_exam(db, exam_id, current_user.id, data)
 
 
@@ -121,7 +106,6 @@ def delete_exam(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """시험 일정을 삭제합니다."""
     service.delete_exam(db, exam_id, current_user.id)
 
 
@@ -132,8 +116,7 @@ def list_events(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """내 이벤트 전체 목록을 반환합니다."""
-    return repository.get_events(db, current_user.id)
+    return service.get_events(db, current_user.id)
 
 
 @router.post("/events", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
@@ -142,8 +125,7 @@ def create_event(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """이벤트를 추가합니다."""
-    return repository.create_event(db, current_user.id, data.model_dump())
+    return service.create_event_row(db, current_user.id, data.model_dump())
 
 
 @router.get("/events/{event_id}", response_model=EventResponse)
@@ -152,7 +134,6 @@ def get_event(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """특정 이벤트 상세 정보를 반환합니다."""
     return service.get_event_or_404(db, event_id, current_user.id)
 
 
@@ -163,7 +144,6 @@ def update_event(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """이벤트를 수정합니다."""
     return service.update_event(db, event_id, current_user.id, data)
 
 
@@ -173,5 +153,4 @@ def delete_event(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """이벤트를 삭제합니다."""
     service.delete_event(db, event_id, current_user.id)
