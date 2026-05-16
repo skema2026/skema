@@ -506,13 +506,15 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
 
   return (
     <div style={{
-      borderRadius: 8,
-      border:       '1px solid #d8e2ef',
-      background:   '#ffffff',
-      overflow:     'hidden',
-      boxShadow:    '0 14px 36px rgba(23,32,51,0.08)',
-      // Prevent text selection while dragging
-      userSelect:   dragSnap ? 'none' : undefined,
+      borderRadius:   8,
+      border:         '1px solid #d8e2ef',
+      background:     '#ffffff',
+      overflow:       'hidden',
+      boxShadow:      '0 14px 36px rgba(23,32,51,0.08)',
+      userSelect:     dragSnap ? 'none' : undefined,
+      display:        'flex',
+      flexDirection:  'column',
+      height:         '100%',
     }}>
 
       {/* Conflict banner */}
@@ -583,7 +585,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
         style={{
           display:        'flex',
           overflowY:      'auto',
-          maxHeight:      640,
+          flex:           1,
+          minHeight:      0,
           scrollbarWidth: 'thin',
         }}
       >

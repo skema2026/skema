@@ -62,7 +62,9 @@ export function SharedTimetable({ token }: { token: string }) {
           <p className="mt-1 text-lg font-extrabold text-slate-950">{data.username}님의 시간표</p>
         </div>
       )}
-      <Timetable schedules={data.schedules} readOnly />
+      <div style={{ height: 640 }}>
+        <Timetable schedules={data.schedules} readOnly />
+      </div>
     </div>
   );
 }

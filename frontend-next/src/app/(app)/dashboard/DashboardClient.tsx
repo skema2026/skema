@@ -27,6 +27,7 @@ import {
 } from './_components/DashboardChrome';
 import { TypeAnalysis, WeeklyReport } from './_components/DashboardReports';
 import { SmartAlertPanel } from './_components/SmartAlertPanel';
+import { EtaReimportModal } from './_components/EtaReimportModal';
 
 interface Props {
   initialSchedules: Schedule[];
@@ -49,6 +50,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isEtaReimportOpen, setIsEtaReimportOpen] = useState(false);
   const [notification, setNotification] = useState<Schedule | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -69,6 +71,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const filteredSchedules = schedules.filter(s =>
     activeTypes.has((s.schedule_type as ScheduleTypeFilter) ?? 'personal')
   );
+  const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
   const queryClient = useQueryClient();
 
   // 온보딩 미완료 시 온보딩 페이지로 이동 (SSR에서 처리 안된 경우 fallback)
@@ -372,6 +375,14 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                 >
                   {activeTypes.size === ALL_TYPES.length ? '필터 해제' : '전체 표시'}
                 </button>
+
+                <button
+                  className="rounded-xl border border-blue-100 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-blue-50"
+                  onClick={() => setIsEtaReimportOpen(true)}
+                  title="강의 시간표 이미지 재업로드"
+                >
+                  📷 시간표 업로드
+                </button>
               </div>
             </div>
 
@@ -643,6 +654,12 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
       </div>
 
       <ClassForm />
+
+      <EtaReimportModal
+        open={isEtaReimportOpen}
+        onClose={() => setIsEtaReimportOpen(false)}
+        existingEtaCount={etaScheduleCount}
+      />
 
       <ShareDialog
         open={isShareModalOpen}

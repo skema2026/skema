@@ -751,6 +751,20 @@ async def parse_eta_image(
     return []
 
 
+@router.delete("/schedules", status_code=204)
+def delete_eta_schedules(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """사용자의 ETA import 강의 시간표를 전체 삭제합니다."""
+    from app.schedule.models import Schedule as ScheduleModel
+    db.query(ScheduleModel).filter(
+        ScheduleModel.user_id == current_user.id,
+        ScheduleModel.schedule_source == "eta_import",
+    ).delete(synchronize_session=False)
+    db.commit()
+
+
 @router.post("/save-schedules")
 def save_eta_schedules(
     body: SaveSchedulesRequest,
