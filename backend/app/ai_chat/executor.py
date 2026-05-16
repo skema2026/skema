@@ -11,50 +11,27 @@ tool 종류:
                check_conflicts, complete_schedule, postpone_schedule,
                reschedule_incomplete
   시험 관리  — add/list/update/delete_exam_schedule
-  학습 계획  — generate_study_schedule, generate_exam_prep_schedule
-
-schedule_source 값의 의미:
-  "user_created"  — 사용자가 직접 추가한 일정 → 삭제 시 DB에서 완전 삭제
-  "ai_generated"  — AI가 생성한 학습 블록  → 삭제 시 deleted_by_user=True로 소프트 삭제
-                    소프트 삭제 이유: original_generated_title을 DB에 보존해야
-                    재계획 시 같은 task가 다시 생성되는 것을 막을 수 있음
 """
 import json
 import logging
 import re
-import threading
 from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from app.auth.models import UserProfile
-from app.core.config import settings
 from app.schedule.models import ExamSchedule, Schedule
-from app.schedule.service import create_exam_record, create_schedule_record, stage_exam_record, stage_schedule_record
-from app.ai_chat.study_planner import (
-    analyze_exam_requirements,
-    get_subject_study_tasks,
-    get_personalized_study_tasks,
-    pick_phase,
-    validate_task_quality,
-)
-from app.utils.time_utils import DAY_NAMES, DAY_NAMES_SHORT, minutes_to_time, overlap, time_to_minutes
+from app.schedule.service import create_exam_record, create_schedule_record
+from app.utils.time_utils import DAY_NAMES, minutes_to_time, overlap, time_to_minutes
 
 logger = logging.getLogger(__name__)
 
 
 # ── 상수 ──────────────────────────────────────────────────────────────────────
 
-# 학습 블록 배치 기준
-_MAX_BLOCK_MINS = 180    # 한 블록 최대 학습 시간 (분)
 _BLOCK_BUFFER_MINS = 60  # 일정과 일정 사이 최소 여유 시간 (분)
-_MIN_BLOCK_MINS = 30     # 배치 가능한 최소 블록 길이 (분)
 _DEFAULT_START_HOUR = 8  # 사용자 기상 시간 미설정 시 기본값 (시)
 _FREE_SLOT_END_HOUR = 22 # 빈 시간 탐색 종료 시각 (시)
-
-# 시험 D-day 기준 학습 단계 — study_planner.pick_phase()와 동기화
-_PHASE_TYPE = {"early": "study", "mid": "practice", "late": "review"}
-_PHASE_PRIO = {"early": 1,       "mid": 1,          "late": 2}
 
 # 과목명 해시 기반 색상 팔레트 (프론트엔드와 동일 알고리즘으로 결정론적 배색)
 _SUBJECT_PALETTE = [
@@ -422,39 +399,12 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         })
         days_left = (exam_date_obj - today).days
         status_str = f"D-{days_left}" if days_left > 0 else ("오늘!" if days_left == 0 else "종료")
-        result = (
+        return (
             f"✅ 시험 일정 '{e.title}' 추가 완료!\n"
             f"📅 {exam_date_str} ({status_str})"
             + (f"  과목: {e.subject}" if e.subject else "")
             + f"\n🆔 ID: {e.id}"
         )
-
-        # 시험 등록 즉시 학습 일정을 백그라운드에서 자동 생성
-        # (사용자 응답을 블로킹하지 않도록 별도 스레드에서 실행)
-        if days_left > 0 and settings.OPENAI_API_KEY:
-            exam_id_bg = e.id
-            target_days_bg = min(days_left, 14)
-            _uid = user_id
-
-            def _bg_generate():
-                from app.db.database import SessionLocal
-                bg_db = SessionLocal()
-                try:
-                    _execute_tool(
-                        "generate_exam_prep_schedule",
-                        {"exam_id": exam_id_bg, "target_days": target_days_bg, "daily_study_hours": 2.0},
-                        bg_db,
-                        _uid,
-                    )
-                except Exception as _e:
-                    logger.warning(f"bg generate_exam_prep_schedule failed: {_e}")
-                finally:
-                    bg_db.close()
-
-            threading.Thread(target=_bg_generate, daemon=True).start()
-            result += "\n\n🔄 AI가 학습 준비 일정을 백그라운드에서 생성 중입니다. 잠시 후 시간표를 확인하세요."
-
-        return result
 
     elif tool_name == "list_exam_schedules":
         exams = db.query(ExamSchedule).filter(ExamSchedule.user_id == user_id).all()
@@ -518,354 +468,5 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         db.commit()
         cleaned_msg = f"\n🧹 연관 학습 일정 {cleaned}개 자동 정리" if cleaned > 0 else ""
         return f"🗑️ 시험 '{exam_title}' 삭제 완료!{cleaned_msg}"
-
-    # ── 학습 계획 ─────────────────────────────────────────────────────────────
-
-    elif tool_name == "generate_study_schedule":
-        """시험 없이 특정 과목 학습 일정을 기간 내 빈 슬롯에 자동 배치."""
-        subject = tool_input["subject"]
-        target_days = tool_input.get("target_days", 7)
-        daily_hours = tool_input.get("daily_study_hours", 2)
-        wake, sleep = _get_user_wake_sleep(db, user_id)
-
-        # AI로 과목에 맞는 구체적 task 목록 생성
-        task_pool: list[dict] = []
-        if settings.OPENAI_API_KEY:
-            task_pool = get_subject_study_tasks(subject=subject, daily_hours=float(daily_hours))
-
-        created = 0
-        task_idx = 0
-        for offset in range(target_days):
-            tdate = today + timedelta(days=offset)
-            date_str = tdate.strftime("%Y-%m-%d")
-            dow = tdate.weekday()
-            existing = _day_schedules(db, user_id, dow, date_str)
-            # 기존 일정을 busy 구간으로 잡고 사이 빈 슬롯에 학습 블록 배치
-            busy = sorted((time_to_minutes(s.start_time), time_to_minutes(s.end_time)) for s in existing)
-            remaining = int(daily_hours * 60)
-            cursor = max(_DEFAULT_START_HOUR * 60, wake)
-            blocks = []
-            for bs, be in busy:
-                if cursor + _MIN_BLOCK_MINS <= bs and remaining > 0:
-                    b = min(bs - cursor, remaining, _MAX_BLOCK_MINS)
-                    blocks.append((cursor, cursor + b))
-                    remaining -= b
-                cursor = max(cursor, be + _BLOCK_BUFFER_MINS)
-            if remaining >= _MIN_BLOCK_MINS and cursor + _MIN_BLOCK_MINS <= sleep:
-                b = min(sleep - cursor, remaining, _MAX_BLOCK_MINS)
-                blocks.append((cursor, cursor + b))
-            for sm, em in blocks:
-                if task_pool:
-                    task = task_pool[task_idx % len(task_pool)]
-                    raw_task_title = task["title"]
-                    title = f"📚 {raw_task_title}"
-                    priority = task.get("priority", 1)
-                    # 같은 날 동일 task가 이미 있으면 skip (중복 방지)
-                    _already = db.query(Schedule).filter(
-                        Schedule.user_id == user_id,
-                        Schedule.date == date_str,
-                        Schedule.schedule_type == "study",
-                        Schedule.original_generated_title == raw_task_title,
-                        Schedule.deleted_by_user != True,
-                    ).first()
-                    if _already:
-                        task_idx += 1
-                        continue
-                else:
-                    raw_task_title = None
-                    title = f"📚 {subject} — 강의 내용 정리 및 예제 풀기"
-                    priority = 1
-                task_idx += 1
-                stage_schedule_record(db, user_id, {
-                    "title": title,
-                    "day_of_week": dow,
-                    "date": date_str,
-                    "start_time": _m2t(sm),
-                    "end_time": _m2t(em),
-                    "color": _subject_color(subject),
-                    "priority": priority,
-                    "schedule_type": "study",
-                    "schedule_source": "ai_generated",
-                    "original_generated_title": raw_task_title,
-                })
-                created += 1
-        db.commit()
-        end_date = (today + timedelta(days=target_days - 1)).strftime("%Y-%m-%d")
-        if created:
-            return (
-                f"📚 '{subject}' 구체적 학습 일정 {created}개 생성 완료!\n"
-                f"📅 {today.strftime('%Y-%m-%d')} ~ {end_date}  ⏰ 하루 {daily_hours}시간 목표"
-            )
-        return "😅 여유 시간이 부족하여 학습 일정을 생성하지 못했습니다."
-
-    elif tool_name == "generate_exam_prep_schedule":
-        """시험 D-day 역산으로 학습 일정을 자동 생성.
-
-        흐름:
-          1. 기존 미완료 AI 학습 블록 삭제 (재생성 전 초기화)
-          2. AI로 시험 종류 분석 → early/mid/late phase별 task 목록 생성
-          3. task를 early/mid/late 버킷으로 분류
-          4. 날짜별로 D-day까지 빈 슬롯에 배치
-             - D-3 이내 → 빨강, 학습량 1.5배 (late phase task)
-             - D-7 이내 → 주황, 학습량 1.2배 (mid phase task)
-             - 그 외    → 보라, 기본 학습량 (early phase task)
-        """
-        exam_id = tool_input.get("exam_id")
-        target_days = tool_input.get("target_days", 14)
-        daily_hours = tool_input.get("daily_study_hours", 2.0)
-        sessions_per_week: int | None = tool_input.get("sessions_per_week")
-        preferred_start_time: str | None = tool_input.get("preferred_start_time")
-
-        exams = db.query(ExamSchedule).filter(ExamSchedule.user_id == user_id).all()
-        if exam_id:
-            exams = [e for e in exams if e.id == exam_id]
-
-        upcoming = [e for e in exams if e.exam_date >= today]
-        if not upcoming:
-            return "📭 예정된 시험이 없습니다. 먼저 시험 일정을 등록해 주세요."
-
-        wake, sleep = _get_user_wake_sleep(db, user_id)
-        created = 0
-        results = []
-
-        for exam in sorted(upcoming, key=lambda e: e.exam_date):
-            exam_date_obj = exam.exam_date
-            days_until_exam = (exam_date_obj - today).days
-            study_days = min(days_until_exam, target_days)
-
-            # 1. 기존 미완료·미삭제 AI 학습 블록 제거 (재생성 전 초기화)
-            #    완료(is_completed=True)나 사용자가 직접 삭제(deleted_by_user=True)한 것은 건드리지 않음
-            today_str = today.isoformat()
-            old_blocks = db.query(Schedule).filter(
-                Schedule.user_id == user_id,
-                Schedule.linked_exam_id == exam.id,
-                Schedule.schedule_source == "ai_generated",
-                Schedule.is_completed == False,
-                Schedule.deleted_by_user.isnot(True),
-                Schedule.date >= today_str,
-            ).all()
-            for blk in old_blocks:
-                db.delete(blk)
-            db.commit()
-
-            if study_days <= 0:
-                continue
-
-            subject = exam.subject or exam.title
-            exam_created = 0
-
-            # 2. 시험 종류 AI 분석 → phase별 task 컴포넌트 생성 (루프 밖에서 한 번만 호출)
-            exam_components: list[dict] = []
-            if settings.OPENAI_API_KEY:
-                exam_components = analyze_exam_requirements(
-                    exam_title=exam.title,
-                    subject=subject,
-                    days_until_exam=days_until_exam,
-                )
-
-            # 3. 컴포넌트를 early / mid / late 버킷으로 분류
-            phase_buckets: dict[str, list[dict]] = {"early": [], "mid": [], "late": []}
-            for comp in exam_components:
-                p = comp.get("phase", "mid")
-                if p not in phase_buckets:
-                    p = "mid"
-                t_type = _PHASE_TYPE.get(p, "study")
-                t_prio = _PHASE_PRIO.get(p, 1)
-                for task_item in comp.get("tasks", []):
-                    if isinstance(task_item, str):
-                        title = task_item.strip()
-                        estimated_minutes = 60
-                        reason = ""
-                    elif isinstance(task_item, dict):
-                        title = task_item.get("title", "").strip()
-                        estimated_minutes = int(task_item.get("estimated_minutes") or 60)
-                        reason = str(task_item.get("reason") or "")
-                    else:
-                        continue
-                    if not title or not validate_task_quality(title):
-                        continue
-                    phase_buckets[p].append({
-                        "title": title,
-                        "task_type": t_type,
-                        "priority": t_prio,
-                        "estimated_minutes": estimated_minutes,
-                        "reason": reason,
-                    })
-
-            # 컴포넌트가 없으면 (AI 호출 실패 등) personalized tasks로 fallback
-            if not any(phase_buckets.values()):
-                existing_study = db.query(Schedule).filter(
-                    Schedule.user_id == user_id, Schedule.schedule_type == "study"
-                ).all()
-                total_blocks = len(existing_study)
-                completed_blocks = sum(1 for s in existing_study if s.is_completed)
-                fallback_tasks = get_personalized_study_tasks(
-                    exam_title=exam.title,
-                    subject=subject,
-                    days_until_exam=days_until_exam,
-                    completed_blocks=completed_blocks,
-                    total_blocks=total_blocks,
-                )
-                for t in fallback_tasks:
-                    phase_buckets["mid"].append(t)
-
-            # 4. 날짜별 일정 배치
-            task_idx = 0
-            week_placed_counts: dict[int, int] = {}  # iso_week → 실제 배치된 날짜 수
-
-            pref_start: int | None = None
-            if preferred_start_time:
-                try:
-                    pref_start = time_to_minutes(preferred_start_time)
-                except Exception:
-                    pass
-
-            for offset in range(study_days):
-                tdate = today + timedelta(days=offset)
-                date_str = tdate.strftime("%Y-%m-%d")
-
-                # sessions_per_week: 이번 주에 이미 충분히 배치했으면 skip
-                if sessions_per_week and 1 <= sessions_per_week <= 7:
-                    iso_week = tdate.isocalendar()[1]
-                    if week_placed_counts.get(iso_week, 0) >= sessions_per_week:
-                        continue
-
-                dow = tdate.weekday()
-                days_left = (exam_date_obj - tdate).days
-
-                # D-day까지 남은 일수에 따라 학습량·색상·우선순위 조정
-                if days_left <= 3:
-                    day_hours = daily_hours * 1.5
-                    color = "#EF4444"   # 빨강 — 긴급
-                    default_priority = 2
-                elif days_left <= 7:
-                    day_hours = daily_hours * 1.2
-                    color = "#F59E0B"   # 주황 — 높음
-                    default_priority = 1
-                else:
-                    day_hours = daily_hours
-                    color = "#8B5CF6"   # 보라 — 보통
-                    default_priority = 1
-
-                current_phase = pick_phase(days_left)
-                current_bucket = phase_buckets.get(current_phase, [])
-                if not current_bucket:
-                    # 현재 phase bucket이 비어있으면 전체 task 합산 사용
-                    current_bucket = [t for bucket in phase_buckets.values() for t in bucket]
-
-                existing = _day_schedules(db, user_id, dow, date_str)
-                busy = sorted((time_to_minutes(s.start_time), time_to_minutes(s.end_time)) for s in existing)
-                remaining = int(day_hours * 60)
-                cursor = pref_start if pref_start is not None else wake
-                blocks = []
-
-                for bs, be in busy:
-                    if cursor + _MIN_BLOCK_MINS <= bs and remaining > 0:
-                        block_len = min(bs - cursor, remaining, _MAX_BLOCK_MINS)
-                        blocks.append((cursor, cursor + block_len))
-                        remaining -= block_len
-                    cursor = max(cursor, be + _BLOCK_BUFFER_MINS)
-                if remaining >= _MIN_BLOCK_MINS and cursor + _MIN_BLOCK_MINS <= sleep:
-                    block_len = min(sleep - cursor, remaining, _MAX_BLOCK_MINS)
-                    blocks.append((cursor, cursor + block_len))
-
-                day_placed = 0
-                for sm, em in blocks:
-                    # 같은 날·시간·과목 study 일정이 이미 있으면 skip
-                    sm_str = _m2t(sm)
-                    already_exists = db.query(Schedule).filter(
-                        Schedule.user_id == user_id,
-                        Schedule.date == date_str,
-                        Schedule.start_time == sm_str,
-                        Schedule.schedule_type == "study",
-                        Schedule.title.ilike(f"%{subject}%"),
-                    ).first()
-                    if already_exists:
-                        task_idx += 1
-                        continue
-
-                    if current_bucket:
-                        task = current_bucket[task_idx % len(current_bucket)]
-                        raw_task_title = task["title"]
-                        title = f"📚 {raw_task_title}"
-                        block_priority = task.get("priority", default_priority)
-                        # estimated_minutes 값이 있으면 블록 길이에 반영
-                        task_mins = task.get("estimated_minutes")
-                        if task_mins and 20 <= task_mins <= _MAX_BLOCK_MINS:
-                            task_em = min(sm + task_mins, em, sm + _MAX_BLOCK_MINS)
-                            em = max(task_em, sm + 20)
-
-                        # 사용자가 삭제하거나 완료한 task는 재생성 금지
-                        already_blocked = db.query(Schedule).filter(
-                            Schedule.user_id == user_id,
-                            Schedule.linked_exam_id == exam.id,
-                            Schedule.original_generated_title == raw_task_title,
-                            Schedule.deleted_by_user == True,
-                        ).first()
-                        if already_blocked:
-                            task_idx += 1
-                            continue
-                        already_done = db.query(Schedule).filter(
-                            Schedule.user_id == user_id,
-                            Schedule.linked_exam_id == exam.id,
-                            Schedule.original_generated_title == raw_task_title,
-                            Schedule.is_completed == True,
-                        ).first()
-                        if already_done:
-                            task_idx += 1
-                            continue
-                    else:
-                        raw_task_title = None
-                        # task pool이 없을 때 D-day 기반 기본 제목 생성
-                        stage = (
-                            f"{subject} 실전 모의고사 1회분 풀기 + 오답 분석" if days_left <= 3
-                            else f"{subject} 기출문제 취약 단원 오답 분석 + 재정리" if days_left <= 7
-                            else f"{subject} 핵심 개념 정리 + 기본 문제 3개 풀기"
-                        )
-                        title = f"📚 {stage}"
-                        block_priority = default_priority
-                    task_idx += 1
-
-                    stage_schedule_record(db, user_id, {
-                        "title": title,
-                        "day_of_week": dow,
-                        "date": date_str,
-                        "start_time": _m2t(sm),
-                        "end_time": _m2t(em),
-                        "color": color,
-                        "priority": block_priority,
-                        "schedule_type": "study",
-                        "schedule_source": "ai_generated",
-                        "linked_exam_id": exam.id,
-                        "original_generated_title": raw_task_title,
-                    })
-                    day_placed += 1
-                    exam_created += 1
-                    created += 1
-
-                # 실제로 배치된 날짜만 sessions_per_week 카운트에 반영
-                if sessions_per_week and 1 <= sessions_per_week <= 7 and day_placed > 0:
-                    iso_week = tdate.isocalendar()[1]
-                    week_placed_counts[iso_week] = week_placed_counts.get(iso_week, 0) + 1
-
-            if exam_created > 0:
-                component_summary = f" ({len(exam_components)}개 준비영역 분석)" if exam_components else ""
-                results.append(
-                    f"  • {subject} ({exam.exam_date} D-{days_until_exam}): {exam_created}개 생성{component_summary}"
-                )
-
-        db.commit()
-
-        if created == 0:
-            return "😅 여유 시간이 부족하여 시험 준비 일정을 생성하지 못했습니다."
-
-        summary = "\n".join(results)
-        return (
-            f"📚 시험 준비 일정 총 {created}개 생성 완료!\n\n"
-            f"{summary}\n\n"
-            f"🔴 D-3 이내: 빨강 (긴급, 모의고사·오답 위주)\n"
-            f"🟡 D-7 이내: 주황 (높음, 문제풀이·심화 위주)\n"
-            f"🟣 그 외: 보라 (보통, 개념·기초 위주)"
-        )
 
     return f"❌ 알 수 없는 도구: {tool_name}"

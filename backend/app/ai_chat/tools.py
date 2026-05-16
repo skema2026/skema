@@ -91,19 +91,6 @@ TOOLS_SPEC = [
         },
     },
     {
-        "name": "generate_study_schedule",
-        "description": "기존 일정·수면 시간·시험 일정을 고려해 학습 시간표를 자동 생성합니다.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subject": {"type": "string", "description": "학습 과목/내용"},
-                "target_days": {"type": "integer", "description": "생성 기간(일수), 기본 7"},
-                "daily_study_hours": {"type": "number", "description": "하루 목표 학습 시간(시간 단위), 기본 2"},
-            },
-            "required": ["subject"],
-        },
-    },
-    {
         "name": "reschedule_incomplete",
         "description": "미완료 상태인 일정을 오늘 이후 빈 시간대에 자동으로 재배치합니다.",
         "parameters": {
@@ -137,24 +124,6 @@ TOOLS_SPEC = [
         "parameters": {
             "type": "object",
             "properties": {},
-        },
-    },
-    {
-        "name": "generate_exam_prep_schedule",
-        "description": (
-            "시험 일정을 기준으로 역산하여 기존 수업·일정 사이의 빈 슬롯에 학습 일정을 자동 생성합니다. "
-            "시험이 가까울수록 학습 강도가 높아지며, 색상으로 긴급도를 표시합니다. "
-            "사용자가 시험 대비 또는 전반적인 시간표 생성을 요청하면 이 도구를 우선 사용하세요."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "exam_id": {"type": "integer", "description": "특정 시험 ID (미지정 시 모든 예정 시험 대상)"},
-                "target_days": {"type": "integer", "description": "학습 일정 생성 기간(일수), 기본 14"},
-                "daily_study_hours": {"type": "number", "description": "기본 하루 학습 시간(시간), 기본 2. 시험 임박 시 자동 증가"},
-                "sessions_per_week": {"type": "integer", "description": "주당 학습 횟수(1~7). 사용자가 '주 N일' 또는 '주 N회'를 언급하면 반드시 설정. 미지정 시 매일 생성"},
-                "preferred_start_time": {"type": "string", "description": "선호 시작 시간 HH:MM (예: '07:00'). 사용자가 '몇 시부터'를 언급하면 반드시 설정"},
-            },
         },
     },
     {
