@@ -5,7 +5,7 @@
 사용법:
     cd backend
     python -m tests.eta.eval_parsers                          # 전체 파서
-    python -m tests.eta.eval_parsers --parsers opencv easyocr # 특정 파서만
+    python -m tests.eta.eval_parsers --parsers opencv       # 특정 파서만
     python -m tests.eta.eval_parsers --fixtures ./my_images   # 다른 fixtures 경로
 
 fixtures 구조:
@@ -41,7 +41,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_BACKEND_DIR))
 
-# .env 로드 (Google Vision API 키 등 필요 시)
+# .env 로드 (LLM Vision API 키 등 필요 시)
 try:
     from dotenv import load_dotenv
     load_dotenv(_BACKEND_DIR / ".env")
@@ -96,23 +96,7 @@ def _make_opencv() -> ParserFn:
 _try_register("opencv", _make_opencv)
 
 
-# 2. EasyOCR + 위치 기반
-def _make_easyocr() -> ParserFn:
-    from app.eta.easyocr_parser import parse_timetable_easyocr
-    return parse_timetable_easyocr
-
-_try_register("easyocr", _make_easyocr)
-
-
-# 3. Google Vision bbox
-def _make_google_vision() -> ParserFn:
-    from app.eta.bbox_parser import parse_timetable_bbox
-    return parse_timetable_bbox
-
-_try_register("google_vision", _make_google_vision)
-
-
-# 4. LLM Vision (OpenAI) — API 키 필요, --llm 플래그로 활성화
+# 2. LLM Vision (OpenAI) — API 키 필요, --llm 플래그로 활성화
 def _make_llm_vision() -> ParserFn:
     from app.eta.router import _parse_via_llm
     from app.eta.schemas import ParsedEntry
@@ -422,7 +406,7 @@ def main() -> None:
     ap.add_argument(
         "--parsers",
         nargs="+",
-        choices=["opencv", "easyocr", "google_vision", "llm_vision"],
+        choices=["opencv", "llm_vision"],
         default=None,
         help="측정할 파서 목록 (기본: 설치된 전체)",
     )

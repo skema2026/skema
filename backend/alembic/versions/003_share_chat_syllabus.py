@@ -92,10 +92,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["syllabus_id"], ["syllabi.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("syllabus_id"),
+        sa.UniqueConstraint("syllabus_id", name="uq_syllabus_analyses_syllabus_id"),
     )
     op.create_index("ix_syllabus_analyses_id", "syllabus_analyses", ["id"], unique=False)
-    op.create_index("ix_syllabus_analyses_syllabus_id", "syllabus_analyses", ["syllabus_id"], unique=True)
     op.create_index("ix_syllabus_analyses_user_id", "syllabus_analyses", ["user_id"], unique=False)
 
 
@@ -104,4 +103,5 @@ def downgrade() -> None:
     op.drop_table("syllabi")
     op.drop_table("ai_chat_logs")
     op.drop_table("share_tokens")
-    op.execute("DROP TYPE IF EXISTS chatrole")
+    if op.get_bind().dialect.name == "postgresql":
+        op.execute("DROP TYPE IF EXISTS chatrole")

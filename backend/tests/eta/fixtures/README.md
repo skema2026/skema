@@ -40,7 +40,7 @@ cd backend
 python -m tests.eta.eval_parsers
 
 # 특정 파서만
-python -m tests.eta.eval_parsers --parsers opencv easyocr
+python -m tests.eta.eval_parsers --parsers opencv
 
 # LLM Vision 포함 (OpenAI API 키 필요)
 python -m tests.eta.eval_parsers --llm
@@ -54,8 +54,6 @@ python -m tests.eta.eval_parsers --fixtures /path/to/images
 | 파서 | API 키 | 과목명 인식 | 속도 |
 |------|--------|-------------|------|
 | `opencv` | 불필요 | ❌ (위치만) | 매우 빠름 |
-| `easyocr` | 불필요 | ✅ | 보통 |
-| `google_vision` | Google Vision API | ✅ | 빠름 |
 | `llm_vision` | OpenAI API | ✅ | 느림 |
 
 ## 출력 예시
@@ -64,8 +62,6 @@ python -m tests.eta.eval_parsers --fixtures /path/to/images
 📷 내시간표.png  (정답 5개)
   파서               검출  매칭  Recall    Prec      F1   과목유사도  과목정확  시작시간  종료시간  속도
   opencv              5     5   100.0%   100.0%  100.0%      0.0%     0.0%    80.0%    60.0%   0.3s
-  easyocr             5     5   100.0%   100.0%  100.0%     92.4%    80.0%    80.0%    60.0%   4.2s
-  google_vision       6     5   100.0%    83.3%   90.9%     95.1%   100.0%    80.0%    80.0%   1.1s
 ```
 
 > `opencv`는 과목명 인식 기능이 없어 과목유사도/과목정확은 항상 0%입니다.

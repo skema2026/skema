@@ -82,6 +82,6 @@ class LoginLog(Base):
     failure_reason = Column(String(100), nullable=True)
     ip_address = Column(String(64), nullable=True)
     user_agent = Column(String(512), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
     user = relationship("User", back_populates="login_logs")

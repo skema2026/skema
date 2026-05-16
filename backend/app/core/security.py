@@ -6,7 +6,7 @@ from jose import JWTError, jwt
 from app.core.config import settings
 
 
-# ── 비밀번호 (passlib 없이 bcrypt 직접 사용) ──────────────────────────────────
+# ── 비밀번호 해시 ──────────────────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()

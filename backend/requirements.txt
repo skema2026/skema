@@ -6,7 +6,7 @@ alembic>=1.13.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
+bcrypt>=4.1.0
 python-multipart>=0.0.6
 openai>=1.0.0
 python-dotenv>=1.0.0
@@ -16,13 +16,10 @@ requests>=2.31.0
 # Positional grid detection (image processing)
 opencv-python-headless>=4.9.0.80
 numpy>=1.26.0
-Pillow>=10.0.0
 
 # Scheduler (알림 주기 실행)
 apscheduler>=3.10.0
 pdfplumber>=0.10.0
 
-# OCR — EasyOCR + 위치 기반 파서 조합 (/eta/parse-image-easyocr)
-# 첫 실행 시 한국어 모델 자동 다운로드 (~300 MB)
-easyocr>=1.7.0
+# Web Push
 pywebpush>=2.0.0

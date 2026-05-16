@@ -105,4 +105,5 @@ def downgrade() -> None:
     op.drop_constraint("fk_schedules_linked_exam_id", "schedules", type_="foreignkey")
     op.drop_table("exam_schedules")
     op.drop_table("schedules")
-    op.execute("DROP TYPE IF EXISTS dayofweek")
+    if op.get_bind().dialect.name == "postgresql":
+        op.execute("DROP TYPE IF EXISTS dayofweek")

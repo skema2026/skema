@@ -48,7 +48,12 @@ class Schedule(Base):
     is_completed = Column(Boolean, nullable=True, default=False, server_default="0")
     schedule_type = Column(String(30), nullable=True, default="class", server_default="class")
     schedule_source = Column(String(30), nullable=True, default="user_created", server_default="user_created")
-    linked_exam_id = Column(Integer, ForeignKey("exam_schedules.id", ondelete="SET NULL"), nullable=True, index=True)
+    linked_exam_id = Column(
+        Integer,
+        ForeignKey("exam_schedules.id", ondelete="SET NULL", name="fk_schedules_linked_exam_id", use_alter=True),
+        nullable=True,
+        index=True,
+    )
     user_override = Column(Boolean, nullable=True, default=False, server_default="0")
     deleted_by_user = Column(Boolean, nullable=True, default=False, server_default="0")
     original_generated_title = Column(String(250), nullable=True)

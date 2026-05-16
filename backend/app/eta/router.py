@@ -1,7 +1,7 @@
 """
 Everytime 등에서 캡처한 시간표 이미지를 파싱하고 결과를 일정으로 저장하는 엔드포인트.
 
-POST /eta/parse-image    : 이미지 업로드 → LLM Vision 파싱 결과 반환
+POST /eta/parse-image    : 이미지 업로드 → LLM Vision + 위치 보정 파싱 결과 반환
 POST /eta/save-schedules : 확정된 항목을 Schedule DB에 저장
 POST /eta/parse-image-v2 : 위치 기반 파서 결과 반환
 """
@@ -218,37 +218,6 @@ def _parse_via_refined_llm(image_bytes: bytes, content_type: str) -> list[Parsed
     return out
 
 
-def _parse_via_easyocr_text(image_bytes: bytes) -> list[ParsedEntry]:
-    """EasyOCR + 위치 파서 결과를 ParsedEntry로 변환한다."""
-    from app.eta.easyocr_parser import parse_timetable_easyocr
-
-    out: list[ParsedEntry] = []
-    for item in parse_timetable_easyocr(image_bytes):
-        subject = str(item.get("subject_name", "")).strip()
-        dow = int(item.get("day_of_week", 0))
-        st = str(item.get("start_time", ""))
-        et = str(item.get("end_time", ""))
-        if not (0 <= dow <= 6) or not st or not et or st >= et:
-            continue
-        if subject:
-            subject, review_flag = normalize_korean_field(subject, "")
-        else:
-            review_flag = True
-        out.append(
-            ParsedEntry(
-                subject_name=subject,
-                day_of_week=dow,
-                start_time=st,
-                end_time=et,
-                location=normalize_location(str(item.get("location") or "").strip()) or None,
-                raw_text=None,
-                source="eta_easyocr",
-                requires_review=review_flag or not bool(subject),
-            )
-        )
-    return out
-
-
 def _best_text_match(base: ParsedEntry, candidates: list[ParsedEntry], used: set[int]) -> tuple[int, ParsedEntry] | None:
     best_idx = -1
     best_score = -1
@@ -417,49 +386,6 @@ def _correct_text_with_geometry(
         )
 
     return _dedup_entries(corrected)
-
-
-def _fallback_positional(image_bytes: bytes) -> list[ParsedEntry]:
-    try:
-        _grid, norm = parse_image_positional(image_bytes)
-
-        out: list[ParsedEntry] = []
-        for e in norm:
-            try:
-                day_map = {
-                    "MONDAY": 0,
-                    "TUESDAY": 1,
-                    "WEDNESDAY": 2,
-                    "THURSDAY": 3,
-                    "FRIDAY": 4,
-                    "SATURDAY": 5,
-                    "SUNDAY": 6,
-                }
-                dow = day_map.get(e["day"], 0)
-                subj = (e.get("title") or "").strip()
-                if subj == "수업":
-                    subj = ""
-
-                rt = f"{KR_DAYS[dow]} {e['startTime']}~{e['endTime']}"
-
-                out.append(
-                    ParsedEntry(
-                        subject_name=subj,
-                        day_of_week=dow,
-                        start_time=e["startTime"],
-                        end_time=e["endTime"],
-                        location=normalize_location(e.get("location") or ""),
-                        raw_text=rt,
-                        source="eta_image_positional",
-                    )
-                )
-            except Exception:
-                continue
-
-        return out
-    except Exception as exc:
-        logger.warning(f"ETA positional fallback failed: {exc}")
-        return []
 
 
 def _apply_everytime_pm(t: str) -> str:
@@ -688,7 +614,7 @@ async def parse_eta_image(
     이미지 기반 시간표 파싱.
 
     - 1순위: 정교한 LLM Vision 파서
-    - 2순위: 위치 기반 색상 블록 파서 + EasyOCR 병합
+    - 2순위: 위치 기반 색상 블록 파서
     - 3순위: 기존 간단 LLM 프롬프트 fallback
     """
     image_bytes, content_type = await _read_image_file(file)
@@ -721,18 +647,6 @@ async def parse_eta_image(
         logger.warning(f"ETA parse: positional parser failed (user={current_user.id}): {exc}")
 
     entries = _merge_geometry_and_text(geometry_entries, text_entries)
-    needs_text_fallback = not text_entries or any(not e.subject_name.strip() for e in entries)
-    if needs_text_fallback:
-        try:
-            ocr_entries = _filter_entries(_parse_via_easyocr_text(image_bytes))
-            if ocr_entries:
-                text_entries = text_entries + ocr_entries
-                entries = _merge_geometry_and_text(geometry_entries, text_entries)
-        except ImportError as exc:
-            logger.info(f"ETA parse: EasyOCR unavailable: {exc}")
-        except Exception as exc:
-            logger.warning(f"ETA parse: EasyOCR fallback failed (user={current_user.id}): {exc}", exc_info=True)
-
     if entries:
         logger.info(
             "ETA hybrid parse: geometry=%d text=%d returned=%d user=%s",
@@ -824,64 +738,3 @@ async def parse_eta_image_v2(
         return []
 
     return entries
-
-
-@router.post("/parse-image-easyocr", response_model=List[ParsedEntry])
-async def parse_eta_image_easyocr(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    EasyOCR + OpenCV 위치 기반 파서.
-    API 키 없이 동작. 첫 호출 시 모델 로딩으로 수 초 소요될 수 있음.
-    """
-    image_bytes, _ = await _read_image_file(file)
-
-    try:
-        from app.eta.easyocr_parser import parse_timetable_easyocr
-    except ImportError:
-        raise HTTPException(
-            status_code=503,
-            detail="easyocr가 설치되지 않았습니다. 서버 관리자에게 문의하세요.",
-        )
-
-    try:
-        entries_raw = parse_timetable_easyocr(image_bytes)
-    except Exception as exc:
-        logger.error(f"EasyOCR parse error (user={current_user.id}): {exc}", exc_info=True)
-        fb = _fallback_positional(image_bytes)
-        return fb if fb else []
-
-    entries: List[ParsedEntry] = []
-    for item in entries_raw:
-        try:
-            subject = str(item.get("subject_name", "")).strip()
-            dow = int(item.get("day_of_week", 0))
-            st = str(item.get("start_time", ""))
-            et = str(item.get("end_time", ""))
-            if not (0 <= dow <= 6) or not st or not et or st >= et:
-                continue
-            if subject:
-                subject, _ = normalize_korean_field(subject, "")
-            entries.append(
-                ParsedEntry(
-                    subject_name=subject,
-                    day_of_week=dow,
-                    start_time=st,
-                    end_time=et,
-                    location=normalize_location(str(item.get("location") or "").strip()) or None,
-                    raw_text=None,
-                    source="eta_easyocr",
-                    requires_review=not bool(subject),
-                )
-            )
-        except Exception:
-            continue
-
-    if not entries:
-        fb = _fallback_positional(image_bytes)
-        return fb if fb else []
-
-    result = _dedup_entries(entries)
-    logger.info(f"EasyOCR: {len(result)} entries for user {current_user.id}")
-    return result

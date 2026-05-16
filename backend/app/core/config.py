@@ -24,8 +24,6 @@ class Settings(BaseSettings):
 
     # ── AI ────────────────────────────────────────────────────────────────────
     OPENAI_API_KEY: str = ""
-    OPENROUTER_API_KEY: str = ""
-    GOOGLE_CLOUD_VISION_API_KEY: str = ""
 
     # ── OAuth ─────────────────────────────────────────────────────────────────
     GOOGLE_CLIENT_ID: str = ""

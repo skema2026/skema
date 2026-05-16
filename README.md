@@ -28,7 +28,7 @@
 | 상태관리 | Zustand v5, TanStack React Query v5 |
 | 백엔드 | FastAPI (Python 3.11+), SQLAlchemy ORM, Alembic |
 | 데이터베이스 | MySQL 8.0 |
-| 인증 | JWT (python-jose, passlib) + Kakao OAuth 2.0 |
+| 인증 | JWT (python-jose, bcrypt) + Kakao OAuth 2.0 |
 | AI | OpenAI GPT-4.1 (채팅·OCR·분석) |
 | 알림 | APScheduler (백그라운드 주기 작업) + Kakao 메시지 API |
 | 운영 | Docker, Docker Compose |
