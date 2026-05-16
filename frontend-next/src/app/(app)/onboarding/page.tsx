@@ -1033,7 +1033,6 @@ export default function OnboardingPage() {
   // 추가 시험 입력 화면
   if (phase === 'external-exam') {
     const EXAM_EXAMPLES = ['중간고사', '기말고사', '토익', '정보처리기사', '자격증', '프로젝트 발표'];
-    const DAYS_OPTIONS = [0, 7, 14, 21, 30, 60] as const;
     const DAYS_PER_WEEK_OPTIONS = [1, 2, 3, 4, 5, 6, 7] as const;
     const fmtHours = (h: number) => h < 1 ? `${h * 60}분` : h % 1 === 0 ? `${h}시간` : `${Math.floor(h)}시간 ${(h % 1) * 60}분`;
     const canAddExam = examDraft.name.trim() && examDraft.date;
@@ -1140,16 +1139,17 @@ export default function OnboardingPage() {
               <div className="space-y-4">
                 <div>
                   <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>시험 몇 일 전부터 공부를 시작할까요?</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DAYS_OPTIONS.map((d) => (
-                      <button key={d} type="button"
-                        onClick={() => setStudyStartDays(d)}
-                        className="py-2 text-xs font-semibold rounded-lg border-2 transition-colors"
-                        style={{ minWidth: 52, padding: '6px 10px', borderColor: studyStartDays === d ? '#059669' : '#ebeef1', background: studyStartDays === d ? '#d1fae5' : '#fff', color: studyStartDays === d ? '#059669' : '#3f4b61' }}>
-                        {d === 0 ? '당일' : `${d}일 전`}
-                      </button>
+                  <select
+                    value={studyStartDays}
+                    onChange={(e) => setStudyStartDays(Number(e.target.value))}
+                    className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
+                    style={{ borderColor: '#c3d0ff', background: '#f8f9ff', color: '#181c1e' }}
+                  >
+                    <option value={0}>당일부터</option>
+                    {Array.from({ length: 100 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={d}>{d}일 전부터</option>
                     ))}
-                  </div>
+                  </select>
                 </div>
                 <div>
                   <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>일주일에 며칠 공부할까요?</p>
@@ -1197,12 +1197,11 @@ export default function OnboardingPage() {
   // 개인 일정 입력 화면
   if (phase === 'personal-schedule') {
     const SCHED_EXAMPLES = ['알바', '면접', '프로젝트', '동아리 활동'];
+    const isOvernight = !!scheduleDraft.start_time && !!scheduleDraft.end_time &&
+      scheduleDraft.end_time <= scheduleDraft.start_time;
     const canAddSched = scheduleDraft.title.trim() && scheduleDraft.start_time && scheduleDraft.end_time &&
-      scheduleDraft.start_time < scheduleDraft.end_time &&
+      scheduleDraft.start_time !== scheduleDraft.end_time &&
       (scheduleDraft.is_recurring ? scheduleDraft.days.length > 0 : !!scheduleDraft.date);
-    const startMinutes = timeToMinutes(scheduleDraft.start_time || '09:00');
-    const endMinutes = timeToMinutes(scheduleDraft.end_time || '10:00');
-    const durationMinutes = Math.max(30, endMinutes - startMinutes);
     const selectedDayIndexes = scheduleDraft.days
       .map((day) => recurringDayToIndex(day))
       .filter((idx) => idx >= 0)
@@ -1210,31 +1209,6 @@ export default function OnboardingPage() {
     const selectedDaySummary = selectedDayIndexes.length
       ? selectedDayIndexes.map((idx) => DAY_LABELS[idx]).join(' · ')
       : '요일 미선택';
-    const timelineLeft = Math.max(0, Math.min(100, ((startMinutes - TIME_BLOCK_START) / TIME_BLOCK_RANGE) * 100));
-    const timelineWidth = Math.max(
-      5,
-      Math.min(100 - timelineLeft, (durationMinutes / TIME_BLOCK_RANGE) * 100),
-    );
-
-    const setScheduleTime = (start: string, duration: number) => {
-      const startMin = timeToMinutes(start);
-      const safeStart = Math.min(Math.max(startMin, TIME_BLOCK_START), TIME_BLOCK_END - 30);
-      const cappedDuration = Math.min(duration, (TIME_BLOCK_END - 30) - safeStart);
-      setScheduleDraft((d) => ({
-        ...d,
-        start_time: minutesToTime(safeStart),
-        end_time: minutesToTime(safeStart + Math.max(30, cappedDuration)),
-      }));
-    };
-
-    const moveTimeBlock = (delta: number) => {
-      const nextStart = Math.min(Math.max(startMinutes + delta, TIME_BLOCK_START), TIME_BLOCK_END - 30);
-      setScheduleTime(minutesToTime(nextStart), durationMinutes);
-    };
-
-    const resizeTimeBlock = (delta: number) => {
-      setScheduleTime(scheduleDraft.start_time, Math.min(Math.max(durationMinutes + delta, 30), 360));
-    };
 
     const toggleDraftDay = (idx: number) => {
       const day = indexToRecurringDay(idx);
@@ -1400,120 +1374,38 @@ export default function OnboardingPage() {
                 </div>
               )}
               {/* 시간 */}
-              <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #eef4ff 100%)', border: '1px solid #cbd5e1' }}>
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div>
-                    <p className="text-xs font-bold" style={{ color: '#334155' }}>집중 시간 설정</p>
-                    <p className="text-[11px]" style={{ color: '#64748b' }}>하루 막대 위에 일정을 얹고, 15분 단위로 움직여요</p>
-                  </div>
-                  <div className="px-3 py-2 rounded-xl text-right" style={{ background: '#fff', border: '1px solid #c3d0ff' }}>
-                    <p className="text-sm font-extrabold" style={{ color: '#2563eb' }}>{scheduleDraft.start_time} - {scheduleDraft.end_time}</p>
-                    <p className="text-[11px] font-semibold" style={{ color: '#334155' }}>{clockLabel(scheduleDraft.start_time)} 시작 · {minutesToLabel(durationMinutes)}</p>
-                  </div>
-                </div>
-
-                <div className="relative mb-4 rounded-2xl p-3" style={{ background: '#fff', border: '1px solid #dbe4ff' }}>
-                  <div className="mb-2 flex justify-between text-[10px] font-bold" style={{ color: '#64748b' }}>
-                    <span>아침 6시</span>
-                    <span>정오</span>
-                    <span>저녁 6시</span>
-                    <span>밤 11:30</span>
-                  </div>
-                  <div className="relative h-16 overflow-hidden rounded-xl" style={{ background: 'linear-gradient(90deg, #fef3c7 0%, #e0f2fe 35%, #dbeafe 68%, #ede9fe 100%)' }}>
-                    <div className="absolute inset-y-0 left-[33.333%] w-px bg-white/80" />
-                    <div className="absolute inset-y-0 left-[66.666%] w-px bg-white/80" />
-                    <div
-                      className="absolute top-2 flex h-12 min-w-[42px] items-center justify-center rounded-xl px-2 text-center text-[11px] font-extrabold text-white shadow-lg"
-                      style={{
-                        left: `${timelineLeft}%`,
-                        width: `${timelineWidth}%`,
-                        background: 'linear-gradient(135deg, #2563eb, #0ea5e9)',
-                      }}
-                    >
-                      {scheduleDraft.start_time}<br />{scheduleDraft.end_time}
-                    </div>
-                  </div>
-                  <div className="mt-2 grid grid-cols-4 gap-1.5">
-                    <button type="button" onClick={() => moveTimeBlock(-15)} className="rounded-lg border bg-white py-2 text-[11px] font-bold" style={{ borderColor: '#cbd5e1', color: '#334155' }}>-15분</button>
-                    <button type="button" onClick={() => moveTimeBlock(15)} className="rounded-lg border bg-white py-2 text-[11px] font-bold" style={{ borderColor: '#cbd5e1', color: '#334155' }}>+15분</button>
-                    <button type="button" onClick={() => resizeTimeBlock(-15)} className="rounded-lg border bg-white py-2 text-[11px] font-bold" style={{ borderColor: '#cbd5e1', color: '#334155' }}>짧게</button>
-                    <button type="button" onClick={() => resizeTimeBlock(15)} className="rounded-lg border bg-white py-2 text-[11px] font-bold" style={{ borderColor: '#cbd5e1', color: '#334155' }}>길게</button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mb-3 sm:grid-cols-4">
-                  {TIME_PRESETS.map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => setScheduleTime(preset.start, preset.duration)}
-                      className="flex min-h-[82px] flex-col justify-between rounded-xl border p-3 text-left transition-colors"
-                      style={{
-                        background: scheduleDraft.start_time === preset.start && durationMinutes === preset.duration ? `${preset.tone}14` : '#fff',
-                        borderColor: scheduleDraft.start_time === preset.start && durationMinutes === preset.duration ? preset.tone : '#e2e8f0',
-                        color: '#181c1e',
-                      }}
-                    >
-                      <MaterialIcon icon={preset.icon} size={20} color={preset.tone} filled />
-                      <span>
-                        <span className="block text-xs font-extrabold">{preset.label}</span>
-                        <span className="block text-[11px]" style={{ color: '#64748b' }}>{preset.start} · {minutesToLabel(preset.duration)}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mb-3">
-                  <div className="flex justify-between text-[11px] font-semibold mb-1" style={{ color: '#64748b' }}>
-                    <span>06:00</span>
-                    <span>시작 {scheduleDraft.start_time}</span>
-                    <span>23:30</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={TIME_BLOCK_START}
-                    max={TIME_BLOCK_END - 30}
-                    step={15}
-                    value={Math.min(Math.max(startMinutes, TIME_BLOCK_START), TIME_BLOCK_END - 30)}
-                    onChange={(e) => setScheduleTime(minutesToTime(Number(e.target.value)), durationMinutes)}
-                    className="w-full accent-[#2563eb]"
-                  />
-                </div>
-
-                <div className="flex gap-1.5 mb-3">
-                  {DURATION_OPTIONS.map((duration) => (
-                    <button
-                      key={duration}
-                      type="button"
-                      onClick={() => setScheduleTime(scheduleDraft.start_time, duration)}
-                      className="flex-1 py-2 text-[11px] rounded-lg font-bold border transition-colors"
-                      style={{
-                        borderColor: Math.abs(durationMinutes - duration) < 1 ? '#2563eb' : '#e2e8f0',
-                        background: Math.abs(durationMinutes - duration) < 1 ? '#eef1ff' : '#fff',
-                        color: Math.abs(durationMinutes - duration) < 1 ? '#2563eb' : '#334155',
-                      }}
-                    >
-                      {minutesToLabel(duration)}
-                    </button>
-                  ))}
-                </div>
-
+              <div className="rounded-2xl p-4" style={{ background: '#f8fafc', border: '1px solid #ebeef1' }}>
+                <p className="text-xs font-bold mb-3" style={{ color: '#334155' }}>시간</p>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
-                    <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>직접 시작</span>
-                    <input type="time" className="w-full px-3 py-2 text-sm border rounded-xl outline-none" style={{ borderColor: '#e2e8f0', background: '#fff' }}
+                    <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>시작 시간</span>
+                    <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
+                      style={{ borderColor: '#e2e8f0', background: '#fff' }}
                       value={scheduleDraft.start_time}
-                      onChange={(e) => setScheduleTime(e.target.value, durationMinutes)} />
+                      onChange={(e) => setScheduleDraft((d) => ({ ...d, start_time: e.target.value }))}
+                      onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'} />
                   </label>
                   <label className="block">
-                    <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>직접 종료</span>
-                    <input type="time" className="w-full px-3 py-2 text-sm border rounded-xl outline-none" style={{ borderColor: scheduleDraft.start_time < scheduleDraft.end_time ? '#e2e8f0' : '#ef4444', background: '#fff' }}
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[11px] font-semibold" style={{ color: '#334155' }}>종료 시간</span>
+                      {isOvernight && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: '#ede9fe', color: '#7c3aed' }}>다음날</span>
+                      )}
+                    </div>
+                    <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
+                      style={{ borderColor: scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0', background: '#fff' }}
                       value={scheduleDraft.end_time}
-                      onChange={(e) => setScheduleDraft((d) => ({ ...d, end_time: e.target.value }))} />
+                      onChange={(e) => setScheduleDraft((d) => ({ ...d, end_time: e.target.value }))}
+                      onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                      onBlur={(e) => e.target.style.borderColor = scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0'} />
                   </label>
                 </div>
-                {scheduleDraft.start_time >= scheduleDraft.end_time && (
-                  <p className="text-xs mt-2" style={{ color: '#ef4444' }}>종료 시간은 시작 시간보다 늦어야 합니다</p>
+                {scheduleDraft.start_time === scheduleDraft.end_time && scheduleDraft.start_time && (
+                  <p className="text-xs mt-2" style={{ color: '#ef4444' }}>시작 시간과 종료 시간이 같습니다</p>
+                )}
+                {isOvernight && (
+                  <p className="text-xs mt-2" style={{ color: '#7c3aed' }}>자정을 넘기는 일정으로 등록됩니다</p>
                 )}
               </div>
               <button onClick={addSched} disabled={!canAddSched}
