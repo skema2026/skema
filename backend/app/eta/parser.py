@@ -11,7 +11,6 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 
 from .location_utils import normalize_location
 
@@ -27,7 +26,7 @@ _EVERYTIME_PM_MAP: dict[int, int] = {
 }
 
 # 한글 요일 → (영문 요일명, 0-based dow)
-_KR_TO_DAY: dict[str, Tuple[str, int]] = {
+_KR_TO_DAY: dict[str, tuple[str, int]] = {
     "월": ("MONDAY",    0),
     "화": ("TUESDAY",   1),
     "수": ("WEDNESDAY", 2),
@@ -50,7 +49,7 @@ class ParseSource:
     column_index:       int
     weekday_confidence: float
     time_confidence:    float
-    correction_notes:   List[str] = field(default_factory=list)
+    correction_notes:   list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -274,7 +273,7 @@ def _time_to_minutes(t: str) -> int:
     return -1
 
 
-def _normalize_time(raw: str) -> Tuple[str, float, str]:
+def _normalize_time(raw: str) -> tuple[str, float, str]:
     """
     시간 문자열 → (정규화된 HH:MM, 신뢰도, 보정 메모).
 
@@ -350,10 +349,10 @@ def _normalize_time(raw: str) -> Tuple[str, float, str]:
     return f"{h:02d}:{m:02d}", confidence, note.strip()
 
 
-def _dedup(entries: List[NormalizedEntry]) -> List[NormalizedEntry]:
+def _dedup(entries: list[NormalizedEntry]) -> list[NormalizedEntry]:
     """(title, day, start_time, end_time) 조합 기준 중복 제거."""
     seen: set[tuple] = set()
-    result: List[NormalizedEntry] = []
+    result: list[NormalizedEntry] = []
     for e in entries:
         key = (e.title.strip(), e.day, e.start_time, e.end_time)
         if key not in seen:
@@ -364,7 +363,7 @@ def _dedup(entries: List[NormalizedEntry]) -> List[NormalizedEntry]:
 
 # ── JSON 추출 유틸리티 ────────────────────────────────────────────────────────
 
-def _extract_json_array(text: str) -> Optional[list]:
+def _extract_json_array(text: str) -> list | None:
     """LLM 응답 텍스트에서 JSON 배열을 추출한다."""
     cleaned = re.sub(r"```(?:json)?\s*", "", text).replace("```", "").strip()
     start = cleaned.find("[")
@@ -409,7 +408,7 @@ _WEEKDAY_MAP: dict[str, tuple[str, int]] = {
 _GENERIC_SUBJECT_NAMES = frozenset({"수업", "class", "CLASS", "강의", "N/A", "Unknown", "unknown", ""})
 
 
-def _resolve_weekday(raw: str) -> Optional[tuple[str, int]]:
+def _resolve_weekday(raw: str) -> tuple[str, int] | None:
     """요일 문자열 → (day_name, dow). 인식 실패 시 None."""
     upper = raw.strip().upper()
     if upper in _WEEKDAY_MAP:
@@ -421,12 +420,12 @@ def _resolve_weekday(raw: str) -> Optional[tuple[str, int]]:
     return None
 
 
-def _parse_llm_array(data: list) -> List[NormalizedEntry]:
+def _parse_llm_array(data: list) -> list[NormalizedEntry]:
     """
     LLM flat array 응답 → 검증된 NormalizedEntry 목록.
     디버그 로그: detected weekday, calculated times, extracted subject_name.
     """
-    result: List[NormalizedEntry] = []
+    result: list[NormalizedEntry] = []
 
     for idx, item in enumerate(data):
         if not isinstance(item, dict):
@@ -480,7 +479,7 @@ def _parse_llm_array(data: list) -> List[NormalizedEntry]:
             )
             continue
 
-        notes: List[str] = []
+        notes: list[str] = []
         if start_note: notes.append(f"start:{start_note}")
         if end_note:   notes.append(f"end:{end_note}")
 
@@ -513,7 +512,7 @@ def _parse_llm_array(data: list) -> List[NormalizedEntry]:
 def parse_timetable_image(
     image_path: str,
     content_type: str,
-) -> Tuple[List[NormalizedEntry], GridModel, str]:
+) -> tuple[list[NormalizedEntry], GridModel, str]:
     """
     에브리타임 시간표 이미지 → NormalizedEntry 목록.
 

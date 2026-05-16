@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from typing import Optional, Tuple
 
 KR_AM = ("오전", "am", "AM")
 KR_PM = ("오후", "pm", "PM")
@@ -19,7 +18,7 @@ def _to_hhmm(h: int, m: int) -> str:
     return f"{h:02d}:{m:02d}"
 
 
-def parse_time_token(token: str) -> Optional[str]:
+def parse_time_token(token: str) -> str | None:
     if not token:
         return None
     t = token.strip()
@@ -64,7 +63,7 @@ def parse_time_token(token: str) -> Optional[str]:
     return _to_hhmm(hh, mm)
 
 
-def parse_time_range(text: str) -> Tuple[Optional[str], Optional[str]]:
+def parse_time_range(text: str) -> tuple[str | None, str | None]:
     if not text:
         return None, None
     s = text.strip()

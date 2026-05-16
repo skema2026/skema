@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from email_validator import EmailNotValidError, validate_email
 from pydantic import BaseModel, field_validator
@@ -8,7 +7,7 @@ from pydantic import BaseModel, field_validator
 class SignupRequest(BaseModel):
     email: str
     password: str
-    username: Optional[str] = None
+    username: str | None = None
 
     @field_validator("email")
     @classmethod
@@ -21,7 +20,7 @@ class SignupRequest(BaseModel):
 
     @field_validator("username")
     @classmethod
-    def normalize_username(cls, value: Optional[str]) -> Optional[str]:
+    def normalize_username(cls, value: str | None) -> str | None:
         if value is None:
             return None
         value = value.strip()
@@ -47,38 +46,38 @@ class TokenResponse(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
-    username: Optional[str] = None
+    username: str | None = None
     email: str
-    is_active: Optional[bool] = True
+    is_active: bool | None = True
     is_admin: bool = False
 
     model_config = {"from_attributes": True}
 
 
 class ProfileCreate(BaseModel):
-    user_type: Optional[str] = None
-    occupation: Optional[str] = None
-    goal_tasks: Optional[str] = None
-    sleep_start: Optional[str] = "23:00"
-    sleep_end: Optional[str] = "07:00"
-    is_college_student: Optional[bool] = None
-    semester_start_date: Optional[str] = None
+    user_type: str | None = None
+    occupation: str | None = None
+    goal_tasks: str | None = None
+    sleep_start: str | None = "23:00"
+    sleep_end: str | None = "07:00"
+    is_college_student: bool | None = None
+    semester_start_date: str | None = None
 
 
 class ProfileUpdate(ProfileCreate):
-    onboarding_completed: Optional[bool] = None
+    onboarding_completed: bool | None = None
 
 
 class ProfileResponse(BaseModel):
     id: int
     user_id: int
-    user_type: Optional[str] = None
-    occupation: Optional[str] = None
-    goal_tasks: Optional[str] = None
-    sleep_start: Optional[str] = None
-    sleep_end: Optional[str] = None
-    is_college_student: Optional[bool] = None
-    semester_start_date: Optional[str] = None
+    user_type: str | None = None
+    occupation: str | None = None
+    goal_tasks: str | None = None
+    sleep_start: str | None = None
+    sleep_end: str | None = None
+    is_college_student: bool | None = None
+    semester_start_date: str | None = None
     onboarding_completed: bool = False
     updated_at: datetime
 

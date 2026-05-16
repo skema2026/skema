@@ -1,6 +1,5 @@
 import re
-from datetime import date, datetime
-from typing import Optional
+from datetime import date as Date, datetime
 
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -10,13 +9,13 @@ _VALID_DAYS = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"}
 _DAY_CODES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 
 
-def _validate_time(v: Optional[str]) -> Optional[str]:
+def _validate_time(v: str | None) -> str | None:
     if v is not None and not _TIME_RE.match(v):
         raise ValueError("시간 형식은 HH:MM 이어야 합니다. (예: 09:00)")
     return v
 
 
-def _validate_color(v: Optional[str]) -> Optional[str]:
+def _validate_color(v: str | None) -> str | None:
     if v and not _COLOR_RE.match(v):
         raise ValueError("색상 코드는 #RRGGBB 또는 #RGB 형식이어야 합니다.")
     return v
@@ -43,21 +42,21 @@ def _date_to_day(date_str: str) -> str:
 # ── Schedule ──────────────────────────────────────────────────────────────────
 
 class ScheduleCreate(BaseModel):
-    course_name: Optional[str] = None
-    title: Optional[str] = None
-    professor: Optional[str] = None
-    location: Optional[str] = None
-    days: Optional[list[str | int]] = None
-    recurring_day: Optional[str] = None
-    day_of_week: Optional[int] = None
-    date: Optional[str] = None
+    course_name: str | None = None
+    title: str | None = None
+    professor: str | None = None
+    location: str | None = None
+    days: list[str | int] | None = None
+    recurring_day: str | None = None
+    day_of_week: int | None = None
+    date: str | None = None
     start_time: str
     end_time: str
-    schedule_type: Optional[str] = "class"
-    color_code: Optional[str] = "#6366F1"
-    color: Optional[str] = None
-    priority: Optional[int] = 0
-    is_completed: Optional[bool] = False
+    schedule_type: str | None = "class"
+    color_code: str | None = "#6366F1"
+    color: str | None = None
+    priority: int | None = 0
+    is_completed: bool | None = False
 
     @field_validator("days")
     @classmethod
@@ -107,20 +106,20 @@ class ScheduleCreate(BaseModel):
 
 
 class ScheduleUpdate(BaseModel):
-    course_name: Optional[str] = None
-    title: Optional[str] = None
-    professor: Optional[str] = None
-    location: Optional[str] = None
-    recurring_day: Optional[str] = None
-    day_of_week: Optional[int] = None
-    date: Optional[str] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    color_code: Optional[str] = None
-    color: Optional[str] = None
-    priority: Optional[int] = None
-    is_completed: Optional[bool] = None
-    schedule_type: Optional[str] = None
+    course_name: str | None = None
+    title: str | None = None
+    professor: str | None = None
+    location: str | None = None
+    recurring_day: str | None = None
+    day_of_week: int | None = None
+    date: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    color_code: str | None = None
+    color: str | None = None
+    priority: int | None = None
+    is_completed: bool | None = None
+    schedule_type: str | None = None
 
     @field_validator("recurring_day")
     @classmethod
@@ -155,10 +154,10 @@ class ScheduleResponse(BaseModel):
     user_id: int
     course_name: str
     title: str
-    professor: Optional[str] = None
-    location: Optional[str] = None
+    professor: str | None = None
+    location: str | None = None
     recurring_day: str
-    date: Optional[str] = None
+    date: str | None = None
     start_time: str
     end_time: str
     color_code: str = "#6366F1"
@@ -166,7 +165,7 @@ class ScheduleResponse(BaseModel):
     priority: int = 0
     is_completed: bool = False
     schedule_type: str = "class"
-    schedule_source: Optional[str] = None
+    schedule_source: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -175,15 +174,15 @@ class ScheduleResponse(BaseModel):
 
 class ExamScheduleCreate(BaseModel):
     title: str
-    schedule_id: Optional[int] = None
-    subject: Optional[str] = None
-    exam_date: date
-    exam_time: Optional[str] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    location: Optional[str] = None
-    memo: Optional[str] = None
-    exam_duration_minutes: Optional[int] = 120
+    schedule_id: int | None = None
+    subject: str | None = None
+    exam_date: Date
+    exam_time: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str | None = None
+    memo: str | None = None
+    exam_duration_minutes: int | None = 120
 
     @field_validator("exam_time", "start_time", "end_time")
     @classmethod
@@ -192,16 +191,16 @@ class ExamScheduleCreate(BaseModel):
 
 
 class ExamScheduleUpdate(BaseModel):
-    title: Optional[str] = None
-    schedule_id: Optional[int] = None
-    subject: Optional[str] = None
-    exam_date: Optional[date] = None
-    exam_time: Optional[str] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    location: Optional[str] = None
-    memo: Optional[str] = None
-    exam_duration_minutes: Optional[int] = None
+    title: str | None = None
+    schedule_id: int | None = None
+    subject: str | None = None
+    exam_date: Date | None = None
+    exam_time: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str | None = None
+    memo: str | None = None
+    exam_duration_minutes: int | None = None
 
     @field_validator("exam_time", "start_time", "end_time")
     @classmethod
@@ -212,16 +211,16 @@ class ExamScheduleUpdate(BaseModel):
 class ExamScheduleResponse(BaseModel):
     id: int
     user_id: int
-    schedule_id: Optional[int] = None
+    schedule_id: int | None = None
     title: str
-    subject: Optional[str] = None
-    exam_date: date
-    exam_time: Optional[str] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    location: Optional[str] = None
-    memo: Optional[str] = None
-    exam_duration_minutes: Optional[int] = None
+    subject: str | None = None
+    exam_date: Date
+    exam_time: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str | None = None
+    memo: str | None = None
+    exam_duration_minutes: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -230,12 +229,12 @@ class ExamScheduleResponse(BaseModel):
 
 class EventCreate(BaseModel):
     title: str
-    date: date
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    location: Optional[str] = None
-    color_code: Optional[str] = "#F59E0B"
-    memo: Optional[str] = None
+    date: Date
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str | None = None
+    color_code: str | None = "#F59E0B"
+    memo: str | None = None
 
     @field_validator("start_time", "end_time")
     @classmethod
@@ -249,13 +248,13 @@ class EventCreate(BaseModel):
 
 
 class EventUpdate(BaseModel):
-    title: Optional[str] = None
-    date: Optional[date] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    location: Optional[str] = None
-    color_code: Optional[str] = None
-    memo: Optional[str] = None
+    title: str | None = None
+    date: Date | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str | None = None
+    color_code: str | None = None
+    memo: str | None = None
 
     @field_validator("start_time", "end_time")
     @classmethod
@@ -272,11 +271,11 @@ class EventResponse(BaseModel):
     id: int
     user_id: int
     title: str
-    date: date
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    location: Optional[str] = None
+    date: Date
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str | None = None
     color_code: str = "#F59E0B"
-    memo: Optional[str] = None
+    memo: str | None = None
 
     model_config = {"from_attributes": True}

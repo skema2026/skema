@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Tuple
 
 import numpy as np
 import cv2  # opencv-python-headless
@@ -33,11 +32,11 @@ def _load_image(image_bytes: bytes) -> np.ndarray:
     return img
 
 
-def _cluster_line_positions(positions: List[int], min_gap: int = 5) -> List[Tuple[int, int]]:
+def _cluster_line_positions(positions: list[int], min_gap: int = 5) -> list[tuple[int, int]]:
     """연속된 픽셀 위치들을 클러스터(start, end)로 묶는다."""
     if not positions:
         return []
-    clusters: List[Tuple[int, int]] = []
+    clusters: list[tuple[int, int]] = []
     start = positions[0]
     prev  = positions[0]
     for p in positions[1:]:
@@ -132,7 +131,7 @@ def _detect_gutter_x(v_proj: np.ndarray, w: int) -> int:
     return gutter_x
 
 
-def _determine_start_minute(content_rows: List[int], header_bottom: int, img_h: int) -> int:
+def _determine_start_minute(content_rows: list[int], header_bottom: int, img_h: int) -> int:
     """
     첫 번째 콘텐츠 행 위치를 기반으로 start_minute(0 또는 30)을 결정한다.
 
@@ -174,7 +173,7 @@ def _determine_start_minute(content_rows: List[int], header_bottom: int, img_h: 
 
 
 def _refine_grid_origin(
-    solid_centers: List[int],
+    solid_centers: list[int],
     grid_origin_y: int,
     pixels_per_slot: float,
 ) -> int:
@@ -216,7 +215,7 @@ def _refine_grid_origin(
     return best_gy
 
 
-def _detect_time_lines_from_gutter(gray: np.ndarray, gutter_x: int) -> List[int]:
+def _detect_time_lines_from_gutter(gray: np.ndarray, gutter_x: int) -> list[int]:
     """
     왼쪽 시간 거터에서 시간축 실선을 직접 찾는다.
 
@@ -305,7 +304,7 @@ def detect_grid(image_bytes: bytes) -> GridModel:
     gutter_x = _detect_gutter_x(v_proj, w)
 
     day_region = v_proj[gutter_x:]
-    day_col_edges: List[Tuple[int, int]] = []
+    day_col_edges: list[tuple[int, int]] = []
     if day_region.max() > 0:
         thresh = 0.35 * float(day_region.max())
         day_xs = [gutter_x + x for x, val in enumerate(day_region) if val >= thresh]
@@ -332,7 +331,7 @@ def detect_grid(image_bytes: bytes) -> GridModel:
     #   bounds[0] = (0, gutter_x)       ← time gutter
     #   bounds[1] = (gutter_x, sep[0])  ← 월(MONDAY, dow=0)
     #   bounds[N] = (sep[N-2], w-1)     ← 마지막 요일
-    column_bounds: List[Tuple[int, int]] = [(0, gutter_x)]
+    column_bounds: list[tuple[int, int]] = [(0, gutter_x)]
     prev = gutter_x
     for sx in sep_centers:
         column_bounds.append((prev, sx))
@@ -391,10 +390,10 @@ def detect_grid(image_bytes: bytes) -> GridModel:
 
     proj_max = float(content_h_proj.max()) if content_h_proj.max() > 0 else 1.0
 
-    def _collect_row_centers(thresh_ratio: float) -> List[int]:
+    def _collect_row_centers(thresh_ratio: float) -> list[int]:
         idxs = [int(y) for y, val in enumerate(content_h_proj)
                 if val >= thresh_ratio * proj_max]
-        centers: List[int] = []
+        centers: list[int] = []
         if not idxs:
             return centers
         s, p = idxs[0], idxs[0]
@@ -430,7 +429,7 @@ def detect_grid(image_bytes: bytes) -> GridModel:
     # ── :30 위치 채우기 ───────────────────────────────────────────────────
     # solid 선 사이의 중간에 all_centers 점이 있으면 그 값을, 없으면 보간값 사용.
     all_set = set(all_centers)
-    row_bounds: List[int] = []
+    row_bounds: list[int] = []
     if solid_centers:
         for i, sc in enumerate(solid_centers):
             row_bounds.append(sc)
@@ -452,7 +451,7 @@ def detect_grid(image_bytes: bytes) -> GridModel:
     # 근접 중복 제거
     if len(row_bounds) >= 2:
         min_gap = max(2, int(pixels_per_slot * 0.3))
-        deduped: List[int] = [row_bounds[0]]
+        deduped: list[int] = [row_bounds[0]]
         for y in row_bounds[1:]:
             if y - deduped[-1] >= min_gap:
                 deduped.append(y)
@@ -501,7 +500,7 @@ def detect_grid(image_bytes: bytes) -> GridModel:
 
 # ── Stage 2: 수업 블록 감지 ──────────────────────────────────────────────────
 
-def _merge_blocks(raw: List[DetectedBlock], step: float) -> List[DetectedBlock]:
+def _merge_blocks(raw: list[DetectedBlock], step: float) -> list[DetectedBlock]:
     """
     같은 수업 블록이 그리드 선/마스크 아티팩트로 여러 contour로 분리된 경우 병합한다.
 
@@ -547,11 +546,11 @@ def _merge_blocks(raw: List[DetectedBlock], step: float) -> List[DetectedBlock]:
             if y_gap < threshold_y:
                 union(i, j)
 
-    groups: dict[int, List[int]] = {}
+    groups: dict[int, list[int]] = {}
     for i in range(n):
         groups.setdefault(find(i), []).append(i)
 
-    merged: List[DetectedBlock] = []
+    merged: list[DetectedBlock] = []
     for indices in groups.values():
         x0 = min(raw[i].bbox[0] for i in indices)
         y0 = min(raw[i].bbox[1] for i in indices)
@@ -570,7 +569,7 @@ def _merge_blocks(raw: List[DetectedBlock], step: float) -> List[DetectedBlock]:
     return merged
 
 
-def detect_blocks(image_bytes: bytes, grid: GridModel) -> List[DetectedBlock]:
+def detect_blocks(image_bytes: bytes, grid: GridModel) -> list[DetectedBlock]:
     """
     색상/텍스트 영역을 기반으로 수업 블록을 감지한다.
 
@@ -594,7 +593,7 @@ def detect_blocks(image_bytes: bytes, grid: GridModel) -> List[DetectedBlock]:
     # 연속 슬롯을 하나의 수업 블록으로 본다.
     if grid.pixels_per_slot > 0 and len(grid.column_bounds) >= 2:
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        slot_blocks: List[DetectedBlock] = []
+        slot_blocks: list[DetectedBlock] = []
         max_slots = int((h - grid.grid_origin_y) / grid.pixels_per_slot)
         max_slots = max(1, min(max_slots, 26))
 
@@ -693,7 +692,7 @@ def detect_blocks(image_bytes: bytes, grid: GridModel) -> List[DetectedBlock]:
     # ── contour 추출 및 1차 필터 ────────────────────────────────────────────
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    raw_blocks: List[DetectedBlock] = []
+    raw_blocks: list[DetectedBlock] = []
     for cnt in contours:
         x, y, bw, bh = cv2.boundingRect(cnt)
         if bw < 20 or bh < 15:
@@ -727,7 +726,7 @@ def detect_blocks(image_bytes: bytes, grid: GridModel) -> List[DetectedBlock]:
 
 # ── Stage 3: 요일/시간 추론 ──────────────────────────────────────────────────
 
-def _column_for_x(center_x: int, columns: List[Tuple[int, int]]) -> int:
+def _column_for_x(center_x: int, columns: list[tuple[int, int]]) -> int:
     """
     center_x가 속하는 컬럼 인덱스를 경계 포함(boundary containment) 방식으로 반환.
     center_x가 어느 (left, right) 구간에 포함되는지 우선 판단하고,
@@ -742,7 +741,7 @@ def _column_for_x(center_x: int, columns: List[Tuple[int, int]]) -> int:
     return int(np.argmin(dists))
 
 
-def _snap_to_row(y: int, row_bounds: List[int]) -> int:
+def _snap_to_row(y: int, row_bounds: list[int]) -> int:
     """y를 가장 가까운 row_bounds 인덱스로 스냅한다."""
     if not row_bounds:
         return 0
@@ -752,7 +751,7 @@ def _snap_to_row(y: int, row_bounds: List[int]) -> int:
     return max(candidates)  # 동점 시 더 늦은(아래) 슬롯 선택
 
 
-def _snap_end_to_row(y: int, row_bounds: List[int]) -> int:
+def _snap_end_to_row(y: int, row_bounds: list[int]) -> int:
     """
     블록 bottom_y → end row 인덱스.
     슬롯 간격의 30% 이상 걸쳐있으면 다음 슬롯으로 올림(ceiling).
@@ -809,7 +808,7 @@ def _height_to_slots(top_y: int, bottom_y: int, grid: GridModel) -> int:
     return max(1, _snap_end_to_row(bottom_y, grid.row_bounds) - _px_to_slot(top_y, grid))
 
 
-def infer_weekday_time(block: DetectedBlock, grid: GridModel) -> Tuple[int, str, str]:
+def infer_weekday_time(block: DetectedBlock, grid: GridModel) -> tuple[int, str, str]:
     raw_col_idx = _column_for_x(block.center_x, grid.column_bounds)
     day_idx = max(0, min(6, raw_col_idx - 1))
 
@@ -830,8 +829,8 @@ def infer_weekday_time(block: DetectedBlock, grid: GridModel) -> Tuple[int, str,
 
 # ── Stage 4: 정규화 출력 ──────────────────────────────────────────────────────
 
-def normalize_blocks(blocks: List[DetectedBlock], grid: GridModel) -> List[NormalizedEntry]:
-    out: List[NormalizedEntry] = []
+def normalize_blocks(blocks: list[DetectedBlock], grid: GridModel) -> list[NormalizedEntry]:
+    out: list[NormalizedEntry] = []
     seen: set[tuple] = set()
 
     for b in blocks:

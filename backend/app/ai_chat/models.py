@@ -1,9 +1,8 @@
 """AI 채팅 DB 모델 + API 스키마."""
 import enum
 from datetime import datetime
-from typing import List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import Column, DateTime, Enum as SAEnum, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -55,7 +54,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    messages: List[ChatMessage] = []  # 대화 히스토리
+    messages: list[ChatMessage] = Field(default_factory=list)  # 대화 히스토리
 
 
 class ChatResponse(BaseModel):

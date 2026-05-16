@@ -2,7 +2,6 @@
 
 흐름: HTTP 요청 → 엔드포인트 → run_ai_agent(service.py) → 응답 + 로그 저장
 """
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -101,7 +100,7 @@ def readiness_summary(
     return {"summary": result.text}
 
 
-@router.get("/ai-chat-logs", response_model=List[AIChatLogResponse])
+@router.get("/ai-chat-logs", response_model=list[AIChatLogResponse])
 def list_logs(
     limit: int = 100,
     db: Session = Depends(get_db),

@@ -15,7 +15,7 @@ Raises LLMError (or a subclass) on failure.
 """
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from app.core.config import settings
 
@@ -34,7 +34,7 @@ class LLMResult:
     status: str                           # "success"
     provider: str                         # "openai"
     model: str                            # exact model string
-    reasoning_details: Optional[Any] = field(default=None)
+    reasoning_details: Any | None = field(default=None)
 
     @property
     def text(self) -> str:

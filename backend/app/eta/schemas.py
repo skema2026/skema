@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -8,8 +7,8 @@ class ParsedEntry(BaseModel):
     day_of_week: int  # 0=월 ... 6=일
     start_time: str  # HH:MM
     end_time: str  # HH:MM
-    location: Optional[str] = None
-    raw_text: Optional[str] = None
+    location: str | None = None
+    raw_text: str | None = None
     source: str = "eta_image"
     requires_review: bool = False
 
