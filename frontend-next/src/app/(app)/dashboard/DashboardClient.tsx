@@ -27,6 +27,7 @@ import {
 import { TypeAnalysis, WeeklyReport } from './_components/DashboardReports';
 import { SmartAlertPanel } from './_components/SmartAlertPanel';
 import { EtaReimportModal } from './_components/EtaReimportModal';
+import { ChatWindow } from '../ai_chat/_components/ChatWindow';
 
 interface Props {
   initialSchedules: Schedule[];
@@ -363,6 +364,41 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                     </div>
                   </div>
                 </div>
+
+                {todaySchedules.length > 0 && (
+                  <div className="mt-4">
+                    <p className="mb-2 text-xs font-black text-slate-400">오늘 일정</p>
+                    <div className="space-y-2">
+                      {todaySchedules.map((schedule) => (
+                        <button
+                          key={schedule.id}
+                          onClick={() => handleToggleComplete(schedule)}
+                          className="flex w-full items-center gap-3 rounded-lg border border-blue-50 p-3 text-left transition hover:bg-blue-50/70"
+                        >
+                          <span
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2"
+                            style={{
+                              background: schedule.is_completed ? '#2563eb' : '#fff',
+                              borderColor: schedule.is_completed ? '#2563eb' : '#bfdbfe',
+                            }}
+                          >
+                            {schedule.is_completed && (
+                              <MaterialIcon icon="check" size={13} color="#fff" />
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className={`block truncate text-sm font-black ${schedule.is_completed ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+                              {schedule.title}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400">
+                              {schedule.start_time} - {schedule.end_time}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
@@ -413,53 +449,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
               </div>
             </section>
 
-            <section className="grid min-h-[560px] gap-5 xl:grid-cols-[360px_1fr]">
-              <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-base font-black text-slate-950">오늘 할 일</h2>
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
-                    {remainingToday.length}개 남음
-                  </span>
-                </div>
-
-                {todaySchedules.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-blue-100 bg-blue-50/40 p-6 text-center">
-                    <p className="text-sm font-bold text-slate-500">오늘은 비어 있습니다</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {todaySchedules.map((schedule) => (
-                      <button
-                        key={schedule.id}
-                        onClick={() => handleToggleComplete(schedule)}
-                        className="flex w-full items-center gap-3 rounded-lg border border-blue-50 p-3 text-left transition hover:bg-blue-50/70"
-                      >
-                        <span
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2"
-                          style={{
-                            background: schedule.is_completed ? '#2563eb' : '#fff',
-                            borderColor: schedule.is_completed ? '#2563eb' : '#bfdbfe',
-                          }}
-                        >
-                          {schedule.is_completed && (
-                            <MaterialIcon icon="check" size={13} color="#fff" />
-                          )}
-                        </span>
-
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-black text-slate-950">
-                            {schedule.title}
-                          </span>
-                          <span className="text-xs font-bold text-slate-400">
-                            {schedule.start_time} - {schedule.end_time}
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
+            <section className="grid min-h-[560px] gap-5 xl:grid-cols-[1fr_360px]">
               <div className="flex min-w-0 flex-col rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -494,6 +484,17 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                 <div className="min-h-[480px] flex-1 overflow-hidden rounded-lg border border-blue-50">
                   <Timetable schedules={schedules} exams={exams} weekStart={weekStart} />
                 </div>
+              </div>
+
+              <div className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm">
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid #ebeef1', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: 7, background: 'linear-gradient(135deg, #2563eb, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <MaterialIcon icon="smart_toy" size={13} color="#fff" filled />
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: '#181c1e' }}>AI 채팅</span>
+                  <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 'auto' }}>일정을 자연어로 관리</span>
+                </div>
+                <ChatWindow compact />
               </div>
             </section>
 
