@@ -1,6 +1,7 @@
 'use client';
 
 import type { MouseEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -126,6 +127,7 @@ export function DashboardHeader({
   onOpenSettings,
   onLogout,
 }: DashboardHeaderProps) {
+  const router = useRouter();
   return (
     <header
       className="skema-dashboard-header"
@@ -173,6 +175,16 @@ export function DashboardHeader({
         >
           <MaterialIcon icon="add" size={16} color="#fff" />
           <span className="hide-mobile">일정</span> 추가
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push('/ai_chat')}
+          title="AI 어시스턴트"
+          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 700, color: '#2563eb', cursor: 'pointer' }}
+        >
+          <MaterialIcon icon="smart_toy" size={16} color="#2563eb" filled />
+          <span className="hide-mobile">AI 채팅</span>
         </button>
 
         <button
