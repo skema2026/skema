@@ -434,8 +434,12 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         if not e:
             return f"❌ ID {eid} 시험 일정을 찾을 수 없습니다."
         exam_title = e.title
+        linked_count = db.query(Schedule).filter(Schedule.user_id == user_id, Schedule.linked_exam_id == eid).delete(synchronize_session=False)
         db.delete(e)
         db.commit()
-        return f"🗑️ 시험 '{exam_title}' 삭제 완료!"
+        result = f"🗑️ 시험 '{exam_title}' 삭제 완료!"
+        if linked_count > 0:
+            result += f"\n📚 연결된 공부 블록 {linked_count}개도 함께 삭제했습니다."
+        return result
 
     return f"❌ 알 수 없는 도구: {tool_name}"

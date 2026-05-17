@@ -68,9 +68,11 @@ def update_exam(db: Session, exam: ExamSchedule, updates: dict) -> ExamSchedule:
     return exam
 
 
-def delete_exam(db: Session, exam: ExamSchedule) -> None:
+def delete_exam(db: Session, exam: ExamSchedule) -> int:
+    linked_count = db.query(Schedule).filter(Schedule.linked_exam_id == exam.id).delete(synchronize_session=False)
     db.delete(exam)
     db.commit()
+    return linked_count
 
 
 # ── Event ─────────────────────────────────────────────────────────────────────
