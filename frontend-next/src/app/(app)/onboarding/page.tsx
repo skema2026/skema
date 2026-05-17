@@ -578,7 +578,13 @@ export default function OnboardingPage() {
               </p>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
-                  onClick={() => { setShowEtaResetConfirm(false); setPhase('eta-upload'); }}
+                  onClick={async () => {
+                    setShowEtaResetConfirm(false);
+                    try {
+                      await api.delete('/eta/schedules');
+                    } catch { /* 삭제 실패 시 무시하고 진행 */ }
+                    setPhase('eta-upload');
+                  }}
                   style={{ flex: 1, height: 44, borderRadius: 11, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}
                 >예</button>
                 <button
