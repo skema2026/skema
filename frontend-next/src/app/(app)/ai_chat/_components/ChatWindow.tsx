@@ -75,7 +75,7 @@ function WelcomeCard() {
   );
 }
 
-export function ChatWindow({ compact = false }: { compact?: boolean }) {
+export function ChatWindow() {
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -158,7 +158,7 @@ export function ChatWindow({ compact = false }: { compact?: boolean }) {
         }
       `}</style>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', maxWidth: compact ? 'none' : 720, width: '100%', margin: '0 auto' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', maxWidth: 720, width: '100%', margin: '0 auto' }}>
         {/* 상단 액션 */}
         {messages.length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px 0' }}>
