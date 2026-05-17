@@ -217,6 +217,10 @@ export default function OnboardingPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatingStep, setGeneratingStep] = useState(0);
+  const [showEtaResetConfirm, setShowEtaResetConfirm] = useState(false);
+  const [showConflictConfirm, setShowConflictConfirm] = useState(false);
+  const [conflictList, setConflictList] = useState<{ title: string; time: string }[]>([]);
+  const [pendingValidEntries, setPendingValidEntries] = useState<EtaEntry[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeSteps = isCollegeStudent ? CHAT_STEPS_COLLEGE : CHAT_STEPS_NON_COLLEGE;
@@ -267,6 +271,43 @@ export default function OnboardingPage() {
 
   /** 새 파일 선택 후 분석 → review 화면 이동 */
   const handleParseEtaImage = (file: File) => _parseEtaFile(file, true);
+
+  const timesOverlap = (s1: string, e1: string, s2: string, e2: string) => s1 < e2 && e1 > s2;
+
+  const executeEtaSave = async (entries: EtaEntry[]) => {
+    setEtaSaving(true);
+    try {
+      const { data } = await api.post('/eta/save-schedules', {
+        entries: entries.map(({ subject_name, day_of_week, start_time, end_time, location, source }) => ({
+          subject_name, day_of_week, start_time, end_time, location: location ?? '', source,
+        })),
+      });
+      if (data.reset) {
+        toast.success(`기존 시간표를 초기화하고 ${entries.length}개 과목을 새로 등록했습니다.`);
+      } else {
+        toast.success(`${entries.length}개 과목을 시간표에 등록했습니다 ✅`);
+      }
+    } catch {
+      toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setEtaSaving(false);
+      setPhase('external-exam');
+    }
+  };
+
+  const handleCollegeYes = async () => {
+    setIsCollegeStudent(true);
+    setSelectedType('student');
+    try {
+      const { data } = await api.get('/schedules');
+      const hasEta = Array.isArray(data) && data.some((s: { schedule_source?: string }) => s.schedule_source === 'eta_import');
+      if (hasEta) {
+        setShowEtaResetConfirm(true);
+        return;
+      }
+    } catch { /* 확인 실패 시 그냥 진행 */ }
+    setPhase('eta-upload');
+  };
 
   /** review 화면에서 기존 이미지 재분석 (화면 이동 없이) */
   const handleReParseEtaImage = async () => {
@@ -495,11 +536,7 @@ export default function OnboardingPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <button
-              onClick={() => {
-                setIsCollegeStudent(true);
-                setSelectedType('student');
-                setPhase('eta-upload');
-              }}
+              onClick={handleCollegeYes}
               className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{ background: '#fff', borderColor: '#ebeef1', boxShadow: '0 2px 12px rgba(26,77,178,0.06)' }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.background = '#eef1ff'; }}
@@ -534,6 +571,29 @@ export default function OnboardingPage() {
             </button>
           </div>
         </div>
+
+        {/* 이전 시간표 초기화 확인 모달 */}
+        {showEtaResetConfirm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+            <div style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', maxWidth: 360, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
+              <p style={{ fontWeight: 800, fontSize: 17, color: '#181c1e', marginBottom: 8 }}>이전 시간표를 초기화하시겠습니까?</p>
+              <p style={{ fontSize: 13, color: '#3f4b61', marginBottom: 24, lineHeight: 1.7 }}>
+                기존에 등록된 에타 시간표가 삭제되고 새로 등록하는 시간표로 교체됩니다.<br />
+                시험 일정 및 다른 일정은 그대로 유지됩니다.
+              </p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => { setShowEtaResetConfirm(false); setPhase('eta-upload'); }}
+                  style={{ flex: 1, height: 44, borderRadius: 11, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}
+                >예</button>
+                <button
+                  onClick={() => setShowEtaResetConfirm(false)}
+                  style={{ flex: 1, height: 44, borderRadius: 11, border: '1px solid #ebeef1', background: '#fff', color: '#334155', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}
+                >아니요</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -675,24 +735,31 @@ export default function OnboardingPage() {
         setPhase('external-exam');
         return;
       }
-      setEtaSaving(true);
+
+      // 비-eta 일정과의 시간 충돌 확인
       try {
-        const { data } = await api.post('/eta/save-schedules', {
-          entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source }) => ({
-            subject_name, day_of_week, start_time, end_time, location: location ?? '', source,
-          })),
-        });
-        if (data.reset) {
-          toast.success(`기존 시간표를 초기화하고 ${valid.length}개 과목을 새로 등록했습니다.`);
-        } else {
-          toast.success(`${valid.length}개 과목을 시간표에 등록했습니다 ✅`);
+        const { data: allSchedules } = await api.get('/schedules');
+        const nonEta = (allSchedules as Array<{ schedule_source?: string; recurring_day?: string; day_of_week?: number; start_time: string; end_time: string; title: string }>)
+          .filter((s) => s.schedule_source !== 'eta_import' && s.recurring_day);
+        const conflicts: { title: string; time: string }[] = [];
+        for (const entry of valid) {
+          for (const sched of nonEta) {
+            if (recurringDayToIndex(sched.recurring_day) === entry.day_of_week &&
+                timesOverlap(entry.start_time, entry.end_time, sched.start_time, sched.end_time) &&
+                !conflicts.some((c) => c.title === sched.title)) {
+              conflicts.push({ title: sched.title, time: `${DAY_FULL_LABELS[entry.day_of_week]} ${sched.start_time}~${sched.end_time}` });
+            }
+          }
         }
-      } catch {
-            toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
-      } finally {
-        setEtaSaving(false);
-        setPhase('external-exam');
-      }
+        if (conflicts.length > 0) {
+          setConflictList(conflicts);
+          setPendingValidEntries(valid);
+          setShowConflictConfirm(true);
+          return;
+        }
+      } catch { /* 충돌 확인 실패 시 그냥 저장 */ }
+
+      await executeEtaSave(valid);
     };
 
     return (
@@ -937,6 +1004,34 @@ export default function OnboardingPage() {
             </button>
           </div>
         </div>
+
+        {/* 일정 충돌 확인 모달 */}
+        {showConflictConfirm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+            <div style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', maxWidth: 400, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
+              <p style={{ fontWeight: 800, fontSize: 17, color: '#181c1e', marginBottom: 8 }}>기존 일정과 겹치는 항목이 있습니다</p>
+              <p style={{ fontSize: 13, color: '#3f4b61', marginBottom: 12 }}>다음 일정과 시간이 겹칩니다. 삭제하고 새 시간표로 추가할까요?</p>
+              <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: '10px 14px', marginBottom: 20, maxHeight: 160, overflowY: 'auto' }}>
+                {conflictList.map((c, i) => (
+                  <div key={i} style={{ fontSize: 13, color: '#92400e', marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700 }}>{c.title}</span>
+                    <span style={{ color: '#b45309', marginLeft: 6 }}>{c.time}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={async () => { setShowConflictConfirm(false); await executeEtaSave(pendingValidEntries); }}
+                  style={{ flex: 1, height: 44, borderRadius: 11, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+                >삭제하고 추가</button>
+                <button
+                  onClick={() => { setShowConflictConfirm(false); setPendingValidEntries([]); setConflictList([]); }}
+                  style={{ flex: 1, height: 44, borderRadius: 11, border: '1px solid #ebeef1', background: '#fff', color: '#334155', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                >취소</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
