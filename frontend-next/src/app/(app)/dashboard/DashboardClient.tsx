@@ -9,7 +9,7 @@ import { ClassForm } from '@/components/class-form/ClassForm';
 import { ExamList } from '@/components/exam/ExamList';
 import { SettingsModal } from '@/components/settings/SettingsModal';
 import { useSchedules, useToggleComplete } from '@/hooks/useSchedules';
-import { useExams } from '@/hooks/useExams';
+import { useExams, useDeleteExam } from '@/hooks/useExams';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
@@ -17,7 +17,7 @@ import { api } from '@/lib/api';
 import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 import { timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
-import { Schedule, UserProfile } from '@/types';
+import { Schedule, UserProfile, ExamSchedule } from '@/types';
 import {
   DashboardHeader,
   DashboardStyles,
@@ -46,6 +46,9 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
 
   const schedulesRef = useRef(schedules);
   useEffect(() => { schedulesRef.current = schedules; }, [schedules]);
+
+  const deleteExam = useDeleteExam();
+  const [examActionTarget, setExamActionTarget] = useState<ExamSchedule | null>(null);
 
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
@@ -382,7 +385,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                       return (
                         <button
                           key={exam.id}
-                          onClick={() => setSecondaryPanel('exams')}
+                          onClick={() => setExamActionTarget(exam)}
                           className="flex w-full items-center justify-between gap-3 rounded-lg border border-blue-50 p-3 text-left transition hover:bg-blue-50"
                         >
                           <span className="min-w-0">
@@ -590,6 +593,55 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
         onClose={() => setIsEtaReimportOpen(false)}
         existingEtaCount={etaScheduleCount}
       />
+
+      {examActionTarget && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setExamActionTarget(null)}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: 18, padding: '24px 20px', maxWidth: 300, width: '90%', boxShadow: '0 12px 48px rgba(0,0,0,0.18)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ fontWeight: 800, fontSize: 15, color: '#181c1e', marginBottom: 4 }}>{examActionTarget.title}</p>
+            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>
+              {examActionTarget.exam_date}
+              {(() => {
+                const days = Math.ceil((new Date(`${examActionTarget.exam_date}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000);
+                return days >= 0 ? ` · ${formatDday(days)}` : '';
+              })()}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => { setExamActionTarget(null); setSecondaryPanel('exams'); }}
+                style={{ padding: '11px 0', borderRadius: 11, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#2563eb', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+              >
+                편집하기
+              </button>
+              <button
+                onClick={() => {
+                  if (!confirm('시험 일정을 삭제하시겠습니까?')) return;
+                  const target = examActionTarget;
+                  setExamActionTarget(null);
+                  deleteExam.mutate(target.id, {
+                    onSuccess: () => toast.success('시험 일정이 삭제되었습니다'),
+                    onError: () => toast.error('삭제 중 오류가 발생했습니다'),
+                  });
+                }}
+                style={{ padding: '11px 0', borderRadius: 11, border: 'none', background: '#fee2e2', color: '#dc2626', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+              >
+                삭제하기
+              </button>
+              <button
+                onClick={() => setExamActionTarget(null)}
+                style={{ padding: '8px 0', borderRadius: 11, border: 'none', background: 'none', color: '#94a3b8', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ShareDialog
         open={isShareModalOpen}
