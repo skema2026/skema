@@ -571,7 +571,6 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                     <SmartAlertPanel
                       exams={exams}
                       schedules={schedules}
-                      currentWeekStart={weekStart}
                     />
                   )}
                 </div>
