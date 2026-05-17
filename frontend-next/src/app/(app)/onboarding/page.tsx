@@ -677,12 +677,16 @@ export default function OnboardingPage() {
       }
       setEtaSaving(true);
       try {
-        await api.post('/eta/save-schedules', {
+        const { data } = await api.post('/eta/save-schedules', {
           entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source }) => ({
             subject_name, day_of_week, start_time, end_time, location: location ?? '', source,
           })),
         });
-        toast.success(`${valid.length}개 과목을 시간표에 등록했습니다 ✅`);
+        if (data.reset) {
+          toast.success(`기존 시간표를 초기화하고 ${valid.length}개 과목을 새로 등록했습니다.`);
+        } else {
+          toast.success(`${valid.length}개 과목을 시간표에 등록했습니다 ✅`);
+        }
       } catch {
             toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
       } finally {
