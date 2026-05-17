@@ -218,9 +218,6 @@ export default function OnboardingPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatingStep, setGeneratingStep] = useState(0);
   const [showEtaResetConfirm, setShowEtaResetConfirm] = useState(false);
-  const [showConflictConfirm, setShowConflictConfirm] = useState(false);
-  const [conflictList, setConflictList] = useState<{ title: string; time: string }[]>([]);
-  const [pendingValidEntries, setPendingValidEntries] = useState<EtaEntry[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeSteps = isCollegeStudent ? CHAT_STEPS_COLLEGE : CHAT_STEPS_NON_COLLEGE;
@@ -271,8 +268,6 @@ export default function OnboardingPage() {
 
   /** 새 파일 선택 후 분석 → review 화면 이동 */
   const handleParseEtaImage = (file: File) => _parseEtaFile(file, true);
-
-  const timesOverlap = (s1: string, e1: string, s2: string, e2: string) => s1 < e2 && e1 > s2;
 
   const executeEtaSave = async (entries: EtaEntry[]) => {
     setEtaSaving(true);
@@ -735,30 +730,6 @@ export default function OnboardingPage() {
         setPhase('external-exam');
         return;
       }
-
-      // 비-eta 일정과의 시간 충돌 확인
-      try {
-        const { data: allSchedules } = await api.get('/schedules');
-        const nonEta = (allSchedules as Array<{ schedule_source?: string; recurring_day?: string; day_of_week?: number; start_time: string; end_time: string; title: string }>)
-          .filter((s) => s.schedule_source !== 'eta_import' && s.recurring_day);
-        const conflicts: { title: string; time: string }[] = [];
-        for (const entry of valid) {
-          for (const sched of nonEta) {
-            if (recurringDayToIndex(sched.recurring_day) === entry.day_of_week &&
-                timesOverlap(entry.start_time, entry.end_time, sched.start_time, sched.end_time) &&
-                !conflicts.some((c) => c.title === sched.title)) {
-              conflicts.push({ title: sched.title, time: `${DAY_FULL_LABELS[entry.day_of_week]} ${sched.start_time}~${sched.end_time}` });
-            }
-          }
-        }
-        if (conflicts.length > 0) {
-          setConflictList(conflicts);
-          setPendingValidEntries(valid);
-          setShowConflictConfirm(true);
-          return;
-        }
-      } catch { /* 충돌 확인 실패 시 그냥 저장 */ }
-
       await executeEtaSave(valid);
     };
 
@@ -1005,33 +976,6 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* 일정 충돌 확인 모달 */}
-        {showConflictConfirm && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-            <div style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', maxWidth: 400, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
-              <p style={{ fontWeight: 800, fontSize: 17, color: '#181c1e', marginBottom: 8 }}>기존 일정과 겹치는 항목이 있습니다</p>
-              <p style={{ fontSize: 13, color: '#3f4b61', marginBottom: 12 }}>다음 일정과 시간이 겹칩니다. 삭제하고 새 시간표로 추가할까요?</p>
-              <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: '10px 14px', marginBottom: 20, maxHeight: 160, overflowY: 'auto' }}>
-                {conflictList.map((c, i) => (
-                  <div key={i} style={{ fontSize: 13, color: '#92400e', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700 }}>{c.title}</span>
-                    <span style={{ color: '#b45309', marginLeft: 6 }}>{c.time}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button
-                  onClick={async () => { setShowConflictConfirm(false); await executeEtaSave(pendingValidEntries); }}
-                  style={{ flex: 1, height: 44, borderRadius: 11, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
-                >삭제하고 추가</button>
-                <button
-                  onClick={() => { setShowConflictConfirm(false); setPendingValidEntries([]); setConflictList([]); }}
-                  style={{ flex: 1, height: 44, borderRadius: 11, border: '1px solid #ebeef1', background: '#fff', color: '#334155', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-                >취소</button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
