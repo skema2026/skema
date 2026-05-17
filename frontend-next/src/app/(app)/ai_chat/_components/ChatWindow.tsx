@@ -87,9 +87,9 @@ export function ChatWindow() {
   useEffect(() => {
     api.get('/ai-chat-logs?limit=100')
       .then(({ data }) => {
-        const sorted = [...data].reverse();
+        const sorted = [...data].sort((a: { id: number }, b: { id: number }) => a.id - b.id);
         setMessages(sorted.map((log: { role: string; message: string }) => ({
-          role: log.role as 'user' | 'assistant',
+          role: (log.role as string).toLowerCase() as 'user' | 'assistant',
           content: log.message,
         })));
       })
