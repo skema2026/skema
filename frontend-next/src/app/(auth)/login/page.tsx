@@ -95,9 +95,10 @@ export default function LoginPage() {
           overflow-x: hidden;
           overflow-y: auto;
           background:
-            radial-gradient(circle at 18% 20%, rgba(56,189,248,0.28), transparent 32%),
-            radial-gradient(circle at 82% 18%, rgba(37,99,235,0.22), transparent 34%),
-            linear-gradient(135deg, #f8fbff 0%, #eaf4ff 48%, #dbeafe 100%);
+            radial-gradient(circle at 18% 20%, rgba(56,189,248,0.18), transparent 32%),
+            radial-gradient(circle at 82% 18%, rgba(37,99,235,0.16), transparent 34%),
+            linear-gradient(135deg, rgba(248,251,255,0.86) 0%, rgba(234,244,255,0.82) 48%, rgba(219,234,254,0.78) 100%),
+            url('/register-bg.jpg') center / cover no-repeat fixed;
           font-family: inherit;
         }
         .lp-overlay {

@@ -28,12 +28,12 @@ def list_tokens(
 
 @router.post("/share-tokens", response_model=ShareTokenResponse, status_code=status.HTTP_201_CREATED)
 def create_token(
-    data: ShareTokenCreate,
+    data: ShareTokenCreate | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """새 공유 토큰을 생성합니다. expires_at을 생략하면 영구 유효합니다."""
-    token = service.create_token(db, current_user.id, data)
+    token = service.create_token(db, current_user.id, data or ShareTokenCreate())
     result = ShareTokenResponse.model_validate(token)
     result.share_url = f"{settings.FRONTEND_URL}/share/{token.token}"
     return result

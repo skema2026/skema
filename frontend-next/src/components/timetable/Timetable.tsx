@@ -36,28 +36,31 @@ import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 const ALL_DAYS = ['월', '화', '수', '목', '금', '토', '일'] as const;
 const VISIBLE_DAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
-const START_HOUR  = 0;
-const END_HOUR    = 24;
+const DEFAULT_START_TIME = '07:00';
+const END_MINUTES  = 24 * 60;
 const SLOT_H      = 24;   // px per 30-min slot
 const GUTTER_W    = 44;   // time-label column width (px)
 const MIN_BLOCK_H = 18;   // minimum rendered block height (px)
 const DRAG_THRESHOLD = 5; // px — below this, treat as click not drag
 
-const TOTAL_SLOTS = (END_HOUR - START_HOUR) * 2;
-const GRID_H      = TOTAL_SLOTS * SLOT_H;
-
 // ── Pure grid helpers ─────────────────────────────────────────────────────────
 
-/** "HH:MM" → slot index measured from START_HOUR. "08:00" → 0, "08:30" → 1 */
-function timeToSlot(time: string): number {
+function normalizeGridStart(time?: string): number {
+  const mins = timeToMinutes(time || DEFAULT_START_TIME);
+  if (mins < 0 || mins >= END_MINUTES) return timeToMinutes(DEFAULT_START_TIME);
+  return mins;
+}
+
+/** "HH:MM" → slot index measured from the displayed grid start. */
+function timeToSlot(time: string, startMinutes: number): number {
   const mins = timeToMinutes(time);
   if (mins < 0) return 0;
-  return (mins - START_HOUR * 60) / 30;
+  return (mins - startMinutes) / 30;
 }
 
 /** Slot index → "HH:MM" */
-function slotToTime(slot: number): string {
-  return minutesToTime(START_HOUR * 60 + slot * 30);
+function slotToTime(slot: number, startMinutes: number): string {
+  return minutesToTime(startMinutes + slot * 30);
 }
 
 /** Clamp a number to [lo, hi] */
@@ -101,16 +104,21 @@ interface BlockProps {
   readOnly:     boolean;
   isFaded:      boolean;   // true while this block is being dragged
   colorMap:     Map<string, string>;
+  startMinutes: number;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>, s: Schedule, blockTopClientY: number) => void;
 }
 
-function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, onPointerDown }: BlockProps) {
-  const startSlot   = timeToSlot(s.start_time);
-  const endSlot     = timeToSlot(s.end_time);
+function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, startMinutes, onPointerDown }: BlockProps) {
+  const startMins   = timeToMinutes(s.start_time);
+  const endMins     = timeToMinutes(s.end_time);
+  if (startMins < 0 || endMins <= startMinutes) return null;
+  const visibleStart = Math.max(startMins, startMinutes);
+  const startSlot   = (visibleStart - startMinutes) / 30;
+  const endSlot     = (endMins - startMinutes) / 30;
   const top         = startSlot * SLOT_H;
   const rawH        = (endSlot - startSlot) * SLOT_H - 1;
   const height      = Math.max(MIN_BLOCK_H, rawH);
-  const durationMin = timeToMinutes(s.end_time) - timeToMinutes(s.start_time);
+  const durationMin = endMins - visibleStart;
   const isCompact   = durationMin < 45;
   const color       = colorMap.get(getScheduleColorKey(s)) ?? getScheduleColor(s);
 
@@ -183,11 +191,12 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, onPo
 }
 
 /** Ghost block — shown at the snapped drop target while dragging */
-function GhostBlock({ schedule: s, slot, durationSlots, colorMap }: {
+function GhostBlock({ schedule: s, slot, durationSlots, colorMap, startMinutes }: {
   schedule: Schedule;
   slot: number;
   durationSlots: number;
   colorMap: Map<string, string>;
+  startMinutes: number;
 }) {
   const top    = slot * SLOT_H;
   const height = Math.max(MIN_BLOCK_H, durationSlots * SLOT_H - 1);
@@ -228,7 +237,7 @@ function GhostBlock({ schedule: s, slot, durationSlots, colorMap }: {
       </div>
       {!isCompact && (
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', marginTop: 1 }}>
-          {slotToTime(slot)}–{slotToTime(slot + durationSlots)}
+          {slotToTime(slot, startMinutes)}–{slotToTime(slot + durationSlots, startMinutes)}
         </div>
       )}
     </div>
@@ -266,10 +275,14 @@ interface TimetableProps {
   exams?:     ExamSchedule[];
   readOnly?:  boolean;
   weekStart?: Date;   // Monday of the displayed week (default: current week)
+  startTime?: string; // top time of the grid, usually the user's wake time
 }
 
-export function Timetable({ schedules, exams = [], readOnly = false, weekStart: weekStartProp }: TimetableProps) {
+export function Timetable({ schedules, exams = [], readOnly = false, weekStart: weekStartProp, startTime }: TimetableProps) {
   const weekStart = weekStartProp ?? getWeekStart();
+  const startMinutes = useMemo(() => normalizeGridStart(startTime), [startTime]);
+  const totalSlots = useMemo(() => Math.ceil((END_MINUTES - startMinutes) / 30), [startMinutes]);
+  const gridHeight = totalSlots * SLOT_H;
   const openClassForm = useUIStore((s) => s.openClassForm);
   const { mutate: updateSchedule } = useUpdateSchedule();
 
@@ -374,12 +387,12 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
 
   const visibleDays = VISIBLE_DAYS;
 
-  // Auto-scroll to 7:00 on mount so morning classes are visible
+  // Keep the selected wake time at the top of the visible timetable.
   useEffect(() => {
     if (gridRef.current) {
-      gridRef.current.scrollTop = 7 * 2 * SLOT_H;
+      gridRef.current.scrollTop = 0;
     }
-  }, []);
+  }, [startMinutes]);
 
   // ── 6. Drag start ───────────────────────────────────────────────────────────
   const handleBlockPointerDown = useCallback((
@@ -395,7 +408,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
 
     dragStateRef.current = {
       schedule,
-      durationSlots: timeToSlot(schedule.end_time) - timeToSlot(schedule.start_time),
+      durationSlots: timeToSlot(schedule.end_time, startMinutes) - timeToSlot(schedule.start_time, startMinutes),
       grabPx:        e.clientY - blockTopClientY,
       initialDowIdx,
       isDateBased:   !!schedule.date,
@@ -406,10 +419,10 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
 
     updateDragSnap({
       scheduleId: schedule.id,
-      slot:       timeToSlot(schedule.start_time),
+      slot:       timeToSlot(schedule.start_time, startMinutes),
       dowIdx:     initialDowIdx,
     });
-  }, [readOnly, updateDragSnap]);
+  }, [readOnly, startMinutes, updateDragSnap]);
 
   // ── 7. Pointer move / up — attached to document while dragging ─────────────
   useEffect(() => {
@@ -433,7 +446,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
       // gridTop in viewport coords = rect.top − scrollTop
       const gridTop = rect.top - scrollTop;
       const relY    = e.clientY - gridTop - drag.grabPx;
-      const maxStart = TOTAL_SLOTS - drag.durationSlots;
+      const maxStart = totalSlots - drag.durationSlots;
       const snapSlot = clamp(Math.round(relY / SLOT_H), 0, maxStart);
 
       // ── Horizontal snap ────────────────────────────────────────────────────
@@ -462,8 +475,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
       } else if (snap) {
         const vd      = visibleDaysRef.current;
         const newDow  = vd[snap.dowIdx];
-        const newStart = slotToTime(snap.slot);
-        const newEnd   = slotToTime(snap.slot + drag.durationSlots);
+        const newStart = slotToTime(snap.slot, startMinutes);
+        const newEnd   = slotToTime(snap.slot + drag.durationSlots, startMinutes);
 
         const unchanged =
           newDow   === effectiveDow(drag.schedule) &&
@@ -471,15 +484,37 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
           newEnd   === drag.schedule.end_time;
 
         if (!unchanged) {
-          updateScheduleRef.current({
-            id:           drag.schedule.id,
-            recurring_day: indexToRecurringDay(newDow),
-            start_time:   newStart,
-            end_time:     newEnd,
-          });
-          toast.success(
-            `${drag.schedule.title} → ${ALL_DAYS[newDow]} ${newStart}–${newEnd}`,
-            { duration: 2000 }
+          updateScheduleRef.current(
+            {
+              id:            drag.schedule.id,
+              recurring_day: indexToRecurringDay(newDow),
+              start_time:    newStart,
+              end_time:      newEnd,
+            },
+            {
+              onSuccess: () => {
+                toast.success(
+                  `${drag.schedule.title} → ${ALL_DAYS[newDow]} ${newStart}-${newEnd}`,
+                  { duration: 2000 }
+                );
+              },
+              onError: (error) => {
+                const response = (error as {
+                  response?: { status?: number; data?: { detail?: string } };
+                }).response;
+                const detail = response?.data?.detail;
+
+                toast.error(
+                  response?.status === 409
+                    ? '시간이 겹쳐 이동할 수 없습니다'
+                    : '일정 이동에 실패했습니다',
+                  {
+                    description: detail,
+                    duration: 3500,
+                  }
+                );
+              },
+            }
           );
         }
       }
@@ -595,9 +630,9 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
           width:     GUTTER_W,
           flexShrink: 0,
           position:  'relative',
-          height:    GRID_H,
+          height:    gridHeight,
         }}>
-          {Array.from({ length: TOTAL_SLOTS }, (_, i) => {
+          {Array.from({ length: totalSlots }, (_, i) => {
             const isHour = i % 2 === 0;
             return (
               <div key={`t-${i}`} style={{
@@ -610,8 +645,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                 userSelect: 'none',
               }}>
                 {isHour
-                  ? String(START_HOUR + i / 2).padStart(2, '0')
-                  : '30'}
+                  ? slotToTime(i, startMinutes)
+                  : slotToTime(i, startMinutes).slice(3)}
               </div>
             );
           })}
@@ -624,13 +659,13 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
             style={{
               flex:       1,
               position:   'relative',
-              height:     GRID_H,
+              height:     gridHeight,
               borderLeft: '1px solid #f0f0f0',
               background: dow >= 5 ? 'rgba(225,29,72,0.02)' : 'transparent',
             }}
           >
             {/* Grid lines */}
-            {Array.from({ length: TOTAL_SLOTS }, (_, i) => (
+            {Array.from({ length: totalSlots }, (_, i) => (
               <div key={`gl-${dow}-${i}`} style={{
                 position:      'absolute',
                 left:          0,
@@ -652,6 +687,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                 readOnly={readOnly}
                 isFaded={dragSnap?.scheduleId === s.id}
                 colorMap={titleColorMap}
+                startMinutes={startMinutes}
                 onPointerDown={handleBlockPointerDown}
               />
             ))}
@@ -663,6 +699,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                 slot={dragSnap.slot}
                 durationSlots={dragStateRef.current.durationSlots}
                 colorMap={titleColorMap}
+                startMinutes={startMinutes}
               />
             )}
 
@@ -694,8 +731,10 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
               if (startMins < 0) return null;
               const durationMins = (e as ExamSchedule & { exam_duration_minutes?: number }).exam_duration_minutes ?? 120;
               const endMins = startMins + durationMins;
-              const top    = (startMins - START_HOUR * 60) / 30 * SLOT_H;
-              const height = Math.max(MIN_BLOCK_H, (endMins - startMins) / 30 * SLOT_H - 1);
+              if (endMins <= startMinutes) return null;
+              const visibleStart = Math.max(startMins, startMinutes);
+              const top    = (visibleStart - startMinutes) / 30 * SLOT_H;
+              const height = Math.max(MIN_BLOCK_H, (endMins - visibleStart) / 30 * SLOT_H - 1);
               return (
                 <div
                   key={`exam-${e.id}`}

@@ -7,6 +7,15 @@ _COLOR_RE = re.compile(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 _VALID_DAYS = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"}
 _DAY_CODES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+_VALID_VIEW_SCOPES = {
+    "day",
+    "week",
+    "month",
+    "day_week",
+    "day_month",
+    "week_month",
+    "all",
+}
 
 
 def _validate_time(v: str | None) -> str | None:
@@ -39,6 +48,19 @@ def _date_to_day(date_str: str) -> str:
         raise ValueError("날짜 형식은 YYYY-MM-DD 이어야 합니다.") from exc
 
 
+def _default_view_scope(date_str: str | None) -> str:
+    return "day_month" if date_str else "day_week"
+
+
+def _validate_view_scope(v: str | None) -> str | None:
+    if v is None:
+        return v
+    scope = v.strip().lower()
+    if scope not in _VALID_VIEW_SCOPES:
+        raise ValueError("표시 위치는 day, week, month 조합이어야 합니다.")
+    return scope
+
+
 # ── Schedule ──────────────────────────────────────────────────────────────────
 
 class ScheduleCreate(BaseModel):
@@ -57,6 +79,7 @@ class ScheduleCreate(BaseModel):
     color: str | None = None
     priority: int | None = 0
     is_completed: bool | None = False
+    view_scope: str | None = None
 
     @field_validator("days")
     @classmethod
@@ -83,6 +106,11 @@ class ScheduleCreate(BaseModel):
     def validate_color(cls, v):
         return _validate_color(v)
 
+    @field_validator("view_scope")
+    @classmethod
+    def validate_view_scope(cls, v):
+        return _validate_view_scope(v)
+
     @model_validator(mode="after")
     def normalize_legacy_fields(self):
         if not self.course_name and self.title:
@@ -102,6 +130,8 @@ class ScheduleCreate(BaseModel):
                 self.days = ["MON"]
         if self.start_time and self.end_time and self.start_time >= self.end_time:
             raise ValueError("시작 시간은 종료 시간보다 이전이어야 합니다.")
+        if not self.view_scope:
+            self.view_scope = _default_view_scope(self.date)
         return self
 
 
@@ -120,6 +150,7 @@ class ScheduleUpdate(BaseModel):
     priority: int | None = None
     is_completed: bool | None = None
     schedule_type: str | None = None
+    view_scope: str | None = None
 
     @field_validator("recurring_day")
     @classmethod
@@ -135,6 +166,11 @@ class ScheduleUpdate(BaseModel):
     @classmethod
     def validate_color(cls, v):
         return _validate_color(v)
+
+    @field_validator("view_scope")
+    @classmethod
+    def validate_view_scope(cls, v):
+        return _validate_view_scope(v)
 
     @model_validator(mode="after")
     def normalize_legacy_fields(self):
@@ -166,6 +202,7 @@ class ScheduleResponse(BaseModel):
     is_completed: bool = False
     schedule_type: str = "class"
     schedule_source: str | None = None
+    view_scope: str = "day_week"
 
     model_config = {"from_attributes": True}
 

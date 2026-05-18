@@ -28,6 +28,7 @@ function normalizeSchedule(schedule: RawSchedule): Schedule {
     priority: schedule.priority ?? 0,
     is_completed: schedule.is_completed ?? false,
     schedule_type: schedule.schedule_type ?? 'class',
+    view_scope: schedule.view_scope ?? (schedule.date ? 'day_month' : 'day_week'),
     schedule_source: schedule.schedule_source,
     linked_exam_id: schedule.linked_exam_id,
     user_override: schedule.user_override,
@@ -49,6 +50,7 @@ function toCreatePayload(schedule: ScheduleCreateInput) {
     priority: schedule.priority,
     is_completed: schedule.is_completed,
     schedule_type: schedule.schedule_type,
+    view_scope: schedule.view_scope,
   };
 }
 
@@ -118,6 +120,7 @@ export function useCreateSchedule() {
         priority: newSchedule.priority ?? 0,
         is_completed: newSchedule.is_completed ?? false,
         schedule_type: newSchedule.schedule_type ?? 'class',
+        view_scope: newSchedule.view_scope ?? (newSchedule.date ? 'day_month' : 'day_week'),
       }));
       qc.setQueryData<Schedule[]>(['schedules'], (old) => [...(old ?? []), ...optimistic]);
       return { prev };

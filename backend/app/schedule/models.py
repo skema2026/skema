@@ -43,6 +43,7 @@ class Schedule(Base):
     is_completed = Column(Boolean, nullable=True, default=False, server_default="0")
     schedule_type = Column(String(30), nullable=True, default="class", server_default="class")
     schedule_source = Column(String(30), nullable=True, default="user_created", server_default="user_created")
+    view_scope = Column(String(30), nullable=True, default="day_week", server_default="day_week")
 
     user = relationship("User", back_populates="schedules")
     exam_schedules = relationship(

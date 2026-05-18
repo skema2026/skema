@@ -150,6 +150,22 @@ def update_profile(db: Session, user_id: int, updates: dict) -> UserProfile:
     return repository.update_profile_record(db, profile, updates)
 
 
+def update_user_account(db: Session, user: User, updates: dict) -> User:
+    email = updates.get("email")
+    if email and email != user.email:
+        existing = repository.get_user_by_email(db, email)
+        if existing and existing.id != user.id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용 중인 이메일입니다.")
+
+    username = updates.get("username")
+    if username and username != user.username:
+        existing = repository.get_user_by_username(db, username)
+        if existing and existing.id != user.id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용 중인 이름입니다.")
+
+    return repository.update_user_record(db, user, updates)
+
+
 # ── OAuth (소셜 로그인) ───────────────────────────────────────────────────────
 
 def exchange_oauth_code(
