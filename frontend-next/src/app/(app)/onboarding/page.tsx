@@ -1135,27 +1135,19 @@ export default function OnboardingPage() {
 
           {/* 공부 블록 설정 — 시험이 하나라도 있을 때만 표시 */}
           {externalExams.length > 0 && (
-            <div className="rounded-2xl p-5 mb-5" style={{ background: '#fff', border: '1px solid #d1fae5', boxShadow: '0 2px 12px rgba(5,150,105,0.06)' }}>
+            <div className="rounded-2xl p-4 mb-4" style={{ background: '#fff', border: '1px solid #d1fae5' }}>
               <p className="font-bold text-sm mb-1" style={{ color: '#065f46' }}>📖 공부 일정 자동 배치</p>
-              <p className="text-xs mb-3" style={{ color: '#3f4b61' }}>캘린더 빈 시간에 공부 블록을 자동으로 넣어드려요</p>
+              <p className="text-xs mb-2 px-2 py-1 rounded-lg inline-block" style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #6ee7b7' }}>
+                📅 {studyStartDays === 0 ? '당일' : `${studyStartDays}일 전`}부터 {studyDaysPerWeek === 7 ? '매일' : `주 ${studyDaysPerWeek}일`}, 하루 {fmtHours(studyHoursPerSession)}씩
+              </p>
 
-              {/* 실시간 미리보기 */}
-              <div className="rounded-xl px-4 py-3 mb-4 flex items-center gap-2" style={{ background: '#ecfdf5', border: '1px solid #6ee7b7' }}>
-                <span style={{ fontSize: 18 }}>📅</span>
-                <p className="text-sm font-bold" style={{ color: '#065f46', lineHeight: 1.5 }}>
-                  시험 {studyStartDays === 0 ? '당일' : `${studyStartDays}일 전`}부터&nbsp;
-                  {studyDaysPerWeek === 7 ? '매일' : `일주일에 ${studyDaysPerWeek}일`},&nbsp;
-                  하루 {fmtHours(studyHoursPerSession)}씩 공부 일정이 만들어져요
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>시험 몇 일 전부터 공부를 시작할까요?</p>
+              <div className="space-y-3 mt-2">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-medium w-24 flex-shrink-0" style={{ color: '#334155' }}>몇 일 전부터?</p>
                   <select
                     value={studyStartDays}
                     onChange={(e) => setStudyStartDays(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
+                    className="flex-1 px-2 py-1.5 text-xs rounded-lg border-2 outline-none"
                     style={{ borderColor: '#c3d0ff', background: '#f8f9ff', color: '#181c1e' }}
                   >
                     <option value={0}>당일부터</option>
@@ -1164,25 +1156,25 @@ export default function OnboardingPage() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>일주일에 며칠 공부할까요?</p>
-                  <div className="flex gap-1.5">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-medium w-24 flex-shrink-0" style={{ color: '#334155' }}>주 몇 일?</p>
+                  <div className="flex flex-1 gap-1">
                     {DAYS_PER_WEEK_OPTIONS.map((d) => (
                       <button key={d} type="button"
                         onClick={() => setStudyDaysPerWeek(d)}
-                        className="flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-colors"
+                        className="flex-1 py-1.5 text-xs font-semibold rounded-lg border-2 transition-colors"
                         style={{ borderColor: studyDaysPerWeek === d ? '#059669' : '#ebeef1', background: studyDaysPerWeek === d ? '#d1fae5' : '#fff', color: studyDaysPerWeek === d ? '#059669' : '#3f4b61' }}>
                         {d === 7 ? '매일' : `${d}일`}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>하루에 몇 시간 공부할까요?</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-medium w-24 flex-shrink-0" style={{ color: '#334155' }}>하루 몇 시간?</p>
                   <select
                     value={studyHoursPerSession}
                     onChange={(e) => setStudyHoursPerSession(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
+                    className="flex-1 px-2 py-1.5 text-xs rounded-lg border-2 outline-none"
                     style={{ borderColor: '#c3d0ff', background: '#f8f9ff', color: '#181c1e' }}
                   >
                     {Array.from({ length: 24 }, (_, i) => (i + 1) * 0.5).map((h) => (
@@ -1272,9 +1264,7 @@ export default function OnboardingPage() {
           <div className="rounded-2xl p-5 mb-5" style={{ background: '#fff', boxShadow: '0 4px 24px rgba(26,77,178,0.08)', border: '1px solid #ebeef1' }}>
             <p className="font-bold text-base mb-1" style={{ color: '#181c1e' }}>학업 외에 중요한 일정이 있나요?</p>
             <p className="text-xs mb-2" style={{ color: '#3f4b61' }}>없으면 건너뛰어도 됩니다</p>
-            <p className="text-xs font-bold mb-4 rounded-xl px-3 py-2" style={{ color: '#2453c2', background: '#eff6ff', border: '1px solid #bfd0ff' }}>
-              입력한 일정은 아래 + 일정 추가 버튼을 눌러야 등록됩니다.
-            </p>
+            <p className="text-xs mb-3" style={{ color: '#64748b' }}>※ 작성 후 '+ 일정 추가' 버튼을 눌러야 등록됩니다</p>
 
             {/* 예시 칩 */}
             <div className="flex flex-wrap gap-2 mb-4">
@@ -1339,33 +1329,22 @@ export default function OnboardingPage() {
                       ))}
                     </div>
                   </div>
-                  <div className="grid grid-cols-7 gap-1.5 rounded-2xl p-2" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <div className="grid grid-cols-7 gap-1">
                     {DAY_LABELS.map((d, i) => (
                       <button
                         key={i}
                         type="button"
                         aria-pressed={scheduleDraft.days.includes(indexToRecurringDay(i))}
                         onClick={() => toggleDraftDay(i)}
-                        className="group flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-xl border-2 transition-all active:scale-95"
+                        className="py-2 rounded-lg border-2 text-sm font-bold transition-all active:scale-95"
                         style={{
                           borderColor: scheduleDraft.days.includes(indexToRecurringDay(i)) ? DAY_COLORS[i] : '#e2e8f0',
-                          background: scheduleDraft.days.includes(indexToRecurringDay(i)) ? `${DAY_COLORS[i]}14` : '#fff',
-                          color: scheduleDraft.days.includes(indexToRecurringDay(i)) ? DAY_COLORS[i] : '#475569',
-                          boxShadow: scheduleDraft.days.includes(indexToRecurringDay(i)) ? `0 6px 0 ${DAY_COLORS[i]}22` : 'none',
+                          background: scheduleDraft.days.includes(indexToRecurringDay(i)) ? DAY_COLORS[i] : '#fff',
+                          color: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#fff' : '#475569',
                         }}
                       >
-                        <span className="text-[10px] font-bold">{DAY_FULL_LABELS[i]}</span>
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-extrabold" style={{ background: scheduleDraft.days.includes(indexToRecurringDay(i)) ? DAY_COLORS[i] : '#f1f5f9', color: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#fff' : '#475569' }}>
-                          {d}
-                        </span>
+                        {d}
                       </button>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {selectedDayIndexes.map((idx) => (
-                      <span key={idx} className="rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: `${DAY_COLORS[idx]}16`, color: DAY_COLORS[idx] }}>
-                        {DAY_FULL_LABELS[idx]}
-                      </span>
                     ))}
                   </div>
                   {scheduleDraft.days.length === 0 && (
@@ -1387,40 +1366,37 @@ export default function OnboardingPage() {
                 </div>
               )}
               {/* 시간 */}
-              <div className="rounded-2xl p-4" style={{ background: '#f8fafc', border: '1px solid #ebeef1' }}>
-                <p className="text-xs font-bold mb-3" style={{ color: '#334155' }}>시간</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block">
-                    <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>시작 시간</span>
-                    <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
-                      style={{ borderColor: '#e2e8f0', background: '#fff' }}
-                      value={scheduleDraft.start_time}
-                      onChange={(e) => setScheduleDraft((d) => ({ ...d, start_time: e.target.value }))}
-                      onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'} />
-                  </label>
-                  <label className="block">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-[11px] font-semibold" style={{ color: '#334155' }}>종료 시간</span>
-                      {isOvernight && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: '#ede9fe', color: '#7c3aed' }}>다음날</span>
-                      )}
-                    </div>
-                    <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
-                      style={{ borderColor: scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0', background: '#fff' }}
-                      value={scheduleDraft.end_time}
-                      onChange={(e) => setScheduleDraft((d) => ({ ...d, end_time: e.target.value }))}
-                      onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                      onBlur={(e) => e.target.style.borderColor = scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0'} />
-                  </label>
-                </div>
-                {scheduleDraft.start_time === scheduleDraft.end_time && scheduleDraft.start_time && (
-                  <p className="text-xs mt-2" style={{ color: '#ef4444' }}>시작 시간과 종료 시간이 같습니다</p>
-                )}
-                {isOvernight && (
-                  <p className="text-xs mt-2" style={{ color: '#7c3aed' }}>자정을 넘기는 일정으로 등록됩니다</p>
-                )}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="block text-xs font-medium mb-1" style={{ color: '#334155' }}>시작 시간</span>
+                  <input type="time" className="w-full px-3 py-2 text-sm border-2 rounded-xl outline-none"
+                    style={{ borderColor: '#e2e8f0', background: '#fff' }}
+                    value={scheduleDraft.start_time}
+                    onChange={(e) => setScheduleDraft((d) => ({ ...d, start_time: e.target.value }))}
+                    onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'} />
+                </label>
+                <label className="block">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-xs font-medium" style={{ color: '#334155' }}>종료 시간</span>
+                    {isOvernight && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: '#ede9fe', color: '#7c3aed' }}>다음날</span>
+                    )}
+                  </div>
+                  <input type="time" className="w-full px-3 py-2 text-sm border-2 rounded-xl outline-none"
+                    style={{ borderColor: scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0', background: '#fff' }}
+                    value={scheduleDraft.end_time}
+                    onChange={(e) => setScheduleDraft((d) => ({ ...d, end_time: e.target.value }))}
+                    onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                    onBlur={(e) => e.target.style.borderColor = scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0'} />
+                </label>
               </div>
+              {scheduleDraft.start_time === scheduleDraft.end_time && scheduleDraft.start_time && (
+                <p className="text-xs" style={{ color: '#ef4444' }}>시작 시간과 종료 시간이 같습니다</p>
+              )}
+              {isOvernight && (
+                <p className="text-xs" style={{ color: '#7c3aed' }}>자정을 넘기는 일정으로 등록됩니다</p>
+              )}
               <button onClick={addSched} disabled={!canAddSched}
                 className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
                 style={{ background: canAddSched ? '#2563eb' : '#d1d5db', cursor: canAddSched ? 'pointer' : 'not-allowed' }}>
@@ -1433,17 +1409,17 @@ export default function OnboardingPage() {
           {personalSchedules.length > 0 && (
             <div className="space-y-2 mb-5">
               {personalSchedules.map((s) => (
-                <div key={s._id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: '#fef3c7', border: '1px solid #fcd34d' }}>
+                <div key={s._id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '3px solid #2563eb' }}>
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: '#92400e' }}>{s.title}</p>
-                    <p className="text-xs" style={{ color: '#78350f' }}>
+                    <p className="text-sm font-semibold" style={{ color: '#1e293b' }}>{s.title}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#64748b' }}>
                       {s.is_recurring
                         ? `${s.days.map((day) => DAY_LABELS[recurringDayToIndex(day)]).join(', ')}요일 ${s.start_time}~${s.end_time} · 매주`
                         : `${s.date} ${s.start_time}~${s.end_time} · 1회`}
                     </p>
                   </div>
                   <button onClick={() => setPersonalSchedules((prev) => prev.filter((x) => x._id !== s._id))}>
-                    <MaterialIcon icon="close" size={16} color="#3f4b61" />
+                    <MaterialIcon icon="close" size={16} color="#94a3b8" />
                   </button>
                 </div>
               ))}
