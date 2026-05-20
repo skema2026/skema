@@ -250,10 +250,7 @@ export function ExamList() {
     if (!confirm(msg)) return;
 
     deleteExam.mutate(id, {
-      onSuccess: async () => {
-        for (const s of linked) {
-          try { await api.delete(`/schedules/${s.id}`); } catch { /* ignore */ }
-        }
+      onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['schedules'] });
         queryClient.invalidateQueries({ queryKey: ['schedules', 'today'] });
         toast.success(
@@ -277,11 +274,12 @@ export function ExamList() {
         ? Math.max(1, getDaysUntil(blockExam.exam_date))
         : blockDays;
 
+      const today = new Date(); today.setHours(0, 0, 0, 0);
       const candidateDays: string[] = [];
       for (let d = actualDays; d >= 1; d--) {
         const day = new Date(examDateObj);
         day.setDate(examDateObj.getDate() - d);
-        candidateDays.push(dateStrFromObj(day));
+        if (day >= today) candidateDays.push(dateStrFromObj(day));
       }
 
       const allSchedules = queryClient.getQueryData<Schedule[]>(['schedules']) ?? [];
@@ -302,29 +300,38 @@ export function ExamList() {
       }
 
       let created = 0;
+      let skipped = 0;
       for (const dateStr of chosenDays) {
         const jsDay = new Date(dateStr + 'T00:00:00').getDay();
         const dow = jsDay === 0 ? 6 : jsDay - 1;
         const daySchedules = getSchedulesForDate(allSchedules, dateStr);
         const { start_time, end_time } = findFreeSlot(daySchedules, studyMinutes);
 
-        await api.post('/schedules', {
-          title: `📖 ${blockExam.title} 준비`,
-          recurring_day: indexToRecurringDay(dow),
-          date: dateStr,
-          start_time,
-          end_time,
-          schedule_type: 'study',
-          schedule_source: 'user_created',
-          linked_exam_id: blockExam.id,
-          color: '#059669',
-        });
-        created++;
+        try {
+          await api.post('/schedules', {
+            title: `📖 ${blockExam.title} 준비`,
+            recurring_day: indexToRecurringDay(dow),
+            date: dateStr,
+            start_time,
+            end_time,
+            schedule_type: 'study',
+            schedule_source: 'user_created',
+            linked_exam_id: blockExam.id,
+            color: '#059669',
+          });
+          created++;
+        } catch {
+          skipped++;
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
       queryClient.invalidateQueries({ queryKey: ['schedules', 'today'] });
-      toast.success(`빈 시간에 공부 블록 ${created}개를 자동 배치했습니다 ✅`);
+      if (created > 0) {
+        toast.success(`공부 블록 ${created}개 배치 완료${skipped > 0 ? ` (충돌 ${skipped}개 건너뜀)` : ''} ✅`);
+      } else {
+        toast.error('배치 가능한 빈 시간이 없습니다. 하루 공부 시간을 줄여보세요');
+      }
       setBlockExam(null);
     } catch {
       toast.error('일정 생성 중 오류가 발생했습니다');
@@ -343,64 +350,92 @@ export function ExamList() {
     color: active ? '#059669' : '#3f4b61',
   });
 
+  const accentColor = (days: number) =>
+    days < 0 ? '#94a3b8' : days === 0 ? '#ef4444' : days <= 3 ? '#f97316' : days <= 7 ? '#eab308' : '#3b82f6';
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--skema-on-surface)' }}>시험 일정</h2>
-          <p style={{ fontSize: 11, color: 'var(--skema-outline-strong)', marginTop: 2 }}>
-            시험을 추가하고 공부 시간을 캘린더에 자동으로 넣어보세요
-          </p>
+          <h2 className="text-base font-black text-slate-800">시험 일정</h2>
+          <p className="text-xs text-slate-400 mt-0.5">시험을 추가하고 공부 시간을 자동으로 배치하세요</p>
         </div>
         <button
           onClick={() => setIsOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--skema-primary)', color: '#fff', border: 'none', borderRadius: 10, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90"
+          style={{ background: 'var(--skema-primary)', border: 'none', cursor: 'pointer' }}
         >
           + 시험 추가
         </button>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-8" style={{ color: 'var(--skema-outline-strong)', fontSize: 13 }}>로딩 중...</div>
+        <div className="flex items-center justify-center py-12 text-sm text-slate-400">로딩 중...</div>
       ) : sortedExams.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
-          <p style={{ fontSize: 13, color: 'var(--skema-outline-strong)' }}>등록된 시험 일정이 없습니다</p>
-          <p style={{ fontSize: 12, color: 'var(--skema-outline-strong)', marginTop: 4, opacity: 0.7 }}>시험을 추가하면 공부 시간을 캘린더에 자동으로 배치할 수 있어요</p>
+        <div className="flex flex-col items-center gap-3 py-14">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
+            <span className="text-2xl">📅</span>
+          </div>
+          <p className="text-sm font-bold text-slate-500">등록된 시험 일정이 없습니다</p>
+          <p className="text-xs text-slate-400">시험을 추가하면 공부 블록을 자동 배치할 수 있어요</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {sortedExams.map((exam) => {
             const days = getDaysUntil(exam.exam_date);
-            const urgency = days <= 3 ? '#fef2f2' : days <= 7 ? '#fffbeb' : '#f7fafd';
+            const accent = accentColor(days);
+            const linkedCount = (queryClient.getQueryData<Schedule[]>(['schedules']) ?? [])
+              .filter(s => s.linked_exam_id === exam.id).length;
             return (
               <div
                 key={exam.id}
                 onClick={() => openDetail(exam)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 12, border: '1px solid var(--skema-container)', background: urgency, gap: 12, cursor: 'pointer' }}
+                className="group flex items-center gap-4 overflow-hidden rounded-2xl border border-slate-200 bg-white px-5 py-4 transition hover:shadow-md hover:-translate-y-px cursor-pointer"
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--skema-on-surface)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exam.title}</p>
-                    {exam.subject && (
-                      <span style={{ fontSize: 11, fontWeight: 600, background: 'var(--skema-secondary-container)', color: 'var(--skema-primary)', borderRadius: 6, padding: '1px 7px', flexShrink: 0 }}>{exam.subject}</span>
-                    )}
-                  </div>
-                  <p style={{ fontSize: 11, color: 'var(--skema-outline-strong)' }}>
-                    {formatDate(exam.exam_date)}
-                    {exam.exam_time && ` ${exam.exam_time}`}
-                    {exam.location && ` • ${exam.location}`}
-                  </p>
+                {/* 왼쪽 컬러 인디케이터 */}
+                <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: accent }} />
+
+                {/* D-day 배지 */}
+                <span
+                  className="flex-shrink-0 inline-flex items-center rounded-full px-3 py-1 text-xs font-black text-white"
+                  style={{ background: accent, minWidth: 52, justifyContent: 'center' }}
+                >
+                  {days < 0 ? '종료' : days === 0 ? 'D-day' : `D-${days}`}
+                </span>
+
+                {/* 제목 + 서브젝트 */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black text-slate-800 truncate">{exam.title}</p>
+                  {exam.subject && (
+                    <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600 mt-0.5">
+                      {exam.subject}
+                    </span>
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  <ExamBadge days={days} />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }}
-                    style={{ color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
-                  >
-                    ✕
-                  </button>
+
+                {/* 날짜 */}
+                <div className="flex-shrink-0 text-right">
+                  <p className="text-xs font-bold text-slate-600">{formatDate(exam.exam_date)}</p>
+                  {exam.exam_time && <p className="text-[10px] text-slate-400 mt-0.5">{exam.exam_time}</p>}
+                  {exam.location && <p className="text-[10px] text-slate-400 truncate max-w-[100px]">📍 {exam.location}</p>}
                 </div>
+
+                {/* 공부 블록 */}
+                {linkedCount > 0 && (
+                  <span className="flex-shrink-0 text-xs font-bold text-emerald-600 bg-emerald-50 rounded-full px-2.5 py-1">
+                    📖 {linkedCount}개
+                  </span>
+                )}
+
+                {/* 삭제 */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }}
+                  className="flex-shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
               </div>
             );
           })}

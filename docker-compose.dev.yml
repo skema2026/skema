@@ -21,6 +21,7 @@ services:
       context: ./frontend-next
       dockerfile: Dockerfile.dev
     container_name: skema_frontend_dev
+    user: root
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
@@ -32,7 +33,8 @@ services:
     volumes:
       - ./frontend-next:/app
       - /app/node_modules
-    command: npx next dev --webpack -p 3000
+      - /app/.next
+    command: sh -c "npm ci && npm run dev"
 
 volumes:
   uploads_data:

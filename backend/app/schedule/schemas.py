@@ -53,6 +53,9 @@ class ScheduleCreate(BaseModel):
     start_time: str
     end_time: str
     schedule_type: str | None = "class"
+    schedule_source: str | None = "user_created"
+    linked_exam_id: int | None = None
+    original_generated_title: str | None = None
     color_code: str | None = "#6366F1"
     color: str | None = None
     priority: int | None = 0
@@ -120,6 +123,9 @@ class ScheduleUpdate(BaseModel):
     priority: int | None = None
     is_completed: bool | None = None
     schedule_type: str | None = None
+    schedule_source: str | None = None
+    linked_exam_id: int | None = None
+    original_generated_title: str | None = None
 
     @field_validator("recurring_day")
     @classmethod
@@ -166,6 +172,8 @@ class ScheduleResponse(BaseModel):
     is_completed: bool = False
     schedule_type: str = "class"
     schedule_source: str | None = None
+    linked_exam_id: int | None = None
+    original_generated_title: str | None = None
 
     model_config = {"from_attributes": True}
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -52,6 +52,7 @@ class UserProfile(Base):
     is_college_student = Column(Boolean, nullable=True, default=False)
     semester_start_date = Column(String(10), nullable=True)
     onboarding_completed = Column(Boolean, default=False, nullable=False)
+    notification_prefs = Column(Text, nullable=True)  # JSON: {"motivation":true,"weekly_report":true,...}
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

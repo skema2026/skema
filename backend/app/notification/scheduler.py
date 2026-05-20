@@ -34,13 +34,36 @@ _MOTIVATIONS = [
 
 def _get_db():
     from app.db.database import SessionLocal
+    # 모든 모델을 미리 로드해 SQLAlchemy relationship 해석 오류 방지
+    import app.auth.models       # noqa: F401
+    import app.schedule.models   # noqa: F401
+    import app.share.models      # noqa: F401
+    import app.ai_chat.models    # noqa: F401
+    import app.notification.models  # noqa: F401
     return SessionLocal()
+
+
+def _is_notif_enabled(db, user_id: int, ntype: str) -> bool:
+    """사용자의 알림 타입 수신 여부 확인."""
+    import json
+    from app.auth.models import UserProfile
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    if not profile or not profile.notification_prefs:
+        return True
+    try:
+        prefs = json.loads(profile.notification_prefs)
+        return prefs.get(ntype, True)
+    except Exception:
+        return True
 
 
 def _push(db, user_id: int, ntype: str, title: str, body: str, related_id: int | None = None):
     """알림 1건 저장. 중복(같은 날 같은 type+title) 방지."""
     from app.notification.models import Notification
     from app.notification.service import send_push_to_user
+
+    if not _is_notif_enabled(db, user_id, ntype):
+        return
 
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     exists = (
