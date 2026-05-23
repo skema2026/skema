@@ -106,11 +106,10 @@ type DashboardHeaderProps = {
   todayPct: number | null;
   todayDone: number;
   todayTotal: number;
-  onAddSchedule: () => void;
   onShare: () => void;
+  onOpenProfile: () => void;
   onOpenAdminUsers: () => void;
   onOpenAdminLogs: () => void;
-  onOpenSettings: () => void;
   onLogout: () => void;
 };
 
@@ -119,13 +118,15 @@ export function DashboardHeader({
   todayPct,
   todayDone,
   todayTotal,
-  onAddSchedule,
   onShare,
+  onOpenProfile,
   onOpenAdminUsers,
   onOpenAdminLogs,
-  onOpenSettings,
   onLogout,
 }: DashboardHeaderProps) {
+  const displayName = user?.username || user?.email?.split('@')[0] || '사용자';
+  const fallback = (displayName || user?.email || 'U')[0]?.toUpperCase() || 'U';
+
   return (
     <header
       className="skema-dashboard-header"
@@ -168,15 +169,6 @@ export function DashboardHeader({
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
           type="button"
-          onClick={onAddSchedule}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--skema-primary)', color: '#fff', border: 'none', borderRadius: '10px', padding: '7px 14px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 18px var(--skema-primary-shadow)' }}
-        >
-          <MaterialIcon icon="add" size={16} color="#fff" />
-          <span className="hide-mobile">일정</span> 추가
-        </button>
-
-        <button
-          type="button"
           onClick={onShare}
           title="공유"
           style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
@@ -186,39 +178,61 @@ export function DashboardHeader({
         </button>
 
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-full transition-all outline-none">
-            <Avatar className="w-8 h-8">
-              <AvatarFallback className="text-xs font-bold" style={{ background: 'var(--skema-secondary-container)', color: 'var(--skema-primary)' }}>
-                {user?.email?.[0]?.toUpperCase() || 'U'}
+          <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-blue-100 bg-white px-1.5 py-1 pr-2 shadow-sm transition-all outline-none hover:border-blue-200 hover:bg-blue-50">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="text-xs font-black" style={{ background: 'var(--skema-secondary-container)', color: 'var(--skema-primary)' }}>
+                {fallback}
               </AvatarFallback>
             </Avatar>
+            <span className="hide-mobile max-w-[120px] truncate text-xs font-black text-slate-700">
+              {displayName}
+            </span>
+            <MaterialIcon icon="expand_more" size={14} color="#64748b" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-72 overflow-hidden rounded-2xl border-blue-100 p-2 shadow-xl">
             <DropdownMenuGroup>
-              <DropdownMenuLabel>
-                <p className="font-semibold">{user?.email}</p>
-                <p className="text-xs text-gray-500 font-normal">{user?.email}</p>
+              <DropdownMenuLabel className="rounded-xl bg-blue-50 p-3">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-11 w-11">
+                    <AvatarFallback className="text-sm font-black" style={{ background: 'var(--skema-primary)', color: '#fff' }}>
+                      {fallback}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-slate-950">{displayName}</p>
+                    <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{user?.email}</p>
+                  </div>
+                </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+              <DropdownMenuItem onClick={onOpenProfile} className="gap-2 rounded-lg py-2.5 font-bold">
+                <MaterialIcon icon="person" size={16} color="#2563eb" />
+                프로필 관리
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onShare} className="gap-2 rounded-lg py-2.5 font-bold">
+                <MaterialIcon icon="share" size={16} color="#2563eb" />
+                시간표 공유
+              </DropdownMenuItem>
               {user?.is_admin && (
                 <>
-                  <DropdownMenuItem onClick={onOpenAdminUsers}>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onOpenAdminUsers} className="gap-2 rounded-lg py-2.5 font-bold">
+                    <MaterialIcon icon="person" size={16} color="#64748b" />
                     관리자 회원 관리
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onOpenAdminLogs}>
+                  <DropdownMenuItem onClick={onOpenAdminLogs} className="gap-2 rounded-lg py-2.5 font-bold">
+                    <MaterialIcon icon="history" size={16} color="#64748b" />
                     관리자 로그인 로그
                   </DropdownMenuItem>
                 </>
               )}
-              <DropdownMenuItem onClick={onOpenSettings}>
-                설정
-              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={onLogout} className="text-red-600 focus:text-red-600">
+              <DropdownMenuItem onClick={onLogout} className="gap-2 rounded-lg py-2.5 font-bold text-red-600 focus:text-red-600">
+                <MaterialIcon icon="close" size={16} color="#dc2626" />
                 로그아웃
               </DropdownMenuItem>
             </DropdownMenuGroup>
