@@ -3,11 +3,14 @@
 import MaterialIcon from '@/components/common/MaterialIcon';
 import type { ExamSchedule, Schedule } from '@/types';
 import { ExamReadinessPanel } from './ExamReadinessPanel';
+import { ForgettingCurvePanel } from './ForgettingCurvePanel';
 import { KakaoNotifyButton } from './KakaoNotifyButton';
+import { WeeklyAIFeedbackPanel } from './WeeklyAIFeedbackPanel';
 
-export function SmartAlertPanel({ exams, schedules }: {
+export function SmartAlertPanel({ exams, schedules, currentWeekStart }: {
   exams: ExamSchedule[];
   schedules: Schedule[];
+  currentWeekStart: Date;
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -89,6 +92,10 @@ export function SmartAlertPanel({ exams, schedules }: {
       )}
 
       <ExamReadinessPanel exams={exams} schedules={schedules} />
+      <div style={{ height: 1, background: '#ebeef1' }} />
+      <ForgettingCurvePanel schedules={schedules} />
+      <div style={{ height: 1, background: '#ebeef1' }} />
+      <WeeklyAIFeedbackPanel schedules={schedules} currentWeekStart={currentWeekStart} />
       <div style={{ height: 1, background: '#ebeef1' }} />
       <KakaoNotifyButton />
     </div>

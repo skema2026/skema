@@ -1,8 +1,6 @@
 'use client';
 
 import type { MouseEvent } from 'react';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -103,16 +101,11 @@ export function NotificationBanner({ notification, onOpen, onDismiss }: Notifica
   );
 }
 
-type SecondaryPanelKey = 'exams' | 'report' | 'analysis' | 'ai' | null;
-
 type DashboardHeaderProps = {
   user: User | null;
   todayPct: number | null;
   todayDone: number;
   todayTotal: number;
-  secondaryPanel: SecondaryPanelKey;
-  onSetSecondaryPanel: (panel: SecondaryPanelKey) => void;
-  onOpenEtaReimport: () => void;
   onAddSchedule: () => void;
   onShare: () => void;
   onOpenAdminUsers: () => void;
@@ -121,20 +114,11 @@ type DashboardHeaderProps = {
   onLogout: () => void;
 };
 
-const NAV_ITEMS: { key: SecondaryPanelKey; label: string; icon: string }[] = [
-  { key: 'exams',    label: '시험 일정', icon: 'school' },
-  { key: 'report',   label: '리포트',   icon: 'bar_chart' },
-  { key: 'analysis', label: '유형 분석', icon: 'pie_chart' },
-];
-
 export function DashboardHeader({
   user,
   todayPct,
   todayDone,
   todayTotal,
-  secondaryPanel,
-  onSetSecondaryPanel,
-  onOpenEtaReimport,
   onAddSchedule,
   onShare,
   onOpenAdminUsers,
@@ -142,7 +126,6 @@ export function DashboardHeader({
   onOpenSettings,
   onLogout,
 }: DashboardHeaderProps) {
-  const router = useRouter();
   return (
     <header
       className="skema-dashboard-header"
@@ -158,18 +141,16 @@ export function DashboardHeader({
         top: 0,
         zIndex: 30,
         flexShrink: 0,
-        gap: '12px',
       }}
     >
-      {/* 좌측: 로고 + 뱃지 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'var(--skema-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <MaterialIcon icon="schedule" size={15} color="#fff" filled />
         </div>
         <span className="skema-headline" style={{ fontWeight: 800, fontSize: '18px', color: 'var(--skema-on-surface)', letterSpacing: 0 }}>SKEMA</span>
         {todayPct !== null && (
           <span
-            className="skema-dashboard-title-badge hide-mobile"
+            className="skema-dashboard-title-badge"
             style={{
               padding: '2px 10px',
               borderRadius: 9999,
@@ -184,68 +165,14 @@ export function DashboardHeader({
         )}
       </div>
 
-      {/* 우측: 모든 버튼 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', flexShrink: 0 }}>
-
-        {/* nav 버튼들 */}
-        {NAV_ITEMS.map(({ key, label, icon }) => {
-          const active = secondaryPanel === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onSetSecondaryPanel(active ? null : key)}
-              className="hide-mobile"
-              style={{
-                display: 'flex', alignItems: 'center', gap: '5px',
-                padding: '7px 12px', borderRadius: '10px', border: 'none',
-                fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                transition: 'all 0.15s',
-                background: active ? 'var(--skema-primary)' : 'var(--skema-surface-low)',
-                color: active ? '#fff' : 'var(--skema-on-surface-variant)',
-              }}
-            >
-              <MaterialIcon icon={icon} size={15} color={active ? '#fff' : 'var(--skema-on-surface-variant)'} />
-              {label}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={onOpenEtaReimport}
-          className="hide-mobile"
-          style={{
-            display: 'flex', alignItems: 'center', gap: '5px',
-            padding: '7px 12px', borderRadius: '10px', border: 'none',
-            fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-            background: 'var(--skema-surface-low)', color: 'var(--skema-on-surface-variant)',
-            transition: 'all 0.15s',
-          }}
-        >
-          <MaterialIcon icon="upload" size={15} color="var(--skema-on-surface-variant)" />
-          시간표 업로드
-        </button>
-
-        {/* 구분선 */}
-        <div className="hide-mobile" style={{ width: 1, height: 22, background: 'var(--skema-container)', margin: '0 2px' }} />
-
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
           type="button"
           onClick={onAddSchedule}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--skema-surface-low)', color: 'var(--skema-on-surface-variant)', border: 'none', borderRadius: '10px', padding: '7px 14px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--skema-primary)', color: '#fff', border: 'none', borderRadius: '10px', padding: '7px 14px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 18px var(--skema-primary-shadow)' }}
         >
-          <MaterialIcon icon="add" size={16} color="var(--skema-on-surface-variant)" />
+          <MaterialIcon icon="add" size={16} color="#fff" />
           <span className="hide-mobile">일정</span> 추가
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push('/ai_chat')}
-          title="AI 어시스턴트"
-          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 700, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
-        >
-          <MaterialIcon icon="smart_toy" size={16} color="var(--skema-on-surface-variant)" filled />
-          <span className="hide-mobile">AI 채팅</span>
         </button>
 
         <button
@@ -347,66 +274,5 @@ export function ShareDialog({ open, isGeneratingShare, shareUrl, onClose, onCopy
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// ── 알림 권한 요청 배너 ──────────────────────────────────────────────────────────
-
-export function NotificationPermissionBanner() {
-  const [show, setShow] = useState(false);
-  const [requesting, setRequesting] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-      const dismissed = sessionStorage.getItem('skema_notif_banner_dismissed');
-      if (!dismissed) setShow(true);
-    }
-  }, []);
-
-  if (!show) return null;
-
-  const handleAllow = async () => {
-    setRequesting(true);
-    const result = await Notification.requestPermission();
-    setRequesting(false);
-    setShow(false);
-    if (result === 'granted') {
-      new Notification('Skema 알림 활성화 ✅', {
-        body: '시험 D-day, 공부 완료율 알림을 받을 수 있습니다.',
-        icon: '/icon-192.png',
-      });
-    }
-  };
-
-  const handleDismiss = () => {
-    sessionStorage.setItem('skema_notif_banner_dismissed', '1');
-    setShow(false);
-  };
-
-  return (
-    <div className="flex items-center justify-between gap-3 bg-indigo-600 px-4 py-2.5 text-white">
-      <div className="flex items-center gap-2">
-        <span className="text-lg">🔔</span>
-        <p className="text-xs font-bold">
-          시험 D-day·공부 완료율 알림을 받으려면 알림을 허용해주세요
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <button
-          onClick={handleAllow}
-          disabled={requesting}
-          className="rounded-lg bg-white px-3 py-1 text-xs font-black text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-60"
-        >
-          {requesting ? '요청 중...' : '알림 허용'}
-        </button>
-        <button
-          onClick={handleDismiss}
-          className="rounded-lg bg-indigo-500 px-2 py-1 text-xs font-bold text-indigo-100 transition hover:bg-indigo-400"
-        >
-          나중에
-        </button>
-      </div>
-    </div>
   );
 }
