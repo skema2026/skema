@@ -52,7 +52,7 @@ export default function LoginPage() {
       setToken(token);
       toast.success('로그인 되었습니다');
       window.history.replaceState({}, '', '/login');
-      router.push('/dashboard');
+      router.push('/onboarding');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -73,7 +73,7 @@ export default function LoginPage() {
     ev.preventDefault();
     if (!validate()) return;
     loginMutation.mutate({ email: form.username, password: form.password }, {
-      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인 되었습니다'); router.push('/dashboard'); },
+      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인 되었습니다'); router.push('/onboarding'); },
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };
         if (error?.response?.status === 401) toast.error('아이디 또는 비밀번호가 올바르지 않습니다');
@@ -304,7 +304,7 @@ export default function LoginPage() {
               최적의 학습 계획을 자동으로 만들어드립니다.
             </p>
             {[
-              { icon: 'calendar_month', title: '시험 기반 자동 배치',    desc: '시험 날짜를 등록하면 AI가 역산해 공부 일정을 배치합니다.' },
+              { icon: 'calendar_month', title: '시험 기반 자동 배치',    desc: '시험 날짜를 등록하고 학습 빈도를 설정하면 빈 시간에 공부 블록을 자동으로 넣어드립니다.' },
               { icon: 'smart_toy',      title: 'AI 채팅으로 일정 관리',  desc: '자연어로 대화하듯 일정을 추가·수정·삭제할 수 있습니다.' },
               { icon: 'bar_chart',      title: '주간 수행률 리포트',      desc: '완료한 일정을 시각화해 학습 패턴을 파악할 수 있습니다.' },
             ].map((f) => (

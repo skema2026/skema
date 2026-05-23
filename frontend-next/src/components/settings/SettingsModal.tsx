@@ -20,8 +20,37 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from '@/lib/push';
+import { api } from '@/lib/api';
 
 const OCCUPATIONS = ['학생', '직장인', '프리랜서', '기타'];
+
+const NOTIF_TYPES = [
+  { key: 'motivation',     label: '동기부여 메시지',    desc: '매일 오전 9시 · 랜덤 동기부여 문구' },
+  { key: 'weekly_report',  label: '주간 수행률 리포트', desc: '매주 월요일 오전 8시 · 지난주 완료율' },
+  { key: 'reminder',       label: '일정 리마인더',      desc: '시작 30분 전 · 미완료 재촉' },
+  { key: 'comparison',     label: '주간 달성 비교',     desc: '매주 수요일 오전 10시 · 전체 평균 비교' },
+  { key: 'exam_alert',     label: '시험 전날 경보',     desc: '시험 전날 · 복습 완료 독려' },
+] as const;
+
+type NotifTypeKey = (typeof NOTIF_TYPES)[number]['key'];
+
+const DEFAULT_NOTIF_PREFS: Record<NotifTypeKey, boolean> = {
+  motivation: true,
+  weekly_report: true,
+  reminder: true,
+  comparison: true,
+  exam_alert: true,
+};
+
+function loadNotifPrefs(): Record<NotifTypeKey, boolean> {
+  if (typeof window === 'undefined') return DEFAULT_NOTIF_PREFS;
+  try {
+    const raw = localStorage.getItem('skema_notif_prefs');
+    return raw ? { ...DEFAULT_NOTIF_PREFS, ...JSON.parse(raw) } : DEFAULT_NOTIF_PREFS;
+  } catch {
+    return DEFAULT_NOTIF_PREFS;
+  }
+}
 
 type ProfileForm = {
   occupation: string;
@@ -65,6 +94,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     reason: null,
   });
   const [pushBusy, setPushBusy] = useState(false);
+  const [notifPrefs, setNotifPrefs] = useState<Record<NotifTypeKey, boolean>>(loadNotifPrefs);
 
   const isCustomOccupation = !!profileForm.occupation && !OCCUPATIONS.includes(profileForm.occupation);
   const updateProfileDraft = (next: ProfileForm) => setProfileDraft(next);
@@ -87,11 +117,21 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     });
   };
 
-  const handleSaveNotif = () => {
+  const handleSaveNotif = async () => {
     localStorage.setItem('skema_notif_enabled', String(notifEnabled));
     localStorage.setItem('skema_notif_minutes', String(notifMinutes));
+    localStorage.setItem('skema_notif_prefs', JSON.stringify(notifPrefs));
+    try {
+      await api.put('/notifications/prefs', notifPrefs);
+    } catch {
+      // 백엔드 저장 실패해도 로컬 설정은 유지
+    }
     toast.success('알림 설정이 저장되었습니다');
     onClose();
+  };
+
+  const toggleNotifPref = (key: NotifTypeKey) => {
+    setNotifPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const refreshPushState = async () => {
@@ -282,6 +322,36 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 </div>
               </div>
             )}
+
+            {/* 알람 종류별 토글 */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">알림 종류 선택</p>
+              <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+                {NOTIF_TYPES.map(({ key, label, desc }) => (
+                  <div key={key} className="flex items-center justify-between px-3 py-2.5">
+                    <div>
+                      <p className="text-sm font-medium">{label}</p>
+                      <p className="text-xs text-gray-500">{desc}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleNotifPref(key)}
+                      style={{
+                        width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer',
+                        background: notifPrefs[key] ? 'var(--skema-primary)' : '#d1d5db',
+                        position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                      }}
+                    >
+                      <span style={{
+                        position: 'absolute', top: 2, left: notifPrefs[key] ? 20 : 2,
+                        width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                        transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="rounded-lg border border-gray-200 p-3 space-y-3">
               <div className="flex items-center justify-between gap-3">

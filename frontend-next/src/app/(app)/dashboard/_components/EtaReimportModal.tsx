@@ -208,11 +208,16 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
           <DialogHeader>
             <DialogTitle>시간표 덮어쓰기 확인</DialogTitle>
           </DialogHeader>
-          <p className="py-2 text-sm text-slate-600">
-            기존에 등록된 강의 시간표{' '}
-            <strong className="text-slate-900">{existingEtaCount}개</strong>를 모두 삭제하고
-            새로 업로드하겠습니까?
-          </p>
+          <div className="py-2 space-y-2">
+            <p className="text-sm text-slate-600">
+              기존에 등록된 강의 시간표{' '}
+              <strong className="text-slate-900">{existingEtaCount}개</strong>를 모두 삭제하고
+              새로 업로드하겠습니까?
+            </p>
+            <p className="text-xs rounded-lg px-3 py-2" style={{ background: '#f0fdf4', color: '#166534' }}>
+              ✓ 개인 일정은 삭제되지 않고 그대로 유지됩니다.
+            </p>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>취소</Button>
             <Button onClick={doSave} disabled={saving} style={{ background: '#ef4444', color: '#fff' }}>

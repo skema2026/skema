@@ -279,15 +279,14 @@ export default function RegisterPage() {
           {/* Left branding */}
           <div className="rp-left">
             <h2>AI가 설계하는<br />나만의 <em>스마트 시간표</em></h2>
-            <p>
-              AI가 당신의 학습 패턴을 분석하고,<br />
-              최적화된 시간표를 설계해 드립니다.<br />
-              지금 바로 스마트한 시간 관리를 시작하세요.
+            <p style={{ fontSize: '15px', lineHeight: 1.8, color: '#2d3a55', margin: '0 0 24px', maxWidth: '380px' }}>
+              시험 일정과 기존 수업을 분석해 빈 시간에<br />
+              최적의 학습 계획을 자동으로 만들어드립니다.
             </p>
             {[
-              { icon: 'psychology',    title: 'Smart Scheduling', desc: 'AI가 최적의 공부 시간을 예측하고 추천합니다' },
-              { icon: 'insights',      title: 'Time Insights',    desc: '학습 효율을 분석하고 개선점을 제안합니다' },
-              { icon: 'track_changes', title: 'Goal Tracking',    desc: '목표 달성을 위한 진척도를 추적합니다' },
+              { icon: 'calendar_month', title: '시험 기반 자동 배치',   desc: '시험 날짜를 등록하고 학습 빈도를 설정하면 빈 시간에 공부 블록을 자동으로 넣어드립니다.' },
+              { icon: 'smart_toy',      title: 'AI 채팅으로 일정 관리', desc: '자연어로 대화하듯 일정을 추가·수정·삭제할 수 있습니다.' },
+              { icon: 'bar_chart',      title: '주간 수행률 리포트',     desc: '완료한 일정을 시각화해 학습 패턴을 파악할 수 있습니다.' },
             ].map((f) => (
               <div className="rp-feat" key={f.title}>
                 <div className="rp-feat-icon">

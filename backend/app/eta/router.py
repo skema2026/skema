@@ -747,7 +747,22 @@ def save_eta_schedules(
 ):
     """
     사용자가 검토 완료한 ETA 시간표 항목들을 반복 일정(date=None)으로 DB에 저장한다.
+    기존 eta_import 스케줄이 있으면 먼저 삭제하고 새로 등록한다.
     """
+    from app.schedule.models import Schedule as ScheduleModel
+
+    existing = db.query(ScheduleModel).filter(
+        ScheduleModel.user_id == current_user.id,
+        ScheduleModel.schedule_source == "eta_import",
+    ).count()
+    if existing > 0:
+        db.query(ScheduleModel).filter(
+            ScheduleModel.user_id == current_user.id,
+            ScheduleModel.schedule_source == "eta_import",
+        ).delete(synchronize_session=False)
+        logger.info(f"ETA: deleted {existing} existing eta_import schedules for user {current_user.id}")
+
+    was_reset = existing > 0
     saved_count = 0
     skipped_count = 0
 
@@ -781,8 +796,8 @@ def save_eta_schedules(
         saved_count += 1
 
     db.commit()
-    logger.info(f"ETA: saved {saved_count} schedules for user {current_user.id} (skipped={skipped_count})")
-    return {"saved": saved_count, "skipped": skipped_count}
+    logger.info(f"ETA: saved {saved_count} schedules for user {current_user.id} (skipped={skipped_count}, reset={was_reset})")
+    return {"saved": saved_count, "skipped": skipped_count, "reset": was_reset}
 
 
 @router.post("/parse-image-v2", response_model=list[NormalizedEntryModel])

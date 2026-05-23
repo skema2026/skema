@@ -1,4 +1,5 @@
 export type RecurringDay = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+export type ScheduleViewScope = 'day' | 'week' | 'month' | 'day_week' | 'day_month' | 'week_month' | 'all';
 
 export type Schedule = {
   id: number;
@@ -13,6 +14,7 @@ export type Schedule = {
   priority: 0 | 1 | 2; // 0=normal, 1=high, 2=urgent
   is_completed: boolean;
   schedule_type: 'class' | 'study' | 'assignment' | 'activity' | 'personal' | 'event';
+  view_scope?: ScheduleViewScope;
   // Phase 5: AI 일관성 추적 필드
   schedule_source?: 'eta_import' | 'ai_generated' | 'user_created';
   linked_exam_id?: number | null;

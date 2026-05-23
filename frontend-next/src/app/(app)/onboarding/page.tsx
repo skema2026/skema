@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 import { normalizeTimeString } from '@/lib/utils';
-import { useUpdateProfile } from '@/hooks/useProfile';
+import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import type { RecurringDay } from '@/types';
 
@@ -42,13 +42,6 @@ interface PersonalSchedule {
 }
 
 const DAY_LABELS = ['월','화','수','목','금','토','일'] as const;
-const DAY_FULL_LABELS = ['월요일','화요일','수요일','목요일','금요일','토요일','일요일'] as const;
-const DAY_COLORS = ['#2563eb', '#0f766e', '#7c3aed', '#be185d', '#b45309', '#dc2626', '#475569'] as const;
-const DAY_SHORTCUTS = [
-  { label: '평일', days: [0, 1, 2, 3, 4] },
-  { label: '주말', days: [5, 6] },
-  { label: '매일', days: [0, 1, 2, 3, 4, 5, 6] },
-] as const;
 const USER_TYPES = [
   { id: 'exam_prep', label: '수험 준비', icon: 'menu_book', desc: '수능/자격/입시 등', color: '#c3d0ff', iconColor: '#2563eb' },
   { id: 'civil_service', label: '공무원', icon: 'account_balance', desc: '공시 등 시험 준비', color: '#ffdcc6', iconColor: '#844000' },
@@ -183,6 +176,18 @@ function _parseExamText(raw: string): Array<{ title: string; exam_date: string; 
 export default function OnboardingPage() {
   const router = useRouter();
   const updateProfile = useUpdateProfile();
+  const { data: profile } = useProfile();
+
+  useEffect(() => {
+    if (!profile?.onboarding_completed) return;
+    const flag = sessionStorage.getItem('skema_onboarding_done');
+    if (!flag) {
+      sessionStorage.setItem('skema_onboarding_done', '1');
+      router.push('/dashboard');
+    }
+  }, [profile?.onboarding_completed, router]);
+
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const [phase, setPhase] = useState<Phase>('college-check');
   const [isCollegeStudent, setIsCollegeStudent] = useState<boolean | null>(null);
@@ -217,6 +222,7 @@ export default function OnboardingPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatingStep, setGeneratingStep] = useState(0);
+  const [showEtaOverwriteConfirm, setShowEtaOverwriteConfirm] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeSteps = isCollegeStudent ? CHAT_STEPS_COLLEGE : CHAT_STEPS_NON_COLLEGE;
@@ -667,16 +673,18 @@ export default function OnboardingPage() {
       setEtaEntries((prev) => prev.map((e) => e._id === id ? { ...e, [field]: value } : e));
     };
 
-    const handleSaveAndContinue = async () => {
-      const valid = etaEntries.filter(
-        (e) => e.subject_name.trim() && e.start_time && e.end_time && e.start_time < e.end_time,
-      );
-      if (valid.length === 0) {
-        setPhase('external-exam');
-        return;
-      }
+    const valid = etaEntries.filter(
+      (e) => e.subject_name.trim() && e.start_time && e.end_time && e.start_time < e.end_time,
+    );
+
+    const isReturningUser = profile?.onboarding_completed || sessionStorage.getItem('skema_onboarding_done') === '1';
+
+    const doSaveAndContinue = async () => {
+      setShowEtaOverwriteConfirm(false);
+      if (valid.length === 0) { setPhase('external-exam'); return; }
       setEtaSaving(true);
       try {
+        if (isReturningUser) await api.delete('/eta/schedules');
         await api.post('/eta/save-schedules', {
           entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source }) => ({
             subject_name, day_of_week, start_time, end_time, location: location ?? '', source,
@@ -684,14 +692,23 @@ export default function OnboardingPage() {
         });
         toast.success(`${valid.length}개 과목을 시간표에 등록했습니다 ✅`);
       } catch {
-            toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+        toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
       } finally {
         setEtaSaving(false);
         setPhase('external-exam');
       }
     };
 
+    const handleSaveAndContinue = () => {
+      if (isReturningUser && valid.length > 0) {
+        setShowEtaOverwriteConfirm(true);
+      } else {
+        doSaveAndContinue();
+      }
+    };
+
     return (
+      <>
       <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-2xl">
           {/* Header */}
@@ -934,6 +951,30 @@ export default function OnboardingPage() {
           </div>
         </div>
       </div>
+
+      {/* 기존 시간표 덮어쓰기 확인 */}
+      {showEtaOverwriteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', maxWidth: 360, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
+            <p className="font-extrabold text-base mb-2" style={{ color: '#181c1e' }}>기존 시간표를 교체할까요?</p>
+            <p className="text-sm mb-2" style={{ color: '#3f4b61' }}>기존 강의 시간표가 모두 삭제되고 새 시간표로 교체됩니다.</p>
+            <p className="text-xs rounded-lg px-3 py-2 mb-5" style={{ background: '#f0fdf4', color: '#166534' }}>
+              ✓ 개인 일정은 삭제되지 않고 그대로 유지됩니다.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowEtaOverwriteConfirm(false)}
+                style={{ flex: 1, height: 44, borderRadius: 11, border: '1px solid #ebeef1', background: '#fff', color: '#334155', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>
+                취소
+              </button>
+              <button onClick={doSaveAndContinue}
+                style={{ flex: 1, height: 44, borderRadius: 11, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                교체
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
@@ -996,8 +1037,6 @@ export default function OnboardingPage() {
 
   // 추가 시험 입력 화면
   if (phase === 'external-exam') {
-    const EXAM_EXAMPLES = ['중간고사', '기말고사', '토익', '정보처리기사', '자격증', '프로젝트 발표'];
-    const DAYS_PER_WEEK_OPTIONS = [1, 2, 3, 4, 5, 6, 7] as const;
     const fmtHours = (h: number) => h < 1 ? `${h * 60}분` : h % 1 === 0 ? `${h}시간` : `${Math.floor(h)}시간 ${(h % 1) * 60}분`;
     const canAddExam = examDraft.name.trim() && examDraft.date;
 
@@ -1010,7 +1049,6 @@ export default function OnboardingPage() {
     return (
       <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-lg">
-          {/* Header */}
           <div className="flex items-center gap-3 mb-6">
             <button onClick={() => setPhase('eta-review')} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#fff', border: '1px solid #ebeef1' }}>
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
@@ -1024,119 +1062,89 @@ export default function OnboardingPage() {
             <div className="h-full rounded-full" style={{ width: '60%', background: '#2563eb' }} />
           </div>
 
-          <div className="rounded-2xl p-5 mb-5" style={{ background: '#fff', boxShadow: '0 4px 24px rgba(26,77,178,0.08)', border: '1px solid #ebeef1' }}>
-            <p className="font-bold text-base mb-1" style={{ color: '#181c1e' }}>별도로 준비 중인 시험이 있나요?</p>
-            <p className="text-xs mb-4" style={{ color: '#3f4b61' }}>없으면 건너뛰어도 됩니다</p>
+          <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>
+            별도로 준비 중인 시험이 있나요?{' '}
+            <span style={{ color: '#94a3b8', fontWeight: 400 }}>없으면 건너뛰어도 됩니다</span>
+          </p>
 
-            {/* 예시 칩 */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {EXAM_EXAMPLES.map((ex) => (
-                <button key={ex} onClick={() => setExamDraft((d) => ({ ...d, name: ex }))}
-                  className="px-3 py-1 text-xs rounded-full border font-medium transition-colors"
-                  style={{ borderColor: examDraft.name === ex ? '#2563eb' : '#c3d0ff', color: '#2563eb', background: examDraft.name === ex ? '#eef1ff' : '#f0f4ff' }}>
-                  {ex}
-                </button>
-              ))}
-            </div>
-
-            {/* 입력 폼 */}
-            <div className="space-y-3">
-              <input
-                className="w-full px-4 py-2.5 text-sm border-2 rounded-xl outline-none"
-                style={{ borderColor: '#ebeef1' }}
-                placeholder="시험명 (예: 중간고사, 프로젝트 발표)"
-                value={examDraft.name}
-                onChange={(e) => setExamDraft((d) => ({ ...d, name: e.target.value }))}
-                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
-              />
-              <input
-                type="date"
-                className="w-full px-4 py-2.5 text-sm border-2 rounded-xl outline-none"
-                style={{ borderColor: '#ebeef1' }}
-                value={examDraft.date}
-                onChange={(e) => setExamDraft((d) => ({ ...d, date: e.target.value }))}
-                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
-              />
-              <button onClick={addExam} disabled={!canAddExam}
-                className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
-                style={{ background: canAddExam ? '#2563eb' : '#d1d5db', cursor: canAddExam ? 'pointer' : 'not-allowed' }}>
-                + 시험 추가
-              </button>
-            </div>
+          <div className="flex gap-2 mb-3">
+            <input
+              className="flex-1 px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
+              style={{ borderColor: '#ebeef1' }}
+              placeholder="시험명 (예: 중간고사, 토익)"
+              value={examDraft.name}
+              onChange={(e) => setExamDraft((d) => ({ ...d, name: e.target.value }))}
+              onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+              onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
+              onKeyDown={(e) => { if (e.key === 'Enter') addExam(); }}
+            />
+            <input
+              type="date"
+              min={todayStr}
+              className="px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
+              style={{ borderColor: '#ebeef1', width: 148 }}
+              value={examDraft.date}
+              onChange={(e) => setExamDraft((d) => ({ ...d, date: e.target.value }))}
+              onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+              onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
+            />
+            <button onClick={addExam} disabled={!canAddExam}
+              className="px-4 py-2.5 rounded-xl text-sm font-bold text-white flex-shrink-0"
+              style={{ background: canAddExam ? '#2563eb' : '#d1d5db', cursor: canAddExam ? 'pointer' : 'not-allowed' }}>
+              추가
+            </button>
           </div>
 
-          {/* 추가된 시험 목록 */}
           {externalExams.length > 0 && (
-            <div className="space-y-2 mb-5">
+            <div className="space-y-2 mb-4">
               {externalExams.map((ex) => (
-                <div key={ex._id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: '#eef1ff', border: '1px solid #c3d0ff' }}>
-                  <div>
-                    <p className="text-sm font-semibold" style={{ color: '#2563eb' }}>{ex.name}</p>
-                    <p className="text-xs" style={{ color: '#334155' }}>{ex.date}</p>
+                <div key={ex._id} className="flex items-center justify-between px-4 py-2.5 rounded-full" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span style={{ color: '#22c55e', fontSize: 10, flexShrink: 0 }}>○</span>
+                    <span className="text-sm font-bold truncate" style={{ color: '#166534' }}>{ex.name}</span>
+                    <span className="text-sm flex-shrink-0" style={{ color: '#166534' }}>{ex.date}</span>
                   </div>
-                  <button onClick={() => setExternalExams((prev) => prev.filter((e) => e._id !== ex._id))}>
-                    <MaterialIcon icon="close" size={16} color="#3f4b61" />
+                  <button onClick={() => setExternalExams((prev) => prev.filter((e) => e._id !== ex._id))} className="flex-shrink-0 ml-2">
+                    <MaterialIcon icon="close" size={14} color="#166534" />
                   </button>
                 </div>
               ))}
             </div>
           )}
 
-          {/* 공부 블록 설정 — 시험이 하나라도 있을 때만 표시 */}
           {externalExams.length > 0 && (
-            <div className="rounded-2xl p-5 mb-5" style={{ background: '#fff', border: '1px solid #d1fae5', boxShadow: '0 2px 12px rgba(5,150,105,0.06)' }}>
-              <p className="font-bold text-sm mb-1" style={{ color: '#065f46' }}>📖 공부 일정 자동 배치</p>
-              <p className="text-xs mb-3" style={{ color: '#3f4b61' }}>캘린더 빈 시간에 공부 블록을 자동으로 넣어드려요</p>
-
-              {/* 실시간 미리보기 */}
-              <div className="rounded-xl px-4 py-3 mb-4 flex items-center gap-2" style={{ background: '#ecfdf5', border: '1px solid #6ee7b7' }}>
-                <span style={{ fontSize: 18 }}>📅</span>
-                <p className="text-sm font-bold" style={{ color: '#065f46', lineHeight: 1.5 }}>
-                  시험 {studyStartDays === 0 ? '당일' : `${studyStartDays}일 전`}부터&nbsp;
-                  {studyDaysPerWeek === 7 ? '매일' : `일주일에 ${studyDaysPerWeek}일`},&nbsp;
-                  하루 {fmtHours(studyHoursPerSession)}씩 공부 일정이 만들어져요
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>시험 몇 일 전부터 공부를 시작할까요?</p>
-                  <select
-                    value={studyStartDays}
-                    onChange={(e) => setStudyStartDays(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
-                    style={{ borderColor: '#c3d0ff', background: '#f8f9ff', color: '#181c1e' }}
-                  >
+            <div className="rounded-xl p-4 mb-5" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+              <p className="text-xs font-bold mb-3" style={{ color: '#1e40af' }}>📖 공부 일정 자동 배치</p>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs flex-shrink-0" style={{ color: '#334155', width: 100 }}>시험 몇 일 전부터</span>
+                  <select value={studyStartDays} onChange={(e) => setStudyStartDays(Number(e.target.value))}
+                    className="flex-1 px-2 py-1.5 text-xs rounded-lg border outline-none"
+                    style={{ borderColor: '#d1d5db', background: '#fff' }}>
                     <option value={0}>당일부터</option>
-                    {Array.from({ length: 100 }, (_, i) => i + 1).map((d) => (
+                    {Array.from({ length: 60 }, (_, i) => i + 1).map((d) => (
                       <option key={d} value={d}>{d}일 전부터</option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>일주일에 며칠 공부할까요?</p>
-                  <div className="flex gap-1.5">
-                    {DAYS_PER_WEEK_OPTIONS.map((d) => (
-                      <button key={d} type="button"
-                        onClick={() => setStudyDaysPerWeek(d)}
-                        className="flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-colors"
-                        style={{ borderColor: studyDaysPerWeek === d ? '#059669' : '#ebeef1', background: studyDaysPerWeek === d ? '#d1fae5' : '#fff', color: studyDaysPerWeek === d ? '#059669' : '#3f4b61' }}>
-                        {d === 7 ? '매일' : `${d}일`}
+                <div className="flex items-center gap-3">
+                  <span className="text-xs flex-shrink-0" style={{ color: '#334155', width: 100 }}>일주일에 며칠</span>
+                  <div className="flex gap-1">
+                    {([1,2,3,4,5,6,7] as const).map((d) => (
+                      <button key={d} type="button" onClick={() => setStudyDaysPerWeek(d)}
+                        className="w-7 h-7 text-xs font-semibold rounded-lg border-2 transition-colors"
+                        style={{ borderColor: studyDaysPerWeek === d ? '#059669' : '#d1d5db', background: studyDaysPerWeek === d ? '#d1fae5' : '#fff', color: studyDaysPerWeek === d ? '#059669' : '#3f4b61' }}>
+                        {d}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold mb-2" style={{ color: '#334155' }}>하루에 몇 시간 공부할까요?</p>
-                  <select
-                    value={studyHoursPerSession}
-                    onChange={(e) => setStudyHoursPerSession(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
-                    style={{ borderColor: '#c3d0ff', background: '#f8f9ff', color: '#181c1e' }}
-                  >
-                    {Array.from({ length: 24 }, (_, i) => (i + 1) * 0.5).map((h) => (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs flex-shrink-0" style={{ color: '#334155', width: 100 }}>하루 몇 시간</span>
+                  <select value={studyHoursPerSession} onChange={(e) => setStudyHoursPerSession(Number(e.target.value))}
+                    className="flex-1 px-2 py-1.5 text-xs rounded-lg border outline-none"
+                    style={{ borderColor: '#d1d5db', background: '#fff' }}>
+                    {Array.from({ length: 18 }, (_, i) => (i + 1) * 0.5).map((h) => (
                       <option key={h} value={h}>{fmtHours(h)}</option>
                     ))}
                   </select>
@@ -1160,40 +1168,27 @@ export default function OnboardingPage() {
 
   // 개인 일정 입력 화면
   if (phase === 'personal-schedule') {
-    const SCHED_EXAMPLES = ['알바', '면접', '프로젝트', '동아리 활동'];
     const isOvernight = !!scheduleDraft.start_time && !!scheduleDraft.end_time &&
       scheduleDraft.end_time <= scheduleDraft.start_time;
     const canAddSched = scheduleDraft.title.trim() && scheduleDraft.start_time && scheduleDraft.end_time &&
       scheduleDraft.start_time !== scheduleDraft.end_time &&
       (scheduleDraft.is_recurring ? scheduleDraft.days.length > 0 : !!scheduleDraft.date);
-    const selectedDayIndexes = scheduleDraft.days
-      .map((day) => recurringDayToIndex(day))
-      .filter((idx) => idx >= 0)
-      .sort((a, b) => a - b);
-    const selectedDaySummary = selectedDayIndexes.length
-      ? selectedDayIndexes.map((idx) => DAY_LABELS[idx]).join(' · ')
-      : '요일 미선택';
 
     const toggleDraftDay = (idx: number) => {
       const day = indexToRecurringDay(idx);
       setScheduleDraft((prev) => {
         const exists = prev.days.includes(day);
         const days = exists ? prev.days.filter((d) => d !== day) : [...prev.days, day];
-        return {
-          ...prev,
-          days,
-          recurring_day: days[0] ?? day,
-        };
+        return { ...prev, days, recurring_day: days[0] ?? day };
       });
     };
 
     const addSched = () => {
       if (!canAddSched) return;
       const draft = { ...scheduleDraft };
-      // 특정 날짜인 경우 recurring_day를 날짜에서 자동 계산
       if (!draft.is_recurring && draft.date) {
         const [y, m, d] = draft.date.split('-').map(Number);
-        const jsDay = new Date(y, m - 1, d).getDay(); // 0=Sun
+        const jsDay = new Date(y, m - 1, d).getDay();
         draft.recurring_day = indexToRecurringDay(jsDay === 0 ? 6 : jsDay - 1);
       } else {
         draft.recurring_day = draft.days[0] ?? 'MON';
@@ -1205,7 +1200,6 @@ export default function OnboardingPage() {
     return (
       <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-lg">
-          {/* Header */}
           <div className="flex items-center gap-3 mb-6">
             <button onClick={() => setPhase('external-exam')} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#fff', border: '1px solid #ebeef1' }}>
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
@@ -1217,184 +1211,111 @@ export default function OnboardingPage() {
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
             <div className="h-full rounded-full" style={{ width: '80%', background: '#2563eb' }} />
-            {/* personal-schedule = 4/5 = 80% */}
           </div>
 
-          <div className="rounded-2xl p-5 mb-5" style={{ background: '#fff', boxShadow: '0 4px 24px rgba(26,77,178,0.08)', border: '1px solid #ebeef1' }}>
-            <p className="font-bold text-base mb-1" style={{ color: '#181c1e' }}>학업 외에 중요한 일정이 있나요?</p>
-            <p className="text-xs mb-2" style={{ color: '#3f4b61' }}>없으면 건너뛰어도 됩니다</p>
-            <p className="text-xs font-bold mb-4 rounded-xl px-3 py-2" style={{ color: '#2453c2', background: '#eff6ff', border: '1px solid #bfd0ff' }}>
-              입력한 일정은 아래 + 일정 추가 버튼을 눌러야 등록됩니다.
-            </p>
+          <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>
+            학업 외에 중요한 일정이 있나요?{' '}
+            <span style={{ color: '#94a3b8', fontWeight: 400 }}>없으면 건너뛰어도 됩니다</span>
+          </p>
 
-            {/* 예시 칩 */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {SCHED_EXAMPLES.map((ex) => (
-                <button key={ex} onClick={() => setScheduleDraft((d) => ({ ...d, title: ex }))}
-                  className="px-3 py-1 text-xs rounded-full border font-medium"
-                  style={{ borderColor: scheduleDraft.title === ex ? '#2563eb' : '#c3d0ff', color: '#2563eb', background: scheduleDraft.title === ex ? '#eef1ff' : '#f0f4ff' }}>
-                  {ex}
-                </button>
-              ))}
+          <div className="space-y-3 mb-4">
+            <input
+              className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
+              style={{ borderColor: '#ebeef1' }}
+              placeholder="일정 제목 (예: 동아리, 운동, 알바)"
+              value={scheduleDraft.title}
+              onChange={(e) => setScheduleDraft((d) => ({ ...d, title: e.target.value }))}
+              onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+              onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
+            />
+
+            <div className="flex gap-2">
+              <button type="button"
+                onClick={() => setScheduleDraft((d) => ({ ...d, is_recurring: true, date: '', days: d.days.length ? d.days : [d.recurring_day] }))}
+                className="flex-1 py-2 text-xs rounded-xl font-semibold border-2 transition-colors"
+                style={{ borderColor: scheduleDraft.is_recurring ? '#2563eb' : '#ebeef1', background: scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: scheduleDraft.is_recurring ? '#2563eb' : '#3f4b61' }}>
+                매주 반복
+              </button>
+              <button type="button"
+                onClick={() => setScheduleDraft((d) => ({ ...d, is_recurring: false }))}
+                className="flex-1 py-2 text-xs rounded-xl font-semibold border-2 transition-colors"
+                style={{ borderColor: !scheduleDraft.is_recurring ? '#2563eb' : '#ebeef1', background: !scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: !scheduleDraft.is_recurring ? '#2563eb' : '#3f4b61' }}>
+                특정 날짜
+              </button>
             </div>
 
-            <div className="space-y-3">
-              <input
-                className="w-full px-4 py-2.5 text-sm border-2 rounded-xl outline-none"
+            {scheduleDraft.is_recurring ? (
+              <div className="flex gap-1.5">
+                {DAY_LABELS.map((d, i) => (
+                  <button key={i} type="button"
+                    onClick={() => toggleDraftDay(i)}
+                    className="flex-1 py-2 text-xs font-bold rounded-lg border-2 transition-colors"
+                    style={{
+                      borderColor: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#2563eb' : '#e2e8f0',
+                      background: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#eef1ff' : '#fff',
+                      color: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#2563eb' : '#64748b',
+                    }}>
+                    {d}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <input type="date"
+                min={todayStr}
+                className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
                 style={{ borderColor: '#ebeef1' }}
-                placeholder="일정 제목 (예: 동아리, 운동)"
-                value={scheduleDraft.title}
-                onChange={(e) => setScheduleDraft((d) => ({ ...d, title: e.target.value }))}
+                value={scheduleDraft.date ?? ''}
+                onChange={(e) => setScheduleDraft((d) => ({ ...d, date: e.target.value }))}
                 onFocus={(e) => e.target.style.borderColor = '#2563eb'}
                 onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
               />
-              {/* 반복/단일 날짜 선택 */}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setScheduleDraft((d) => ({ ...d, is_recurring: true, date: '', days: d.days.length ? d.days : [d.recurring_day] }))}
-                  className="flex-1 py-2 text-xs rounded-xl font-semibold border-2 transition-colors"
-                  style={{ borderColor: scheduleDraft.is_recurring ? '#2563eb' : '#ebeef1', background: scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: scheduleDraft.is_recurring ? '#2563eb' : '#3f4b61' }}>
-                  매주 반복
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScheduleDraft((d) => ({ ...d, is_recurring: false }))}
-                  className="flex-1 py-2 text-xs rounded-xl font-semibold border-2 transition-colors"
-                  style={{ borderColor: !scheduleDraft.is_recurring ? '#2563eb' : '#ebeef1', background: !scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: !scheduleDraft.is_recurring ? '#2563eb' : '#3f4b61' }}>
-                  특정 날짜
-                </button>
-              </div>
-              {/* 요일 (매주 반복) / 날짜 (특정 날짜) */}
-              {scheduleDraft.is_recurring ? (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="text-xs font-bold" style={{ color: '#334155' }}>반복 요일</p>
-                      <p className="text-[11px]" style={{ color: '#64748b' }}>{selectedDayIndexes.length}개 선택 · {selectedDaySummary}</p>
-                    </div>
-                    <div className="flex gap-1">
-                      {DAY_SHORTCUTS.map((shortcut) => (
-                        <button
-                          key={shortcut.label}
-                          type="button"
-                          onClick={() => {
-                            const days = shortcut.days.map((idx) => indexToRecurringDay(idx));
-                            setScheduleDraft((d) => ({ ...d, days, recurring_day: days[0] ?? 'MON' }));
-                          }}
-                          className="px-2 py-1 text-[11px] rounded-md font-semibold"
-                          style={{ background: '#f1f4f7', color: '#334155' }}
-                        >
-                          {shortcut.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-7 gap-1.5 rounded-2xl p-2" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    {DAY_LABELS.map((d, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        aria-pressed={scheduleDraft.days.includes(indexToRecurringDay(i))}
-                        onClick={() => toggleDraftDay(i)}
-                        className="group flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-xl border-2 transition-all active:scale-95"
-                        style={{
-                          borderColor: scheduleDraft.days.includes(indexToRecurringDay(i)) ? DAY_COLORS[i] : '#e2e8f0',
-                          background: scheduleDraft.days.includes(indexToRecurringDay(i)) ? `${DAY_COLORS[i]}14` : '#fff',
-                          color: scheduleDraft.days.includes(indexToRecurringDay(i)) ? DAY_COLORS[i] : '#475569',
-                          boxShadow: scheduleDraft.days.includes(indexToRecurringDay(i)) ? `0 6px 0 ${DAY_COLORS[i]}22` : 'none',
-                        }}
-                      >
-                        <span className="text-[10px] font-bold">{DAY_FULL_LABELS[i]}</span>
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-extrabold" style={{ background: scheduleDraft.days.includes(indexToRecurringDay(i)) ? DAY_COLORS[i] : '#f1f5f9', color: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#fff' : '#475569' }}>
-                          {d}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {selectedDayIndexes.map((idx) => (
-                      <span key={idx} className="rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: `${DAY_COLORS[idx]}16`, color: DAY_COLORS[idx] }}>
-                        {DAY_FULL_LABELS[idx]}
-                      </span>
-                    ))}
-                  </div>
-                  {scheduleDraft.days.length === 0 && (
-                    <p className="text-xs mt-1.5" style={{ color: '#ef4444' }}>요일을 최소 1개 선택해주세요</p>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <p className="text-xs font-medium mb-2" style={{ color: '#334155' }}>날짜</p>
-                  <input
-                    type="date"
-                    className="w-full px-4 py-2.5 text-sm border-2 rounded-xl outline-none"
-                    style={{ borderColor: scheduleDraft.date ? '#2563eb' : '#ebeef1' }}
-                    value={scheduleDraft.date ?? ''}
-                    onChange={(e) => setScheduleDraft((d) => ({ ...d, date: e.target.value }))}
-                    onFocus={(ev) => ev.target.style.borderColor = '#2563eb'}
-                    onBlur={(ev) => ev.target.style.borderColor = scheduleDraft.date ? '#2563eb' : '#ebeef1'}
-                  />
-                </div>
-              )}
-              {/* 시간 */}
-              <div className="rounded-2xl p-4" style={{ background: '#f8fafc', border: '1px solid #ebeef1' }}>
-                <p className="text-xs font-bold mb-3" style={{ color: '#334155' }}>시간</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block">
-                    <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>시작 시간</span>
-                    <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
-                      style={{ borderColor: '#e2e8f0', background: '#fff' }}
-                      value={scheduleDraft.start_time}
-                      onChange={(e) => setScheduleDraft((d) => ({ ...d, start_time: e.target.value }))}
-                      onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'} />
-                  </label>
-                  <label className="block">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-[11px] font-semibold" style={{ color: '#334155' }}>종료 시간</span>
-                      {isOvernight && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: '#ede9fe', color: '#7c3aed' }}>다음날</span>
-                      )}
-                    </div>
-                    <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
-                      style={{ borderColor: scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0', background: '#fff' }}
-                      value={scheduleDraft.end_time}
-                      onChange={(e) => setScheduleDraft((d) => ({ ...d, end_time: e.target.value }))}
-                      onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                      onBlur={(e) => e.target.style.borderColor = scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0'} />
-                  </label>
-                </div>
-                {scheduleDraft.start_time === scheduleDraft.end_time && scheduleDraft.start_time && (
-                  <p className="text-xs mt-2" style={{ color: '#ef4444' }}>시작 시간과 종료 시간이 같습니다</p>
-                )}
-                {isOvernight && (
-                  <p className="text-xs mt-2" style={{ color: '#7c3aed' }}>자정을 넘기는 일정으로 등록됩니다</p>
-                )}
-              </div>
-              <button onClick={addSched} disabled={!canAddSched}
-                className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
-                style={{ background: canAddSched ? '#2563eb' : '#d1d5db', cursor: canAddSched ? 'pointer' : 'not-allowed' }}>
-                + 일정 추가
-              </button>
+            )}
+
+            <div className="flex gap-2">
+              <label className="flex-1">
+                <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>시작 시간</span>
+                <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
+                  style={{ borderColor: '#e2e8f0' }}
+                  value={scheduleDraft.start_time}
+                  onChange={(e) => setScheduleDraft((d) => ({ ...d, start_time: e.target.value }))}
+                  onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'} />
+              </label>
+              <label className="flex-1">
+                <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>
+                  종료 시간{isOvernight && <span className="ml-1 text-[10px] px-1 py-0.5 rounded" style={{ background: '#ede9fe', color: '#7c3aed' }}>다음날</span>}
+                </span>
+                <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
+                  style={{ borderColor: scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0' }}
+                  value={scheduleDraft.end_time}
+                  onChange={(e) => setScheduleDraft((d) => ({ ...d, end_time: e.target.value }))}
+                  onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                  onBlur={(e) => e.target.style.borderColor = scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0'} />
+              </label>
             </div>
+
+            <button onClick={addSched} disabled={!canAddSched}
+              className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
+              style={{ background: canAddSched ? '#2563eb' : '#d1d5db', cursor: canAddSched ? 'pointer' : 'not-allowed' }}>
+              + 일정 추가
+            </button>
           </div>
 
-          {/* 추가된 일정 목록 */}
           {personalSchedules.length > 0 && (
             <div className="space-y-2 mb-5">
               {personalSchedules.map((s) => (
-                <div key={s._id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: '#fef3c7', border: '1px solid #fcd34d' }}>
-                  <div>
-                    <p className="text-sm font-semibold" style={{ color: '#92400e' }}>{s.title}</p>
-                    <p className="text-xs" style={{ color: '#78350f' }}>
+                <div key={s._id} className="flex items-center justify-between px-4 py-2.5 rounded-full" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span style={{ color: '#22c55e', fontSize: 10, flexShrink: 0 }}>○</span>
+                    <span className="text-sm truncate" style={{ color: '#166534' }}>
+                      {s.title && <span className="font-semibold mr-1">{s.title}</span>}
                       {s.is_recurring
-                        ? `${s.days.map((day) => DAY_LABELS[recurringDayToIndex(day)]).join(', ')}요일 ${s.start_time}~${s.end_time} · 매주`
-                        : `${s.date} ${s.start_time}~${s.end_time} · 1회`}
-                    </p>
+                        ? `${s.days.map((day) => DAY_LABELS[recurringDayToIndex(day)]).join('')}요일 ${s.start_time}~${s.end_time}`
+                        : `${s.date} ${s.start_time}~${s.end_time}`}
+                    </span>
                   </div>
-                  <button onClick={() => setPersonalSchedules((prev) => prev.filter((x) => x._id !== s._id))}>
-                    <MaterialIcon icon="close" size={16} color="#3f4b61" />
+                  <button onClick={() => setPersonalSchedules((prev) => prev.filter((x) => x._id !== s._id))} className="flex-shrink-0 ml-2">
+                    <MaterialIcon icon="close" size={14} color="#166534" />
                   </button>
                 </div>
               ))}
@@ -1511,74 +1432,52 @@ export default function OnboardingPage() {
           </div>
 
           {/* Progress */}
-          <div className="w-full h-1.5 rounded-full mb-8" style={{ background: '#ebeef1' }}>
+          <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
             <div className="h-full rounded-full" style={{ width: '100%', background: '#2563eb' }} />
           </div>
 
-          {/* Card */}
-          <div className="rounded-2xl p-6 mb-6" style={{ background: '#fff', boxShadow: '0 4px 24px rgba(26,77,178,0.08)', border: '1px solid #ebeef1' }}>
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#eef1ff' }}>
-                <MaterialIcon icon="bedtime" size={20} color="#2563eb" filled />
-              </div>
-              <p className="font-bold text-base" style={{ color: '#181c1e' }}>평소 수면 패턴을 알려주세요</p>
-            </div>
+          <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>평소 수면 패턴을 알려주세요</p>
 
-            {/* 취침 시간 */}
-            <div className="mb-5">
-              <label className="block text-sm font-semibold mb-2" style={{ color: '#334155' }}>
-                <MaterialIcon icon="nights_stay" size={16} color="#2563eb" className="mr-1 align-middle" />
-                취침 시간
+          <div className="space-y-3 mb-4">
+            <div className="flex gap-2">
+              <label className="flex-1">
+                <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>취침 시간</span>
+                <select
+                  value={sleepStart}
+                  onChange={(e) => setSleepStart(e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
+                  style={{ borderColor: '#ebeef1', background: '#fff', color: '#181c1e' }}
+                >
+                  {HOUR_OPTIONS.map((h) => (
+                    <option key={h} value={fmtHour(h)}>
+                      {h === 0 ? '자정 (00:00)' : h < 12 ? `오전 ${h}시` : h === 12 ? '정오 (12:00)' : `오후 ${h - 12}시 (${String(h).padStart(2,'0')}:00)`}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <select
-                value={sleepStart}
-                onChange={(e) => setSleepStart(e.target.value)}
-                className="w-full px-4 py-3 text-sm rounded-xl border-2 outline-none font-medium"
-                style={{ borderColor: '#c3d0ff', background: '#f8f9ff', color: '#181c1e' }}
-              >
-                {HOUR_OPTIONS.map((h) => (
-                  <option key={h} value={fmtHour(h)}>
-                    {h === 0 ? '자정 (00:00)' : h < 12 ? `오전 ${h}시` : h === 12 ? '정오 (12:00)' : `오후 ${h - 12}시 (${String(h).padStart(2,'0')}:00)`}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 기상 시간 */}
-            <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: '#334155' }}>
-                <MaterialIcon icon="wb_sunny" size={16} color="#f59e0b" className="mr-1 align-middle" />
-                기상 시간
+              <label className="flex-1">
+                <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>기상 시간</span>
+                <select
+                  value={sleepEnd}
+                  onChange={(e) => setSleepEnd(e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
+                  style={{ borderColor: '#ebeef1', background: '#fff', color: '#181c1e' }}
+                >
+                  {HOUR_OPTIONS.map((h) => (
+                    <option key={h} value={fmtHour(h)}>
+                      {h === 0 ? '자정 (00:00)' : h < 12 ? `오전 ${h}시` : h === 12 ? '정오 (12:00)' : `오후 ${h - 12}시 (${String(h).padStart(2,'0')}:00)`}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <select
-                value={sleepEnd}
-                onChange={(e) => setSleepEnd(e.target.value)}
-                className="w-full px-4 py-3 text-sm rounded-xl border-2 outline-none font-medium"
-                style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#181c1e' }}
-              >
-                {HOUR_OPTIONS.map((h) => (
-                  <option key={h} value={fmtHour(h)}>
-                    {h === 0 ? '자정 (00:00)' : h < 12 ? `오전 ${h}시` : h === 12 ? '정오 (12:00)' : `오후 ${h - 12}시 (${String(h).padStart(2,'0')}:00)`}
-                  </option>
-                ))}
-              </select>
             </div>
 
-            {/* 수면 시간 요약 */}
-            {(() => {
-              const startH = parseInt(sleepStart.split(':')[0]);
-              const endH = parseInt(sleepEnd.split(':')[0]);
-              const hours = endH > startH ? endH - startH : 24 - startH + endH;
-              const isValid = hours >= 6;
-              return (
-                <div className="mt-4 px-4 py-3 rounded-xl flex items-center gap-2" style={{ background: isValid ? '#f0fdf4' : '#f6f8fc', border: `1px solid ${isValid ? '#bbf7d0' : '#fed7aa'}` }}>
-                  <MaterialIcon icon={isValid ? 'check_circle' : 'warning'} size={16} color={isValid ? '#16a34a' : '#ea580c'} filled />
-                  <span className="text-sm font-medium" style={{ color: isValid ? '#15803d' : '#c2410c' }}>
-                    {isValid ? `${hours}시간 수면 · 권장 범위예요` : `${hours}시간 수면 · 최소 6시간 이상 권장해요`}
-                  </span>
-                </div>
-              );
-            })()}
+            <div className="px-4 py-2.5 rounded-xl flex items-center gap-2" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+              <MaterialIcon icon="check_circle" size={15} color="#16a34a" filled />
+              <span className="text-sm" style={{ color: '#15803d' }}>
+                {`${sleepStart.split(':')[0]}시부터 ${sleepEnd.split(':')[0]}시 취침`}
+              </span>
+            </div>
           </div>
 
           {/* Quick presets */}

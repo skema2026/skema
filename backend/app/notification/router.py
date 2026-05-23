@@ -87,6 +87,40 @@ def delete_notification(
     db.commit()
 
 
+# ── /notifications/prefs ─────────────────────────────────────
+
+@router.get("/notifications/prefs")
+def get_notif_prefs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    import json
+    from app.auth.models import UserProfile
+    profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
+    if not profile or not profile.notification_prefs:
+        return {"motivation": True, "weekly_report": True, "reminder": True, "comparison": True, "exam_alert": True}
+    try:
+        return json.loads(profile.notification_prefs)
+    except Exception:
+        return {"motivation": True, "weekly_report": True, "reminder": True, "comparison": True, "exam_alert": True}
+
+
+@router.put("/notifications/prefs")
+def update_notif_prefs(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    import json
+    from app.auth.models import UserProfile
+    profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="프로필이 없습니다.")
+    profile.notification_prefs = json.dumps(body)
+    db.commit()
+    return {"ok": True}
+
+
 # ── /push/* ───────────────────────────────────────────────────
 
 @router.get("/push/public-key")

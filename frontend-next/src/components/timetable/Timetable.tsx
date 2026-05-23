@@ -131,9 +131,9 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, onPo
         left:          2,
         right:         2,
         height,
-        background:    `linear-gradient(160deg, ${color} 0%, ${color}CC 100%)`,
+        background:    `${color}65`,
         borderRadius:  7,
-        borderLeft:    `3px solid rgba(255,255,255,0.45)`,
+        borderLeft:    `3px solid ${color}`,
         padding:       isCompact ? '1px 5px' : '4px 7px',
         overflow:      'hidden',
         cursor:        readOnly ? 'default' : isFaded ? 'grabbing' : 'grab',
@@ -144,32 +144,31 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, onPo
         touchAction:   'none',
         zIndex:        isFaded ? 0 : 1,
         boxSizing:     'border-box',
-        boxShadow:     isFaded ? 'none' : '0 1px 3px rgba(0,0,0,0.18)',
+        boxShadow:     isFaded ? 'none' : `0 1px 4px ${color}33`,
         transition:    isFaded ? 'none' : 'opacity 0.1s',
       }}
     >
       <div style={{
-        fontSize:       isCompact ? 9 : 10,
+        fontSize:       isCompact ? 10 : 11,
         fontWeight:     700,
-        color:          '#fff',
+        color:          color,
         overflow:       'hidden',
         textOverflow:   'ellipsis',
         whiteSpace:     'nowrap',
         textDecoration: s.is_completed ? 'line-through' : 'none',
         lineHeight:     1.3,
-        textShadow:     '0 1px 2px rgba(0,0,0,0.15)',
       }}>
         {s.title}
       </div>
       {!isCompact && (
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>
+        <div style={{ fontSize: 10, color: `${color}aa`, marginTop: 1 }}>
           {s.start_time}–{s.end_time}
         </div>
       )}
       {!isCompact && s.location && (
         <div style={{
           fontSize:     9,
-          color:        'rgba(255,255,255,0.75)',
+          color:        `${color}99`,
           marginTop:    1,
           overflow:     'hidden',
           textOverflow: 'ellipsis',
@@ -203,12 +202,10 @@ function GhostBlock({ schedule: s, slot, durationSlots, colorMap }: {
         left:          2,
         right:         2,
         height,
-        background:    color,
+        background:    `${color}50`,
         borderRadius:  5,
-        opacity:       0.75,
-        border:        `2px dashed rgba(255,255,255,0.7)`,
-        outline:       `2px solid ${color}`,
-        outlineOffset: 1,
+        opacity:       0.9,
+        border:        `2px dashed ${color}`,
         boxSizing:     'border-box',
         pointerEvents: 'none',
         zIndex:        20,
@@ -216,9 +213,9 @@ function GhostBlock({ schedule: s, slot, durationSlots, colorMap }: {
       }}
     >
       <div style={{
-        fontSize:   isCompact ? 9 : 10,
+        fontSize:   isCompact ? 10 : 11,
         fontWeight: 700,
-        color:      '#fff',
+        color:      color,
         overflow:   'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
@@ -227,7 +224,7 @@ function GhostBlock({ schedule: s, slot, durationSlots, colorMap }: {
         {s.title}
       </div>
       {!isCompact && (
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', marginTop: 1 }}>
+        <div style={{ fontSize: 10, color: `${color}aa`, marginTop: 1 }}>
           {slotToTime(slot)}–{slotToTime(slot + durationSlots)}
         </div>
       )}
@@ -262,13 +259,14 @@ function localDateStr(d: Date): string {
 // ── Public component ──────────────────────────────────────────────────────────
 
 interface TimetableProps {
-  schedules:  Schedule[];
-  exams?:     ExamSchedule[];
-  readOnly?:  boolean;
-  weekStart?: Date;   // Monday of the displayed week (default: current week)
+  schedules:    Schedule[];
+  exams?:       ExamSchedule[];
+  readOnly?:    boolean;
+  weekStart?:   Date;
+  onExamClick?: (exam: ExamSchedule) => void;
 }
 
-export function Timetable({ schedules, exams = [], readOnly = false, weekStart: weekStartProp }: TimetableProps) {
+export function Timetable({ schedules, exams = [], readOnly = false, weekStart: weekStartProp, onExamClick }: TimetableProps) {
   const weekStart = weekStartProp ?? getWeekStart();
   const openClassForm = useUIStore((s) => s.openClassForm);
   const { mutate: updateSchedule } = useUpdateSchedule();
@@ -588,8 +586,28 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
           flex:           1,
           minHeight:      0,
           scrollbarWidth: 'thin',
+          position:       'relative',
         }}
       >
+        {/* Empty state overlay */}
+        {unique.length === 0 && (
+          <div style={{
+            position:       'absolute',
+            top:            '30%',
+            left:           0,
+            right:          0,
+            zIndex:         10,
+            display:        'flex',
+            flexDirection:  'column',
+            alignItems:     'center',
+            gap:            10,
+            pointerEvents:  'none',
+          }}>
+            <div style={{ fontSize: 40 }}>📅</div>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#475569' }}>이번 주 일정이 없습니다</p>
+            <p style={{ fontSize: 12, color: '#94a3b8' }}>헤더의 "+ 일정 추가" 버튼을 눌러 첫 일정을 추가해보세요</p>
+          </div>
+        )}
         {/* Time gutter — :00 labels + :30 minor marks */}
         <div style={{
           width:     GUTTER_W,
@@ -668,22 +686,32 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
 
             {/* Exam blocks (read-only, always on top) */}
             {(examByDow[dow] ?? []).map((e) => {
+              const examClickable = !!onExamClick;
+              const examStyle: React.CSSProperties = {
+                cursor:   examClickable ? 'pointer' : 'default',
+                outline:  'none',
+              };
+
               // Exams without time: show as all-day banner at top of column
               if (!e.exam_time) {
                 return (
-                  <div key={`exam-${e.id}`} style={{
-                    position:     'absolute',
-                    top:          2,
-                    left:         2,
-                    right:        2,
-                    height:       MIN_BLOCK_H,
-                    background:   '#fbbf24',
-                    borderRadius: 4,
-                    padding:      '2px 4px',
-                    overflow:     'hidden',
-                    pointerEvents: 'none',
-                    zIndex:        3,
-                  }}>
+                  <div
+                    key={`exam-${e.id}`}
+                    onClick={() => onExamClick?.(e)}
+                    style={{
+                      position:     'absolute',
+                      top:          2,
+                      left:         2,
+                      right:        2,
+                      height:       MIN_BLOCK_H,
+                      background:   '#fbbf24',
+                      borderRadius: 4,
+                      padding:      '2px 4px',
+                      overflow:     'hidden',
+                      zIndex:       3,
+                      ...examStyle,
+                    }}
+                  >
                     <div style={{ fontSize: 8, fontWeight: 700, color: '#78350f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       📝 {e.title}
                     </div>
@@ -699,6 +727,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
               return (
                 <div
                   key={`exam-${e.id}`}
+                  onClick={() => onExamClick?.(e)}
                   style={{
                     position:     'absolute',
                     top,
@@ -709,8 +738,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                     borderRadius: 5,
                     padding:      '2px 5px',
                     overflow:     'hidden',
-                    pointerEvents: 'none',
-                    zIndex:        2,
+                    zIndex:       2,
+                    ...examStyle,
                   }}
                 >
                   <div style={{

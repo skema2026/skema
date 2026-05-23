@@ -43,6 +43,8 @@ class Schedule(Base):
     is_completed = Column(Boolean, nullable=True, default=False, server_default="0")
     schedule_type = Column(String(30), nullable=True, default="class", server_default="class")
     schedule_source = Column(String(30), nullable=True, default="user_created", server_default="user_created")
+    linked_exam_id = Column(Integer, ForeignKey("exam_schedules.id", ondelete="SET NULL"), nullable=True, index=True)
+    original_generated_title = Column(String(200), nullable=True)
 
     user = relationship("User", back_populates="schedules")
     exam_schedules = relationship(
