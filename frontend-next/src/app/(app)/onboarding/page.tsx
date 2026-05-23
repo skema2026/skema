@@ -222,6 +222,7 @@ export default function OnboardingPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatingStep, setGeneratingStep] = useState(0);
+  const [showEtaOverwriteConfirm, setShowEtaOverwriteConfirm] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeSteps = isCollegeStudent ? CHAT_STEPS_COLLEGE : CHAT_STEPS_NON_COLLEGE;
@@ -672,16 +673,16 @@ export default function OnboardingPage() {
       setEtaEntries((prev) => prev.map((e) => e._id === id ? { ...e, [field]: value } : e));
     };
 
-    const handleSaveAndContinue = async () => {
-      const valid = etaEntries.filter(
-        (e) => e.subject_name.trim() && e.start_time && e.end_time && e.start_time < e.end_time,
-      );
-      if (valid.length === 0) {
-        setPhase('external-exam');
-        return;
-      }
+    const valid = etaEntries.filter(
+      (e) => e.subject_name.trim() && e.start_time && e.end_time && e.start_time < e.end_time,
+    );
+
+    const doSaveAndContinue = async () => {
+      setShowEtaOverwriteConfirm(false);
+      if (valid.length === 0) { setPhase('external-exam'); return; }
       setEtaSaving(true);
       try {
+        if (profile?.onboarding_completed) await api.delete('/eta/schedules');
         await api.post('/eta/save-schedules', {
           entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source }) => ({
             subject_name, day_of_week, start_time, end_time, location: location ?? '', source,
@@ -689,14 +690,23 @@ export default function OnboardingPage() {
         });
         toast.success(`${valid.length}개 과목을 시간표에 등록했습니다 ✅`);
       } catch {
-            toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+        toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
       } finally {
         setEtaSaving(false);
         setPhase('external-exam');
       }
     };
 
+    const handleSaveAndContinue = () => {
+      if (profile?.onboarding_completed && valid.length > 0) {
+        setShowEtaOverwriteConfirm(true);
+      } else {
+        doSaveAndContinue();
+      }
+    };
+
     return (
+      <>
       <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-2xl">
           {/* Header */}
@@ -939,6 +949,30 @@ export default function OnboardingPage() {
           </div>
         </div>
       </div>
+
+      {/* 기존 시간표 덮어쓰기 확인 */}
+      {showEtaOverwriteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', maxWidth: 360, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
+            <p className="font-extrabold text-base mb-2" style={{ color: '#181c1e' }}>기존 시간표를 교체할까요?</p>
+            <p className="text-sm mb-2" style={{ color: '#3f4b61' }}>기존 강의 시간표가 모두 삭제되고 새 시간표로 교체됩니다.</p>
+            <p className="text-xs rounded-lg px-3 py-2 mb-5" style={{ background: '#f0fdf4', color: '#166534' }}>
+              ✓ 개인 일정은 삭제되지 않고 그대로 유지됩니다.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowEtaOverwriteConfirm(false)}
+                style={{ flex: 1, height: 44, borderRadius: 11, border: '1px solid #ebeef1', background: '#fff', color: '#334155', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>
+                취소
+              </button>
+              <button onClick={doSaveAndContinue}
+                style={{ flex: 1, height: 44, borderRadius: 11, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                교체
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
