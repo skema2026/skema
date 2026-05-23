@@ -187,6 +187,8 @@ export default function OnboardingPage() {
     }
   }, [profile?.onboarding_completed, router]);
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const [phase, setPhase] = useState<Phase>('college-check');
   const [isCollegeStudent, setIsCollegeStudent] = useState<boolean | null>(null);
 
@@ -1042,6 +1044,7 @@ export default function OnboardingPage() {
             />
             <input
               type="date"
+              min={todayStr}
               className="px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
               style={{ borderColor: '#ebeef1', width: 148 }}
               value={examDraft.date}
@@ -1222,6 +1225,7 @@ export default function OnboardingPage() {
               </div>
             ) : (
               <input type="date"
+                min={todayStr}
                 className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
                 style={{ borderColor: '#ebeef1' }}
                 value={scheduleDraft.date ?? ''}
@@ -1374,17 +1378,7 @@ export default function OnboardingPage() {
     const fmtHour = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
     return (
-      <div
-        className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6"
-        style={{
-          background: `
-            radial-gradient(circle at 18% 20%, rgba(56,189,248,0.28), transparent 32%),
-            radial-gradient(circle at 82% 18%, rgba(37,99,235,0.22), transparent 34%),
-            linear-gradient(135deg, rgba(248,251,255,0.75) 0%, rgba(234,244,255,0.75) 48%, rgba(219,234,254,0.75) 100%),
-            url('/register-bg.jpg') center/cover no-repeat
-          `,
-        }}
-      >
+      <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-md">
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
