@@ -811,7 +811,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
 
                 <div className="min-h-[620px] flex-1 overflow-hidden rounded-lg border border-blue-50 xl:min-h-[calc(100vh-190px)]">
                   {timetableView === 'week' && (
-                    <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} startTime={wakeStartTime} />
+                    <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} />
                   )}
 
                   {timetableView === 'day' && (
