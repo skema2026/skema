@@ -5,6 +5,7 @@
   POST /auth/login               — JSON 로그인 → JWT
   POST /auth/token               — form-data 로그인 → JWT (OAuth2 호환)
   GET  /users/me                 — 내 계정 정보
+  PUT  /users/me                 — 내 계정 수정
   GET  /profiles                 — 내 프로필 조회
   POST /profiles                 — 프로필 생성
   PUT  /profiles                 — 프로필 수정
@@ -30,6 +31,7 @@ from app.auth.schemas import (
     SignupRequest,
     TokenResponse,
     UserResponse,
+    UserUpdate,
 )
 from app.auth.service import OAUTH_CONFIGS
 from app.core.config import settings
@@ -92,6 +94,20 @@ def login_form(
 def get_me(current_user: User = Depends(get_current_user)):
     """현재 인증된 사용자 정보를 반환합니다."""
     return _serialize_current_user(current_user)
+
+
+@router.put("/users/me", response_model=UserResponse)
+def update_me(
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """현재 인증된 사용자의 이름과 이메일을 수정합니다."""
+    updates = data.model_dump(exclude_unset=True)
+    if updates.get("email") is None:
+        updates.pop("email", None)
+    updated = service.update_user_account(db, current_user, updates)
+    return _serialize_current_user(updated)
 
 
 # ── 프로필 ────────────────────────────────────────────────────────────────────

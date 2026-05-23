@@ -301,8 +301,8 @@ export default function LandingPage() {
 
           <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_300px]">
             <div className="rounded-lg border border-[#d8e2ef] bg-white p-4 shadow-sm">
-              <p className="mb-3 text-sm font-extrabold text-slate-950">오늘 할 일</p>
-              {['자료구조 수업', '중간고사 복습', '프로젝트 회의'].map((item, idx) => (
+              <p className="mb-3 text-sm font-extrabold text-slate-950">다음 일정</p>
+              {['자료구조 수업', '알고리즘 과제', '프로젝트 회의'].map((item, idx) => (
                 <div key={item} className="mb-2 flex items-center gap-3 rounded-lg bg-slate-50 p-3">
                   <span className={`h-4 w-4 rounded ${idx === 0 ? 'bg-emerald-500' : 'border-2 border-slate-300 bg-white'}`} />
                   <div>
@@ -336,14 +336,14 @@ export default function LandingPage() {
             </div>
 
             <div className="rounded-lg border border-[#d8e2ef] bg-white p-4 shadow-sm">
-              <p className="mb-3 text-sm font-extrabold text-slate-950">AI 패널</p>
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">
-                <p className="text-xs font-bold">준비도 경보</p>
-                <p className="mt-1 text-lg font-extrabold">D-5 · 42%</p>
+              <p className="mb-3 text-sm font-extrabold text-slate-950">빠른 실행</p>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-800">
+                <p className="text-xs font-bold">AI 채팅</p>
+                <p className="mt-1 text-sm font-semibold">말로 일정 추가·수정</p>
               </div>
-              <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3 text-violet-800">
-                <p className="text-xs font-bold">복습 스케줄러</p>
-                <p className="mt-1 text-sm font-semibold">내일 복습 2개 자동 배치</p>
+              <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-800">
+                <p className="text-xs font-bold">시간표 업로드</p>
+                <p className="mt-1 text-sm font-semibold">이미지에서 수업 자동 인식</p>
               </div>
             </div>
           </div>
@@ -357,9 +357,9 @@ export default function LandingPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {[
               ['자연어 일정 관리', 'AI 채팅으로 일정을 추가하고 미완료 일정을 재배치합니다.', 'chat'],
-              ['시험 준비도', '시험일까지 남은 일정, 수행률, 확보 가능한 시간을 함께 계산합니다.', 'quiz'],
+              ['시간표 이미지 인식', '캡처한 시간표를 업로드하면 수업 정보를 자동으로 정리합니다.', 'upload_file'],
+              ['일간·주간·월간 보기', '기상시간을 기준으로 하루, 주간, 월간 흐름을 빠르게 확인합니다.', 'calendar_month'],
               ['공유 시간표', '읽기 전용 링크로 주간 시간표를 빠르게 공유합니다.', 'ios_share'],
-              ['주간 리포트', '요일별 수행률과 유형별 시간을 확인해 다음 주 계획을 조정합니다.', 'bar_chart'],
             ].map(([title, desc, icon]) => (
               <article key={title} className="rounded-lg border border-[#d8e2ef] bg-[#f8fbff] p-5 shadow-sm">
                 <div className="skema-sticker mb-5 h-11 w-11">

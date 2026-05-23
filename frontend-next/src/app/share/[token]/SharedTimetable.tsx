@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { Schedule } from '@/types';
 import { Timetable } from '@/components/timetable/Timetable';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { scheduleVisibleIn } from '@/lib/scheduleViewScope';
 
 interface SharedData {
   schedules: Schedule[];
@@ -63,7 +64,7 @@ export function SharedTimetable({ token }: { token: string }) {
         </div>
       )}
       <div style={{ height: 640 }}>
-        <Timetable schedules={data.schedules} readOnly />
+        <Timetable schedules={data.schedules.filter((schedule) => scheduleVisibleIn(schedule, 'week'))} readOnly />
       </div>
     </div>
   );

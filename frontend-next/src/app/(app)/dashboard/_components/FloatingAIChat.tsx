@@ -223,6 +223,7 @@ export function FloatingAIChat({ open, onOpenChange }: FloatingAIChatProps) {
         >
           <AIChat
             onClose={() => onOpenChange(false)}
+            className="border-l-0"
             height={panelHeight}
           />
         </div>

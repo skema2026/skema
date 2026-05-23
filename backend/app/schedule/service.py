@@ -47,6 +47,9 @@ def normalize_schedule_record(data: dict[str, Any]) -> dict[str, Any]:
         normalized["recurring_day"] = _day_to_enum(normalized["recurring_day"])
         normalized.pop("day_of_week", None)
 
+    if not normalized.get("view_scope"):
+        normalized["view_scope"] = "day_month" if normalized.get("date") else "day_week"
+
     return normalized
 
 

@@ -54,6 +54,30 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserUpdate(BaseModel):
+    username: str | None = None
+    email: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_update_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            result = validate_email(value.strip(), check_deliverability=False)
+        except EmailNotValidError as exc:
+            raise ValueError("올바른 이메일 형식이 아닙니다.") from exc
+        return result.normalized
+
+    @field_validator("username")
+    @classmethod
+    def normalize_update_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+
 class ProfileCreate(BaseModel):
     user_type: str | None = None
     occupation: str | None = None

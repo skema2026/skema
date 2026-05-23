@@ -99,6 +99,14 @@ def deactivate_user(db: Session, user: User) -> User:
     return user
 
 
+def update_user_record(db: Session, user: User, updates: dict) -> User:
+    for field, value in updates.items():
+        setattr(user, field, value)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def delete_user(db: Session, user: User) -> None:
     db.query(LoginLog).filter(LoginLog.user_id == user.id).update(
         {LoginLog.user_id: None},

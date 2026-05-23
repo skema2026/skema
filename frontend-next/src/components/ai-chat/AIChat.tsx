@@ -11,7 +11,8 @@ import { cn } from '@/lib/utils';
 
 interface AIChatProps {
   onClose?: () => void;
-  height?: number;
+  className?: string;
+  height?: string | number;
 }
 
 const SUGGESTED_PROMPTS = [
@@ -22,7 +23,7 @@ const SUGGESTED_PROMPTS = [
   '이번 주 일정 목록 보여줘',
 ];
 
-export function AIChat({ onClose, height }: AIChatProps) {
+export function AIChat({ onClose, className, height = 'calc(100vh - 56px)' }: AIChatProps) {
   const queryClient = useQueryClient();
 
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -125,8 +126,8 @@ export function AIChat({ onClose, height }: AIChatProps) {
 
   return (
     <div
-      className="flex flex-col bg-white border-l"
-      style={{ height: height ?? 'calc(100vh - 56px)' }}
+      className={cn('flex flex-col bg-white border-l', className)}
+      style={{ height }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 bg-gradient-to-r from-blue-200 via-sky-200 to-indigo-200">

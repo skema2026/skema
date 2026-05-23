@@ -187,10 +187,10 @@ button {
 
 .skema-onboarding-screen {
   background:
-    radial-gradient(circle at 18% 20%, rgba(56,189,248,0.28), transparent 32%),
-    radial-gradient(circle at 82% 18%, rgba(37,99,235,0.22), transparent 34%),
-    linear-gradient(135deg, rgba(248,251,255,0.75) 0%, rgba(234,244,255,0.75) 48%, rgba(219,234,254,0.75) 100%),
-    url('/register-bg.jpg') center/cover no-repeat;
+    radial-gradient(circle at 18% 20%, rgba(56,189,248,0.18), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgba(37,99,235,0.16), transparent 34%),
+    linear-gradient(135deg, rgba(248,251,255,0.88) 0%, rgba(234,244,255,0.84) 48%, rgba(219,234,254,0.8) 100%),
+    url('/register-bg.jpg') center / cover no-repeat fixed;
   min-height: 100dvh;
   position: relative;
   isolation: isolate;

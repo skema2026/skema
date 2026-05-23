@@ -18,26 +18,25 @@ import { useUIStore } from '@/store/uiStore';
 import { useCreateSchedule, useDeleteSchedule, useUpdateSchedule } from '@/hooks/useSchedules';
 import {
   DAY_NAMES_FULL,
-  PRIORITY_LABELS,
   cn,
 } from '@/lib/utils';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { ALL_SCHEDULE_COLORS, getAutoColor } from '@/lib/scheduleColor';
 import { dateStringToRecurringDay, recurringDayToIndex, indexToRecurringDay } from '@/lib/recurringDay';
-import { RecurringDay, Schedule } from '@/types';
+import {
+  defaultScopeForMode,
+  ScheduleViewTarget,
+  scopeToTargets,
+  targetsToScope,
+} from '@/lib/scheduleViewScope';
+import { RecurringDay, Schedule, ScheduleViewScope } from '@/types';
+import MaterialIcon from '@/components/common/MaterialIcon';
 
 const SCHEDULE_TYPE_OPTIONS = [
-  { value: 'class',      label: '수업',     icon: '📚', desc: '강의·실습' },
-  { value: 'study',      label: '자율학습', icon: '✏️', desc: '복습·공부' },
-  { value: 'assignment', label: '과제',     icon: '📋', desc: '제출·마감' },
-  { value: 'activity',   label: '활동',     icon: '🏃', desc: '동아리·알바' },
-  { value: 'personal',   label: '개인',     icon: '🏠', desc: '약속·기타' },
+  { value: 'class',      label: '수업',     icon: 'school', desc: '강의·실습' },
+  { value: 'study',      label: '자율학습', icon: 'edit_note', desc: '공부·학습' },
+  { value: 'assignment', label: '과제',     icon: 'assignment', desc: '제출·마감' },
+  { value: 'activity',   label: '활동',     icon: 'directions_run', desc: '동아리·알바' },
+  { value: 'personal',   label: '개인',     icon: 'event', desc: '약속·기타' },
 ] as const;
 
 const defaultForm = {
@@ -49,9 +48,16 @@ const defaultForm = {
   end_time: '10:00',
   location: '',
   color: '#6366F1',
-  priority: 0 as Schedule['priority'],
   is_completed: false,
+  view_scope: 'day_week' as ScheduleViewScope,
 };
+
+const VIEW_SCOPE_OPTIONS: { value: ScheduleViewTarget; label: string; desc: string; icon: string }[] = [
+  { value: 'day', label: '일간', desc: '하루 화면', icon: 'today' },
+  { value: 'week', label: '주간', desc: '주간 시간표', icon: 'view_week' },
+  { value: 'month', label: '월간', desc: '월간 달력', icon: 'calendar_month' },
+];
+
 
 function timesOverlap(s1: string, e1: string, s2: string, e2: string): boolean {
   return s1 < e2 && s2 < e1;
@@ -113,8 +119,8 @@ export function ClassForm() {
         end_time: editingSchedule.end_time,
         location: editingSchedule.location || '',
         color: editingSchedule.color,
-        priority: editingSchedule.priority,
         is_completed: editingSchedule.is_completed,
+        view_scope: editingSchedule.view_scope ?? defaultScopeForMode(!hasDate),
       });
       setSelectedDays([editingSchedule.recurring_day]);
     } else {
@@ -133,6 +139,7 @@ export function ClassForm() {
     if (!isRecurring && !form.date) newErrors.date = '날짜를 선택해주세요';
     if (!form.start_time) newErrors.start_time = '시작 시간을 입력해주세요';
     if (!form.end_time) newErrors.end_time = '종료 시간을 입력해주세요';
+    if (scopeToTargets(form.view_scope).length === 0) newErrors.view_scope = '표시 위치를 선택해주세요';
     if (form.start_time >= form.end_time) newErrors.end_time = '종료 시간은 시작 시간 이후여야 합니다';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -162,8 +169,9 @@ export function ClassForm() {
       end_time: form.end_time,
       location: form.location || undefined,
       color: form.color,
-      priority: form.priority,
+      priority: editingSchedule?.priority ?? 0,
       is_completed: form.is_completed,
+      view_scope: form.view_scope,
     };
 
     if (editingSchedule) {
@@ -189,6 +197,8 @@ export function ClassForm() {
   };
 
   const isPending = createSchedule.isPending || updateSchedule.isPending || deleteSchedule.isPending;
+  const fieldClassName = 'h-14 rounded-lg border-blue-100 bg-[#fbfdff] px-4 text-base font-bold text-slate-950 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-blue-200 focus-visible:ring-offset-0';
+  const selectedViewTargets = scopeToTargets(form.view_scope);
 
   const handleDelete = () => {
     if (!editingSchedule) return;
@@ -203,14 +213,25 @@ export function ClassForm() {
 
   return (
     <Dialog open={isClassFormOpen} onOpenChange={(open) => !open && closeClassForm()}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto border-[#d8e2ef] bg-[#ffffff]">
-        <DialogHeader>
-          <DialogTitle>{editingSchedule ? '일정 수정' : '일정 추가'}</DialogTitle>
+      <DialogContent className="max-h-[94vh] w-[calc(100vw-2rem)] max-w-[820px] overflow-hidden border border-blue-100 bg-white p-0 shadow-2xl sm:max-w-[820px] sm:rounded-lg">
+        <DialogHeader className="border-b border-blue-50 bg-[#fbfdff] px-6 py-5 text-left sm:px-8">
+          <div className="flex items-center gap-4">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-blue-600">
+              <MaterialIcon icon={editingSchedule ? 'edit_calendar' : 'add'} size={28} color="#fff" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-blue-600">시간표 관리</p>
+              <DialogTitle className="text-3xl font-black text-slate-950">
+                {editingSchedule ? '일정 수정' : '일정 추가'}
+              </DialogTitle>
+            </div>
+          </div>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+        <form onSubmit={handleSubmit} className="flex max-h-[calc(94vh-106px)] min-h-0 flex-col">
+          <div className="min-h-0 flex-1 space-y-8 overflow-y-auto px-6 py-6 sm:px-8">
           {/* Title */}
-          <div className="space-y-1.5">
-            <Label htmlFor="title">제목 *</Label>
+          <div className="space-y-3">
+            <Label htmlFor="title" className="text-base font-black text-slate-950">제목 *</Label>
             <Input
               id="title"
               placeholder="일정 제목"
@@ -224,15 +245,15 @@ export function ClassForm() {
                   setForm({ ...form, title });
                 }
               }}
-              className={errors.title ? 'border-red-500' : ''}
+              className={cn(fieldClassName, errors.title && 'border-red-500 focus-visible:ring-red-100')}
             />
             {errors.title && <p className="text-red-500 text-xs">{errors.title}</p>}
           </div>
 
           {/* Schedule Type */}
-          <div className="space-y-1.5">
-            <Label>유형</Label>
-            <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-3">
+            <Label className="text-base font-black text-slate-950">유형</Label>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {SCHEDULE_TYPE_OPTIONS.map(({ value, label, icon, desc }) => {
                 const selected = form.schedule_type === value;
                 return (
@@ -248,15 +269,15 @@ export function ClassForm() {
                       }
                     }}
                     className={cn(
-                      'flex flex-col items-center gap-1 py-2.5 px-1 rounded-lg border-2 text-center transition-all',
+                      'flex min-h-[116px] flex-col items-center justify-center gap-2 rounded-lg border p-3 text-center transition',
                       selected
-                        ? 'border-indigo-500 bg-indigo-50'
-                        : 'border-gray-100 bg-white hover:border-gray-300'
+                        ? 'border-blue-600 bg-blue-50 shadow-sm'
+                        : 'border-blue-100 bg-white hover:border-blue-300 hover:bg-blue-50/60'
                     )}
                   >
-                    <span style={{ fontSize: 20 }}>{icon}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: selected ? '#4338CA' : '#181c1e' }}>{label}</span>
-                    <span style={{ fontSize: 9, color: '#64748b', lineHeight: 1.3 }}>{desc}</span>
+                    <MaterialIcon icon={icon} size={25} color={selected ? '#2563eb' : '#64748b'} />
+                    <span className={cn('text-base font-black', selected ? 'text-blue-700' : 'text-slate-950')}>{label}</span>
+                    <span className="text-xs font-bold leading-4 text-slate-500">{desc}</span>
                   </button>
                 );
               })}
@@ -264,33 +285,36 @@ export function ClassForm() {
           </div>
 
           {/* 반복 방식 토글 */}
-          <div className="space-y-1.5">
-            <Label>일정 방식</Label>
-            <div className="flex gap-2">
+          <div className="space-y-3">
+            <Label className="text-base font-black text-slate-950">일정 방식</Label>
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-blue-100 bg-blue-50/70 p-1.5">
               <button
                 type="button"
                 onClick={() => {
                   setIsRecurring(true);
                   setSelectedDays((days) => days.length ? days : [form.recurring_day]);
-                  setForm((f) => ({ ...f, date: '' }));
+                  setForm((f) => ({ ...f, date: '', view_scope: defaultScopeForMode(true) }));
                 }}
                 className={cn(
-                  'flex-1 py-1.5 rounded-lg text-sm font-semibold border transition-colors',
+                  'rounded-md px-4 py-3 text-base font-black transition',
                   isRecurring
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-400'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-white'
                 )}
               >
                 매주 반복
               </button>
               <button
                 type="button"
-                onClick={() => setIsRecurring(false)}
+                onClick={() => {
+                  setIsRecurring(false);
+                  setForm((f) => ({ ...f, view_scope: defaultScopeForMode(false) }));
+                }}
                 className={cn(
-                  'flex-1 py-1.5 rounded-lg text-sm font-semibold border transition-colors',
+                  'rounded-md px-4 py-3 text-base font-black transition',
                   !isRecurring
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-400'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-white'
                 )}
               >
                 특정 날짜
@@ -298,11 +322,55 @@ export function ClassForm() {
             </div>
           </div>
 
+          {/* View scope */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-base font-black text-slate-950">표시 위치</Label>
+              <span className="text-xs font-bold text-slate-400">
+                {isRecurring ? '반복 일정 기본: 일간+주간' : '특정 날짜 기본: 일간+월간'}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {VIEW_SCOPE_OPTIONS.map((option) => {
+                const selected = selectedViewTargets.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => {
+                      const next = selected
+                        ? selectedViewTargets.filter((target) => target !== option.value)
+                        : [...selectedViewTargets, option.value];
+                      setForm((prev) => ({
+                        ...prev,
+                        view_scope: targetsToScope(next.length ? next : [option.value]),
+                      }));
+                    }}
+                    className={cn(
+                      'flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-lg border p-3 text-center transition',
+                      selected
+                        ? 'border-blue-600 bg-blue-50 shadow-sm'
+                        : 'border-blue-100 bg-white hover:border-blue-300 hover:bg-blue-50/60'
+                    )}
+                  >
+                    <MaterialIcon icon={option.icon} size={25} color={selected ? '#2563eb' : '#64748b'} />
+                    <span className={cn('text-base font-black', selected ? 'text-blue-700' : 'text-slate-950')}>
+                      {option.label}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500">{option.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {errors.view_scope && <p className="text-red-500 text-xs">{errors.view_scope}</p>}
+          </div>
+
           {/* 매주 반복 → 요일 선택 / 특정 날짜 → 날짜 입력 */}
           {isRecurring ? (
-            <div className="space-y-1.5">
-              <Label>요일</Label>
-              <div className="grid grid-cols-7 gap-1.5">
+            <div className="space-y-3">
+              <Label className="text-base font-black text-slate-950">요일</Label>
+              <div className="grid grid-cols-7 gap-2">
                 {DAY_NAMES_FULL.map((day, idx) => {
                   const recurringDay = indexToRecurringDay(idx);
                   const selected = selectedDays.includes(recurringDay);
@@ -323,10 +391,10 @@ export function ClassForm() {
                         });
                       }}
                       className={cn(
-                        'h-10 rounded-lg border text-sm font-semibold transition-all',
+                        'h-12 rounded-lg border text-base font-black transition',
                         selected
-                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-                          : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300 hover:text-indigo-600'
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                          : 'border-blue-100 bg-white text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700'
                       )}
                     >
                       {day.slice(0, 1)}
@@ -337,8 +405,8 @@ export function ClassForm() {
               {errors.days && <p className="text-red-500 text-xs">{errors.days}</p>}
             </div>
           ) : (
-            <div className="space-y-1.5">
-              <Label htmlFor="date">날짜 *</Label>
+            <div className="space-y-3">
+              <Label htmlFor="date" className="text-base font-black text-slate-950">날짜 *</Label>
               <Input
                 id="date"
                 type="date"
@@ -348,7 +416,7 @@ export function ClassForm() {
                   const recurringDay = dateVal ? dateStringToRecurringDay(dateVal) : form.recurring_day;
                   setForm((f) => ({ ...f, date: dateVal, recurring_day: recurringDay }));
                 }}
-                className={errors.date ? 'border-red-500' : ''}
+                className={cn(fieldClassName, errors.date && 'border-red-500 focus-visible:ring-red-100')}
               />
               {errors.date && <p className="text-red-500 text-xs">{errors.date}</p>}
               {form.date && (
@@ -358,46 +426,49 @@ export function ClassForm() {
           )}
 
           {/* Time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="start_time">시작 시간 *</Label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-3">
+              <Label htmlFor="start_time" className="text-base font-black text-slate-950">시작 시간 *</Label>
               <Input
                 id="start_time"
                 type="time"
                 value={form.start_time}
                 onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                className={errors.start_time ? 'border-red-500' : ''}
+                className={cn(fieldClassName, errors.start_time && 'border-red-500 focus-visible:ring-red-100')}
               />
               {errors.start_time && <p className="text-red-500 text-xs">{errors.start_time}</p>}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="end_time">종료 시간 *</Label>
+            <div className="space-y-3">
+              <Label htmlFor="end_time" className="text-base font-black text-slate-950">종료 시간 *</Label>
               <Input
                 id="end_time"
                 type="time"
                 value={form.end_time}
                 onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                className={errors.end_time ? 'border-red-500' : ''}
+                className={cn(fieldClassName, errors.end_time && 'border-red-500 focus-visible:ring-red-100')}
               />
               {errors.end_time && <p className="text-red-500 text-xs">{errors.end_time}</p>}
             </div>
           </div>
 
           {/* Location */}
-          <div className="space-y-1.5">
-            <Label htmlFor="location">장소 (선택)</Label>
+          <div className="space-y-3">
+            <Label htmlFor="location" className="text-base font-black text-slate-950">장소 (선택)</Label>
             <Input
               id="location"
               placeholder="장소를 입력하세요"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
+              className={fieldClassName}
             />
           </div>
 
           {/* Color */}
-          <div className="space-y-2">
-            <Label>색상 {isAutoColor && <span className="text-xs font-normal text-gray-400">(제목 기반 자동 — 클릭으로 변경)</span>}</Label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 6 }}>
+          <div className="space-y-3">
+            <Label className="text-base font-black text-slate-950">
+              색상 {isAutoColor && <span className="text-xs font-bold text-slate-400">(제목 기반 자동)</span>}
+            </Label>
+            <div className="grid grid-cols-6 gap-3 rounded-lg border border-blue-50 bg-[#fbfdff] p-3 sm:grid-cols-10">
               {ALL_SCHEDULE_COLORS.map((color) => {
                 const selected = form.color === color;
                 return (
@@ -405,37 +476,16 @@ export function ClassForm() {
                     key={color}
                     type="button"
                     onClick={() => { setIsAutoColor(false); setForm({ ...form, color }); }}
-                    style={{
-                      width: '100%', aspectRatio: '1', borderRadius: 8,
-                      background: `linear-gradient(135deg, ${color} 0%, ${color}BB 100%)`,
-                      border: selected ? '2.5px solid #181c1e' : '2.5px solid transparent',
-                      boxShadow: selected ? `0 0 0 2px #fff, 0 0 0 4px ${color}` : '0 1px 3px rgba(0,0,0,0.15)',
-                      cursor: 'pointer',
-                      transform: selected ? 'scale(1.12)' : 'scale(1)',
-                      transition: 'transform 0.12s, box-shadow 0.12s',
-                    }}
+                    className={cn(
+                      'aspect-square min-h-10 rounded-lg border transition sm:min-h-11',
+                      selected ? 'scale-105 border-slate-950 shadow-sm ring-2 ring-blue-200' : 'border-transparent hover:scale-105'
+                    )}
+                    aria-label={`색상 ${color}`}
+                    style={{ background: color }}
                   />
                 );
               })}
             </div>
-          </div>
-
-          {/* Priority */}
-          <div className="space-y-1.5">
-            <Label>우선순위</Label>
-            <Select
-              value={String(form.priority)}
-              onValueChange={(v) => setForm({ ...form, priority: Number(v) as Schedule['priority'] })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
-                  <SelectItem key={val} value={val}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Completed */}
@@ -446,7 +496,7 @@ export function ClassForm() {
                 type="checkbox"
                 checked={form.is_completed}
                 onChange={(e) => setForm({ ...form, is_completed: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-300 text-indigo-600"
+                className="h-4 w-4 rounded border-blue-200 text-blue-600"
               />
               <Label htmlFor="is_completed" className="cursor-pointer">완료 표시</Label>
             </div>
@@ -459,7 +509,9 @@ export function ClassForm() {
             </div>
           )}
 
-          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between gap-2">
+          </div>
+
+          <DialogFooter className="mx-0 mb-0 mt-0 flex-col-reverse gap-2 rounded-none border-t border-blue-50 bg-white px-6 py-4 sm:flex-row sm:justify-between sm:px-8">
             <div>
               {editingSchedule && (
                 <Button
@@ -473,10 +525,10 @@ export function ClassForm() {
               )}
             </div>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={closeClassForm}>
+              <Button type="button" variant="outline" onClick={closeClassForm} className="h-11 rounded-lg border-blue-100 px-5 font-black text-slate-700 hover:bg-blue-50">
                 취소
               </Button>
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={isPending}>
+              <Button type="submit" className="h-11 rounded-lg bg-blue-600 px-6 font-black hover:bg-blue-700" disabled={isPending}>
                 {isPending ? '저장 중...' : editingSchedule ? '수정' : '추가'}
               </Button>
             </div>
