@@ -677,12 +677,14 @@ export default function OnboardingPage() {
       (e) => e.subject_name.trim() && e.start_time && e.end_time && e.start_time < e.end_time,
     );
 
+    const isReturningUser = profile?.onboarding_completed || sessionStorage.getItem('skema_onboarding_done') === '1';
+
     const doSaveAndContinue = async () => {
       setShowEtaOverwriteConfirm(false);
       if (valid.length === 0) { setPhase('external-exam'); return; }
       setEtaSaving(true);
       try {
-        if (profile?.onboarding_completed) await api.delete('/eta/schedules');
+        if (isReturningUser) await api.delete('/eta/schedules');
         await api.post('/eta/save-schedules', {
           entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source }) => ({
             subject_name, day_of_week, start_time, end_time, location: location ?? '', source,
@@ -698,7 +700,7 @@ export default function OnboardingPage() {
     };
 
     const handleSaveAndContinue = () => {
-      if (profile?.onboarding_completed && valid.length > 0) {
+      if (isReturningUser && valid.length > 0) {
         setShowEtaOverwriteConfirm(true);
       } else {
         doSaveAndContinue();
