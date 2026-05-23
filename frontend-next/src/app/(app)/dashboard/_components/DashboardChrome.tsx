@@ -1,6 +1,7 @@
 'use client';
 
 import type { MouseEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -124,6 +125,7 @@ export function DashboardHeader({
   onOpenAdminLogs,
   onLogout,
 }: DashboardHeaderProps) {
+  const router = useRouter();
   const displayName = user?.username || user?.email?.split('@')[0] || '사용자';
   const fallback = (displayName || user?.email || 'U')[0]?.toUpperCase() || 'U';
 
@@ -145,6 +147,14 @@ export function DashboardHeader({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          type="button"
+          onClick={() => router.back()}
+          title="이전으로"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer' }}
+        >
+          <MaterialIcon icon="arrow_back" size={18} color="var(--skema-on-surface-variant)" />
+        </button>
         <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'var(--skema-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <MaterialIcon icon="schedule" size={15} color="#fff" filled />
         </div>
