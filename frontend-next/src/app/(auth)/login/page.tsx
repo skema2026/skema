@@ -52,7 +52,7 @@ export default function LoginPage() {
       setToken(token);
       toast.success('로그인 되었습니다');
       window.history.replaceState({}, '', '/login');
-      router.push('/dashboard');
+      router.push('/onboarding');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -73,7 +73,7 @@ export default function LoginPage() {
     ev.preventDefault();
     if (!validate()) return;
     loginMutation.mutate({ email: form.username, password: form.password }, {
-      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인 되었습니다'); router.push('/dashboard'); },
+      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인 되었습니다'); router.push('/onboarding'); },
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };
         if (error?.response?.status === 401) toast.error('아이디 또는 비밀번호가 올바르지 않습니다');

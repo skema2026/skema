@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 import { normalizeTimeString } from '@/lib/utils';
-import { useUpdateProfile } from '@/hooks/useProfile';
+import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import type { RecurringDay } from '@/types';
 
@@ -183,6 +183,17 @@ function _parseExamText(raw: string): Array<{ title: string; exam_date: string; 
 export default function OnboardingPage() {
   const router = useRouter();
   const updateProfile = useUpdateProfile();
+  const { data: profile } = useProfile();
+
+  useEffect(() => {
+    if (!profile?.onboarding_completed) return;
+    // 이미 완료된 유저: 처음 진입 시만 대시보드로 이동 (뒤로가기로 돌아온 경우 제외)
+    const flag = sessionStorage.getItem('skema_onboarding_done');
+    if (!flag) {
+      sessionStorage.setItem('skema_onboarding_done', '1');
+      router.push('/dashboard');
+    }
+  }, [profile?.onboarding_completed, router]);
 
   const [phase, setPhase] = useState<Phase>('college-check');
   const [isCollegeStudent, setIsCollegeStudent] = useState<boolean | null>(null);
