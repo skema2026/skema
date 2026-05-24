@@ -713,7 +713,7 @@ useEffect(() => {
                           </button>
                         </div>
 
-                        <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
                           <button
                             type="button"
                             onClick={() => selectedDayPrimarySchedule ? openClassForm(selectedDayPrimarySchedule) : openClassForm()}
@@ -751,16 +751,6 @@ useEffect(() => {
                                 : '일정을 조정하면 확보할 수 있습니다'}
                             </span>
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={handleReschedule}
-                            disabled={aiAction !== null}
-                            className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <MaterialIcon icon="auto_awesome" size={16} color="#2563eb" />
-                            {isRegenerating ? '정리 중입니다' : 'AI 재배치'}
-                          </button>
                         </div>
                       </div>
 
