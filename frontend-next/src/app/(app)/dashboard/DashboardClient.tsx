@@ -102,13 +102,13 @@ function StatusSummaryCard({
   const toneClass = STATUS_CARD_TONES[tone];
 
   return (
-    <section className={`min-w-0 border-l-4 py-1.5 pl-4 pr-2 text-left ${toneClass.border}`}>
-      <div className="flex items-center gap-2">
-        <MaterialIcon icon={icon} size={15} color={toneClass.iconColor} />
-        <p className="truncate text-xs font-black text-slate-500">{label}</p>
+    <section className={`min-w-0 border-l-4 py-1 pl-3 pr-2 text-left ${toneClass.border}`}>
+      <div className="flex items-center gap-1.5">
+        <MaterialIcon icon={icon} size={13} color={toneClass.iconColor} />
+        <p className="truncate text-[11px] font-black text-slate-500">{label}</p>
       </div>
-      <p className="mt-2 truncate text-xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 truncate text-xs font-bold text-slate-500">{detail}</p>
+      <p className="mt-1 truncate text-base font-black text-slate-950">{value}</p>
+      <p className="truncate text-[11px] font-bold text-slate-400">{detail}</p>
     </section>
   );
 }
@@ -599,13 +599,17 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
           onOpenAdminUsers={() => router.push('/admin/users')}
           onOpenAdminLogs={() => router.push('/admin/login-logs')}
           onLogout={handleLogout}
+          onAddSchedule={() => openClassForm()}
+          onReschedule={handleReschedule}
+          onUploadTimetable={() => setIsEtaReimportOpen(true)}
+          isRegenerating={isRegenerating}
         />
 
         <main className="min-h-0 flex-1 overflow-y-auto bg-[#f8fbff] p-4 sm:p-5">
           <div className="mx-auto flex max-w-[1500px] flex-col gap-4">
-            <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
               <div className="flex min-w-0 flex-col rounded-lg border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-black text-blue-600">{todayLabel}</p>
                     <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
@@ -655,163 +659,9 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                   </div>
                 </div>
 
-                <div className="mb-4 grid gap-x-3 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <StatusSummaryCard
-                    label="다음 일정"
-                    value={nextSchedule ? nextSchedule.title : '없음'}
-                    detail={nextSchedule
-                      ? `${nextSchedule.start_time}-${nextSchedule.end_time}`
-                      : '오늘 남은 일정 없음'}
-                    icon="event_available"
-                    tone="blue"
-                  />
-
-                  <StatusSummaryCard
-                    label="오늘 빈 시간"
-                    value={formatMinutesDuration(todayAvailableMinutes)}
-                    detail={`가장 긴 집중 시간 ${longestFreeWindow ? formatDuration(longestFreeWindow.start, longestFreeWindow.end) : '없음'}`}
-                    icon="schedule"
-                    tone="slate"
-                  />
-
-                  <StatusSummaryCard
-                    label="확인 필요"
-                    value={issueCount > 0 ? `${issueCount}개` : '정상'}
-                    detail={issueItems[0]?.label ?? '겹침과 미완료 없음'}
-                    icon={issueCount > 0 ? 'warning' : 'check_circle'}
-                    tone={issueCount > 0 ? 'amber' : 'green'}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={handleReschedule}
-                    disabled={aiAction !== null}
-                    className="rounded-lg border border-blue-100 bg-blue-600 p-4 text-left text-white shadow-sm transition hover:bg-blue-700"
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="inline-flex rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-black text-blue-50">
-                        AI 작업
-                      </span>
-                      <MaterialIcon icon="smart_toy" size={17} color="#fff" />
-                    </span>
-                    <span className="mt-2 block text-lg font-black">
-                      바로 정리
-                    </span>
-                    <span className="mt-1 block truncate text-xs font-bold text-blue-100">
-                      빈 시간·겹침·시험 준비를 자동으로 처리
-                    </span>
-                  </button>
-                </div>
-
-                <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px]">
-                  <div className="flex min-h-[132px] items-center justify-between gap-4 rounded-lg border border-blue-500 bg-blue-600 p-5 text-left text-white shadow-sm">
-                    <span className="min-w-0">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-black text-blue-50">
-                        <MaterialIcon icon="smart_toy" size={15} color="#fff" />
-                        AI 자동 관리
-                      </span>
-                      <span className="mt-3 block text-2xl font-black leading-tight sm:text-3xl">
-                        말하면 시간표에 바로 반영됩니다
-                      </span>
-                      <span className="mt-2 block text-sm font-bold text-blue-100">
-                        일정 추가, 수정, 삭제, 빈 시간 찾기를 채팅으로 처리하세요.
-                      </span>
-                    </span>
-                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600">
-                      <MaterialIcon icon="send" size={24} color="#2563eb" />
-                    </span>
-                  </div>
-
-                  <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
-                    <button
-                      onClick={() => openClassForm()}
-                      className="flex items-center gap-3 rounded-lg border border-blue-100 bg-[#fbfdff] px-3 py-3 text-left shadow-sm transition hover:bg-blue-50"
-                    >
-                      <MaterialIcon icon="add" size={18} color="#2563eb" />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-black text-slate-950">일정 추가</span>
-                        <span className="block truncate text-xs font-bold text-slate-500">직접 입력</span>
-                      </span>
-                    </button>
-                    <button
-                      onClick={handleReschedule}
-                      disabled={aiAction !== null}
-                      className="flex items-center gap-3 rounded-lg border border-blue-100 bg-[#fbfdff] px-3 py-3 text-left shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <MaterialIcon icon="auto_awesome" size={18} color="#2563eb" />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-black text-slate-950">
-                          {isRegenerating ? '처리 중...' : 'AI 재배치'}
-                        </span>
-                        <span className="block truncate text-xs font-bold text-slate-500">빈 시간 자동 정리</span>
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => setIsEtaReimportOpen(true)}
-                      className="flex items-center gap-3 rounded-lg border border-blue-100 bg-[#fbfdff] px-3 py-3 text-left shadow-sm transition hover:bg-blue-50"
-                    >
-                      <MaterialIcon icon="upload_file" size={18} color="#2563eb" />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-black text-slate-950">시간표 업로드</span>
-                        <span className="block truncate text-xs font-bold text-slate-500">이미지 인식</span>
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mb-4 grid gap-3 lg:grid-cols-3">
-                  {situationAiActions.map((action) => (
-                    <button
-                      key={action.key}
-                      type="button"
-                      onClick={action.onClick}
-                      disabled={aiAction !== null}
-                      className="flex items-center gap-3 rounded-lg border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-                        <MaterialIcon icon={action.icon} size={19} color="#2563eb" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-black text-slate-950">
-                          {aiAction === action.key ? 'AI 처리 중...' : action.label}
-                        </span>
-                        <span className="mt-0.5 block truncate text-xs font-bold text-slate-500">
-                          {action.desc}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                {needsTimetableUpload && (
-                  <div className="mb-4 rounded-lg border border-dashed border-blue-200 bg-blue-50/70 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white">
-                          <MaterialIcon icon="upload_file" size={21} color="#2563eb" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-black text-slate-950">시간표 이미지를 올리면 시작이 빨라집니다</p>
-                          <p className="mt-1 text-xs font-bold text-slate-500">
-                            인식 결과는 표에서 검토하고, 필요한 부분만 수정해 최종 반영하세요.
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsEtaReimportOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-blue-700"
-                      >
-                        <MaterialIcon icon="image" size={16} color="#fff" />
-                        이미지 업로드
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="min-h-[620px] flex-1 overflow-hidden rounded-lg border border-blue-50 xl:min-h-[calc(100vh-190px)]">
+                <div className="mt-3 min-h-[calc(100vh-140px)] flex-1 overflow-hidden rounded-lg border border-blue-50">
                   {timetableView === 'week' && (
-                    <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} startTime={wakeStartTime} />
+                    <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} startTime="00:00" />
                   )}
 
                   {timetableView === 'day' && (
@@ -1153,25 +1003,99 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                 </div>
               </div>
 
-              <aside className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-4 xl:max-h-[calc(100vh-104px)]">
-                <section className="rounded-lg border border-blue-500 bg-blue-600 p-4 text-white shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white">
-                      <MaterialIcon icon="smart_toy" size={22} color="#2563eb" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black text-blue-100">주 기능</p>
-                      <h2 className="mt-1 text-lg font-black leading-tight">AI 채팅으로 시간표를 관리하세요</h2>
-                      <p className="mt-2 text-xs font-bold text-blue-100">
-                        말로 추가하고, 빈 시간을 찾고, 겹친 일정을 바로 정리합니다.
-                      </p>
+              <aside className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-4 xl:max-h-[calc(100vh-88px)] xl:overflow-y-auto">
+                <div className="rounded-lg border border-blue-100 bg-white p-3 shadow-sm">
+                  <p className="mb-2 text-[11px] font-black text-slate-400">오늘 현황</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <StatusSummaryCard
+                      label="다음 일정"
+                      value={nextSchedule ? nextSchedule.title : '없음'}
+                      detail={nextSchedule
+                        ? `${nextSchedule.start_time}-${nextSchedule.end_time}`
+                        : '오늘 남은 일정 없음'}
+                      icon="event_available"
+                      tone="blue"
+                    />
+                    <StatusSummaryCard
+                      label="오늘 빈 시간"
+                      value={formatMinutesDuration(todayAvailableMinutes)}
+                      detail={`최장 ${longestFreeWindow ? formatDuration(longestFreeWindow.start, longestFreeWindow.end) : '없음'}`}
+                      icon="schedule"
+                      tone="slate"
+                    />
+                    <StatusSummaryCard
+                      label="확인 필요"
+                      value={issueCount > 0 ? `${issueCount}개` : '정상'}
+                      detail={issueItems[0]?.label ?? '이상 없음'}
+                      icon={issueCount > 0 ? 'warning' : 'check_circle'}
+                      tone={issueCount > 0 ? 'amber' : 'green'}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleReschedule}
+                      disabled={aiAction !== null}
+                      className="rounded-lg border border-blue-100 bg-blue-600 p-3 text-left text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      <span className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-black text-blue-100">AI 작업</span>
+                        <MaterialIcon icon="smart_toy" size={13} color="#fff" />
+                      </span>
+                      <span className="mt-1 block text-sm font-black">바로 정리</span>
+                      <span className="block truncate text-[10px] font-bold text-blue-100">
+                        빈 시간·겹침·시험 자동 처리
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-blue-100 bg-white p-3 shadow-sm">
+                  <p className="mb-2 text-[11px] font-black text-slate-400">AI 빠른 작업</p>
+                  <div className="flex flex-col gap-1.5">
+                    {situationAiActions.map((action) => (
+                      <button
+                        key={action.key}
+                        type="button"
+                        onClick={action.onClick}
+                        disabled={aiAction !== null}
+                        className="flex items-center gap-2 rounded-lg border border-blue-100 bg-white p-2.5 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                          <MaterialIcon icon={action.icon} size={15} color="#2563eb" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-black text-slate-950">
+                            {aiAction === action.key ? 'AI 처리 중...' : action.label}
+                          </span>
+                          <span className="block truncate text-[10px] font-bold text-slate-400">
+                            {action.desc}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {needsTimetableUpload && (
+                  <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/70 p-3">
+                    <div className="flex items-start gap-2">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
+                        <MaterialIcon icon="upload_file" size={16} color="#2563eb" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-black text-slate-950">시간표 이미지로 빠르게 시작</p>
+                        <p className="mt-0.5 text-[11px] font-bold text-slate-500">인식 결과 검토 후 반영</p>
+                        <button
+                          type="button"
+                          onClick={() => setIsEtaReimportOpen(true)}
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white transition hover:bg-blue-700"
+                        >
+                          <MaterialIcon icon="image" size={13} color="#fff" />
+                          업로드
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-4 rounded-lg bg-white/15 px-4 py-3 text-xs font-bold text-blue-50">
-                    채팅은 화면 오른쪽의 떠다니는 AI 버튼 하나로 언제든 열 수 있습니다.
-                  </div>
-                </section>
-
+                )}
               </aside>
 
             </section>

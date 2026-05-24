@@ -385,11 +385,14 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
 
   const visibleDays = VISIBLE_DAYS;
 
-  // Keep the selected wake time at the top of the visible timetable.
+  // Scroll to current time (or to top if before startMinutes) on mount/startMinutes change.
   useEffect(() => {
-    if (gridRef.current) {
-      gridRef.current.scrollTop = 0;
-    }
+    if (!gridRef.current) return;
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const offsetSlots = Math.max(0, (nowMins - startMinutes) / 30);
+    const target = offsetSlots * SLOT_H - gridRef.current.clientHeight / 3;
+    gridRef.current.scrollTop = Math.max(0, target);
   }, [startMinutes]);
 
   // ── 6. Drag start ───────────────────────────────────────────────────────────

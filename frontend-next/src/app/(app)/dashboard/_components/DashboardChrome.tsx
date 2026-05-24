@@ -112,6 +112,10 @@ type DashboardHeaderProps = {
   onOpenAdminUsers: () => void;
   onOpenAdminLogs: () => void;
   onLogout: () => void;
+  onAddSchedule: () => void;
+  onReschedule: () => void;
+  onUploadTimetable: () => void;
+  isRegenerating: boolean;
 };
 
 export function DashboardHeader({
@@ -124,6 +128,10 @@ export function DashboardHeader({
   onOpenAdminUsers,
   onOpenAdminLogs,
   onLogout,
+  onAddSchedule,
+  onReschedule,
+  onUploadTimetable,
+  isRegenerating,
 }: DashboardHeaderProps) {
   const router = useRouter();
   const displayName = user?.username || user?.email?.split('@')[0] || '사용자';
@@ -177,6 +185,34 @@ export function DashboardHeader({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          type="button"
+          onClick={onAddSchedule}
+          title="일정 추가"
+          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
+        >
+          <MaterialIcon icon="add" size={16} color="var(--skema-on-surface-variant)" />
+          <span className="hide-mobile">일정 추가</span>
+        </button>
+        <button
+          type="button"
+          onClick={onReschedule}
+          disabled={isRegenerating}
+          title="AI 재배치"
+          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: isRegenerating ? 'not-allowed' : 'pointer', opacity: isRegenerating ? 0.5 : 1 }}
+        >
+          <MaterialIcon icon="auto_awesome" size={16} color="var(--skema-on-surface-variant)" />
+          <span className="hide-mobile">{isRegenerating ? '처리 중...' : 'AI 재배치'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={onUploadTimetable}
+          title="시간표 업로드"
+          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
+        >
+          <MaterialIcon icon="upload_file" size={16} color="var(--skema-on-surface-variant)" />
+          <span className="hide-mobile">시간표 업로드</span>
+        </button>
         <button
           type="button"
           onClick={onShare}
