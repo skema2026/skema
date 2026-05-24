@@ -189,9 +189,9 @@ export function DashboardHeader({
           type="button"
           onClick={onAddSchedule}
           title="일정 추가"
-          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
+          className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-400 px-5 py-2 text-sm font-bold text-white shadow-sm hover:opacity-90"
         >
-          <MaterialIcon icon="add" size={16} color="var(--skema-on-surface-variant)" />
+          <MaterialIcon icon="add" size={16} color="#fff" />
           <span className="hide-mobile">일정 추가</span>
         </button>
         <button
@@ -199,18 +199,18 @@ export function DashboardHeader({
           onClick={onReschedule}
           disabled={isRegenerating}
           title="AI 재배치"
-          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: isRegenerating ? 'not-allowed' : 'pointer', opacity: isRegenerating ? 0.5 : 1 }}
+          className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <MaterialIcon icon="auto_awesome" size={16} color="var(--skema-on-surface-variant)" />
+          <MaterialIcon icon="auto_awesome" size={16} color="#2563eb" />
           <span className="hide-mobile">{isRegenerating ? '처리 중...' : 'AI 재배치'}</span>
         </button>
         <button
           type="button"
           onClick={onUploadTimetable}
           title="시간표 업로드"
-          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
+          className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100"
         >
-          <MaterialIcon icon="upload_file" size={16} color="var(--skema-on-surface-variant)" />
+          <MaterialIcon icon="upload_file" size={16} color="#2563eb" />
           <span className="hide-mobile">시간표 업로드</span>
         </button>
         <button

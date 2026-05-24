@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -221,6 +221,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [weekOffset, setWeekOffset] = useState(0);
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
   const queryClient = useQueryClient();
+  const timetableRef = useRef<HTMLDivElement | null>(null);
 
   // 온보딩 미완료 시 온보딩 페이지로 이동 (SSR에서 처리 안된 경우 fallback)
   useEffect(() => {
@@ -302,6 +303,21 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     ...todayRecurring.filter((s) => !todaySpecificKeys.has(`${s.title}|${s.start_time}`)),
   ].sort(compareByWakeTime(wakeStartMinutes));
 
+
+useEffect(() => {
+  if (!timetableRef.current || todaySchedules.length === 0) return;
+
+  const firstSchedule = todaySchedules[0];
+
+  const startMinutes = timeToMinutes(firstSchedule.start_time);
+
+  const hourHeight = 64;
+
+  const scrollPosition = (startMinutes / 60) * hourHeight;
+
+  timetableRef.current.scrollTop = Math.max(scrollPosition - 120, 0);
+}, [todaySchedules]);
+  
   const dayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
   const monthDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const monthLabel = `${monthDate.getFullYear()}년 ${monthDate.getMonth() + 1}월`;
@@ -579,7 +595,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   return (
     <>
       <DashboardStyles />
-      <div className="flex h-screen flex-col bg-[#f8fbff]">
+      <div className="flex h-screen flex-col bg-[#f8f9ff]">
         <NotificationBanner
           notification={notification}
           onOpen={(schedule) => {
@@ -605,10 +621,10 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
           isRegenerating={isRegenerating}
         />
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f8fbff] p-4 sm:p-5">
+        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f8f9ff] p-4 sm:p-5">
           <div className="mx-auto flex max-w-[1500px] flex-col gap-4">
             <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-              <div className="flex min-w-0 flex-col rounded-lg border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+              <div className="flex min-w-0 flex-col rounded-2xl border border-blue-100 bg-white p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-black text-blue-600">{todayLabel}</p>
@@ -659,9 +675,14 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                   </div>
                 </div>
 
-                <div className="mt-3 min-h-[calc(100vh-140px)] flex-1 overflow-hidden rounded-lg border border-blue-50">
+                <div className="mt-5 min-h-[calc(100vh-170px)] flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-white">
                   {timetableView === 'week' && (
-                    <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} startTime="00:00" />
+                    <div
+                      ref={timetableRef}
+                      className="max-h-[calc(100vh-220px)] overflow-y-auto"
+                    >
+                      <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} startTime="00:00" />
+                    </div>
                   )}
 
                   {timetableView === 'day' && (
@@ -735,18 +756,10 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                             type="button"
                             onClick={handleReschedule}
                             disabled={aiAction !== null}
-                            className="rounded-lg border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
-                              <MaterialIcon icon="auto_awesome" size={18} color="#fff" />
-                            </span>
-                            <span className="mt-3 block text-xs font-black text-blue-600">AI 자동 정리</span>
-                            <span className="mt-1 block truncate text-base font-black text-slate-950">
-                              {isRegenerating ? '정리 중입니다' : '빈 시간에 재배치'}
-                            </span>
-                            <span className="mt-1 block truncate text-xs font-bold text-slate-500">
-                              미완료 일정을 남는 시간으로 이동
-                            </span>
+                            <MaterialIcon icon="auto_awesome" size={16} color="#2563eb" />
+                            {isRegenerating ? '정리 중입니다' : 'AI 재배치'}
                           </button>
                         </div>
                       </div>
@@ -791,13 +804,13 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                           <MaterialIcon icon="calendar_month" size={42} color="#93c5fd" />
                           <p className="mt-3 text-lg font-black text-slate-950">이 날은 비어 있습니다</p>
                           <p className="mt-1 text-sm font-bold text-slate-500">직접 일정을 추가하거나 AI에게 빈 시간을 채워달라고 요청하세요.</p>
-                          <div className="mt-5 flex flex-wrap justify-center gap-2">
+                            <div className="mt-5 flex flex-wrap justify-center gap-2">
                             <button
                               type="button"
                               onClick={() => openClassForm()}
-                              className="inline-flex items-center gap-2 rounded-lg border border-blue-100 px-4 py-2.5 text-sm font-black text-blue-700 transition hover:bg-blue-50"
+                              className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-400 px-5 py-2 text-sm font-bold text-white shadow-sm hover:opacity-90"
                             >
-                              <MaterialIcon icon="add" size={17} color="#2563eb" />
+                              <MaterialIcon icon="add" size={16} color="#fff" />
                               일정 추가
                             </button>
                           </div>
@@ -1003,8 +1016,8 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                 </div>
               </div>
 
-              <aside className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-4 xl:max-h-[calc(100vh-88px)] xl:overflow-y-auto">
-                <div className="rounded-lg border border-blue-100 bg-white p-3 shadow-sm">
+              <aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto">
+                <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
                   <p className="mb-2 text-[11px] font-black text-slate-400">오늘 현황</p>
                   <div className="grid grid-cols-2 gap-2">
                     <StatusSummaryCard
@@ -1048,7 +1061,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-blue-100 bg-white p-3 shadow-sm">
+                <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
                   <p className="mb-2 text-[11px] font-black text-slate-400">AI 빠른 작업</p>
                   <div className="flex flex-col gap-1.5">
                     {situationAiActions.map((action) => (
@@ -1076,7 +1089,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                 </div>
 
                 {needsTimetableUpload && (
-                  <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/70 p-3">
+                  <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
                     <div className="flex items-start gap-2">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
                         <MaterialIcon icon="upload_file" size={16} color="#2563eb" />
@@ -1087,10 +1100,10 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
                         <button
                           type="button"
                           onClick={() => setIsEtaReimportOpen(true)}
-                          className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white transition hover:bg-blue-700"
+                          className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100"
                         >
-                          <MaterialIcon icon="image" size={13} color="#fff" />
-                          업로드
+                          <MaterialIcon icon="image" size={16} color="#2563eb" />
+                          시간표 업로드
                         </button>
                       </div>
                     </div>
