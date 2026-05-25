@@ -602,12 +602,12 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
               </div>
               {hasExam && (
                 <div style={{ fontSize: 8, fontWeight: 700, color: '#92400e', marginTop: 2, letterSpacing: 0.3 }}>
-                  📝 시험
+                  시험
                 </div>
               )}
               {isPreExam && !hasExam && (
                 <div style={{ fontSize: 8, fontWeight: 700, color: '#DC2626', marginTop: 2, letterSpacing: 0.3 }}>
-                  ⚠️ 시험 전날
+                  시험 전날
                 </div>
               )}
             </div>
@@ -641,7 +641,6 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
             gap:            10,
             pointerEvents:  'none',
           }}>
-            <div style={{ fontSize: 40 }}>📅</div>
             <p style={{ fontSize: 14, fontWeight: 700, color: '#475569' }}>이번 주 일정이 없습니다</p>
             <p style={{ fontSize: 12, color: '#94a3b8' }}>헤더의 "+ 일정 추가" 버튼을 눌러 첫 일정을 추가해보세요</p>
           </div>

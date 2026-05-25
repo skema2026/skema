@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
-import { usePushNotifications, useNotificationPrefs, useReminderSettings } from '@/hooks/usePushNotifications';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import type { User } from '@/types';
@@ -53,9 +52,7 @@ export default function ProfileClient() {
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
 
-  const push = usePushNotifications();
-  const { prefs, loading: prefsLoading, updatePref } = useNotificationPrefs();
-  const { enabled: reminderEnabled, minutes: reminderMinutes, setNotifEnabled, setNotifMinutes } = useReminderSettings();
+
 
   const [accountForm, setAccountForm] = useState<AccountForm>({ username: '', email: '' });
   const [profileDraft, setProfileDraft] = useState<ProfileForm | null>(null);
@@ -424,134 +421,6 @@ export default function ProfileClient() {
             </div>
           </section>
 
-          {/* ── 알림 설정 ── */}
-          <section id="notifications" className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600">
-                <MaterialIcon icon="notifications" size={22} color="#fff" />
-              </div>
-              <div>
-                <p className="text-sm font-black text-blue-600">알림 설정</p>
-                <h2 className="text-2xl font-black text-slate-950">알림 관리</h2>
-              </div>
-            </div>
-
-            {/* OS 푸시 알림 */}
-            <div className="mb-4 rounded-2xl border border-blue-100 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-base font-black text-slate-950">OS 푸시 알림</p>
-                  <p className="mt-1 text-sm font-bold text-slate-500">
-                    {push.permission === 'unsupported'
-                      ? '이 브라우저는 푸시 알림을 지원하지 않습니다'
-                      : push.permission === 'denied'
-                        ? '브라우저 설정에서 알림 권한을 허용해주세요'
-                        : push.isSubscribed
-                          ? '앱이 꺼진 상태에서도 알림을 받을 수 있습니다'
-                          : '일정 시작 전 OS 알림을 받으려면 켜주세요'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {push.isSubscribed && (
-                    <button
-                      type="button"
-                      onClick={async () => { await push.sendTest(); toast.success('테스트 알림을 전송했습니다'); }}
-                      className="rounded-lg border border-blue-100 px-3 py-2 text-xs font-black text-blue-600 transition hover:bg-blue-50"
-                    >
-                      테스트
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={push.isLoading || push.permission === 'unsupported' || push.permission === 'denied'}
-                    onClick={push.isSubscribed ? push.unsubscribe : push.subscribe}
-                    className={`h-9 rounded-full px-4 text-sm font-black transition disabled:opacity-40 ${
-                      push.isSubscribed ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 border border-slate-200'
-                    }`}
-                  >
-                    {push.isLoading ? '처리 중...' : push.isSubscribed ? '켜짐' : '꺼짐'}
-                  </button>
-                </div>
-              </div>
-              {push.permission === 'denied' && (
-                <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
-                  브라우저 주소창 왼쪽 자물쇠 아이콘 → 알림 → 허용으로 변경해주세요
-                </p>
-              )}
-            </div>
-
-            {/* 앱 내 알림 타이밍 */}
-            <div className="mb-4 rounded-2xl border border-blue-100 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <div>
-                  <p className="text-base font-black text-slate-950">앱 내 알림</p>
-                  <p className="mt-1 text-sm font-bold text-slate-500">앱이 열려 있을 때 상단 배너로 알림</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setNotifEnabled(!reminderEnabled)}
-                  className={`h-9 rounded-full px-4 text-sm font-black transition ${
-                    reminderEnabled ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 border border-slate-200'
-                  }`}
-                >
-                  {reminderEnabled ? '켜짐' : '꺼짐'}
-                </button>
-              </div>
-              {reminderEnabled && (
-                <div>
-                  <p className="mb-2 text-xs font-black text-slate-500">일정 시작 몇 분 전에 알릴까요?</p>
-                  <div className="flex flex-wrap gap-2">
-                    {[5, 10, 15, 30, 60].map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setNotifMinutes(m)}
-                        className={`rounded-lg border px-3 py-2 text-sm font-black transition ${
-                          reminderMinutes === m
-                            ? 'border-blue-600 bg-blue-50 text-blue-600'
-                            : 'border-blue-100 bg-white text-slate-600 hover:bg-blue-50'
-                        }`}
-                      >
-                        {m}분 전
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 알림 종류 */}
-            {!prefsLoading && (
-              <div className="rounded-2xl border border-blue-100 bg-slate-50 p-4">
-                <p className="mb-3 text-base font-black text-slate-950">알림 종류</p>
-                <div className="space-y-3">
-                  {([
-                    { key: 'reminder',      label: '일정 리마인더',   desc: '일정 시작 전 미리 알림' },
-                    { key: 'exam_alert',    label: '시험 D-day 알림', desc: '시험 전날 경고' },
-                    { key: 'motivation',    label: '학습 동기 부여',   desc: '매일 오전 동기 부여 메시지' },
-                    { key: 'weekly_report', label: '주간 리포트',      desc: '매주 월요일 한 주 계획 요약' },
-                    { key: 'comparison',    label: '학습 비교',        desc: '매주 수요일 다른 사용자 대비 현황' },
-                  ] as const).map(({ key, label, desc }) => (
-                    <div key={key} className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-slate-950">{label}</p>
-                        <p className="text-xs font-bold text-slate-400">{desc}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => updatePref(key, !prefs[key])}
-                        className={`h-8 shrink-0 rounded-full px-3 text-xs font-black transition ${
-                          prefs[key] ? 'bg-blue-600 text-white' : 'bg-white text-slate-400 border border-slate-200'
-                        }`}
-                      >
-                        {prefs[key] ? 'ON' : 'OFF'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
         </div>
       </main>
     </div>

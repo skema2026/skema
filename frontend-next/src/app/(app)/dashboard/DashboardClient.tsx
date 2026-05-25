@@ -18,6 +18,12 @@ import { minutesToTime, timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { Schedule, UserProfile } from '@/types';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   DashboardHeader,
   DashboardStyles,
   NotificationBanner,
@@ -92,14 +98,33 @@ function StatusSummaryCard({
   detail,
   icon,
   tone = 'slate',
+  onClick,
 }: {
   label: string;
   value: string;
   detail: string;
   icon: string;
   tone?: StatusCardTone;
+  onClick?: () => void;
 }) {
   const toneClass = STATUS_CARD_TONES[tone];
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`min-w-0 cursor-pointer border-l-4 py-1 pl-3 pr-2 text-left transition hover:bg-slate-50 rounded-r-lg ${toneClass.border}`}
+      >
+        <div className="flex items-center gap-1.5">
+          <MaterialIcon icon={icon} size={13} color={toneClass.iconColor} />
+          <p className="truncate text-[11px] font-black text-slate-500">{label}</p>
+        </div>
+        <p className="mt-1 truncate text-base font-black text-slate-950">{value}</p>
+        <p className="truncate text-[11px] font-bold text-slate-400">{detail}</p>
+      </button>
+    );
+  }
 
   return (
     <section className={`min-w-0 border-l-4 py-1 pl-3 pr-2 text-left ${toneClass.border}`}>
@@ -220,6 +245,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [dayOffset, setDayOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
   const queryClient = useQueryClient();
   const timetableRef = useRef<HTMLDivElement | null>(null);
@@ -339,7 +365,7 @@ useEffect(() => {
   };
 
   const daySchedules = getSchedulesForDate(dayDate);
-  const weekSchedules = schedules.filter((schedule) => scheduleVisibleIn(schedule, 'week'));
+  const weekSchedules = schedules.filter((schedule) => scheduleVisibleIn(schedule, 'week') || schedule.schedule_type === 'study');
   const dayExams = exams.filter((exam) => exam.exam_date === toLocalDateString(dayDate));
   const dayFreeWindows = findFreeWindows(daySchedules, wakeStartMinutes).slice(0, 4);
   const dayConflictSchedules = getOverlappingSchedules(daySchedules);
@@ -360,7 +386,7 @@ useEffect(() => {
   const todayPct   = todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : null;
 
   const remainingToday = todaySchedules.filter((s) => !s.is_completed);
-  const nextSchedule = remainingToday.find((s) => timeToMinutes(s.start_time) >= nowMin) ?? remainingToday[0] ?? null;
+  const nextSchedule = remainingToday.find((s) => timeToMinutes(s.start_time) >= nowMin) ?? null;
   const todayFreeWindows = findFreeWindows(todaySchedules, wakeStartMinutes);
   const todayAvailableMinutes = todayFreeWindows.reduce(
     (sum, window) => sum + Math.max(0, window.end - window.start),
@@ -1075,6 +1101,7 @@ useEffect(() => {
                       detail={issueItems[0]?.label ?? '이상 없음'}
                       icon={issueCount > 0 ? 'warning' : 'check_circle'}
                       tone={issueCount > 0 ? 'amber' : 'green'}
+                      onClick={issueCount > 0 ? () => setIsIssueDialogOpen(true) : undefined}
                     />
                     <button
                       type="button"
@@ -1093,6 +1120,31 @@ useEffect(() => {
                     </button>
                   </div>
                 </div>
+
+                {upcomingExams.length > 0 && (
+                  <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
+                    <p className="mb-3 text-[11px] font-black text-slate-400">다가오는 시험</p>
+                    <div className="flex flex-col gap-2">
+                      {upcomingExams.map((exam) => {
+                        const days = getDaysUntil(exam.exam_date);
+                        const dday = formatDday(days);
+                        const urgent = days <= 3;
+                        return (
+                          <div key={exam.id} className={`flex items-center gap-3 rounded-xl border p-3 ${urgent ? 'border-red-100 bg-red-50' : 'border-amber-100 bg-amber-50'}`}>
+                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${urgent ? 'bg-red-100' : 'bg-amber-100'}`}>
+                              <MaterialIcon icon="quiz" size={16} color={urgent ? '#dc2626' : '#d97706'} />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-black text-slate-950">{exam.title}</p>
+                              <p className="text-[11px] font-bold text-slate-500">{exam.exam_date}</p>
+                            </div>
+                            <span className={`text-xs font-black ${urgent ? 'text-red-600' : 'text-amber-600'}`}>{dday}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
                   <p className="mb-2 text-[11px] font-black text-slate-400">AI 빠른 작업</p>
@@ -1207,6 +1259,29 @@ useEffect(() => {
           </section>
         </div>
       )}
+
+      <Dialog open={isIssueDialogOpen} onOpenChange={setIsIssueDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>확인 필요 항목</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            {issueItems.length === 0 ? (
+              <p className="text-sm text-slate-500">이상 없음</p>
+            ) : (
+              issueItems.map((item) => (
+                <div key={item.key} className="rounded-lg border border-slate-100 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-slate-500">{item.label}</span>
+                    <span className="text-sm font-black text-slate-950">{item.value}</span>
+                  </div>
+                  <p className="mt-1 text-[11px] font-bold text-slate-400">{item.detail}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ClassForm />
 

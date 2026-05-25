@@ -277,7 +277,7 @@ export function DashboardHeader({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => router.push('/profile#notifications')} className="gap-2 rounded-lg py-2.5 font-bold">
+              <DropdownMenuItem onClick={() => router.push('/notifications')} className="gap-2 rounded-lg py-2.5 font-bold">
                 <MaterialIcon icon="notifications" size={16} color="#2563eb" />
                 알림 설정
               </DropdownMenuItem>
