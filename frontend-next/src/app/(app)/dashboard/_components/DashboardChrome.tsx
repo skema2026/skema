@@ -257,10 +257,6 @@ export function DashboardHeader({
                 <MaterialIcon icon="person" size={16} color="#2563eb" />
                 프로필 관리
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push('/profile#notifications')} className="gap-2 rounded-lg py-2.5 font-bold">
-                <MaterialIcon icon="notifications" size={16} color="#2563eb" />
-                알림 설정
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={onShare} className="gap-2 rounded-lg py-2.5 font-bold">
                 <MaterialIcon icon="share" size={16} color="#2563eb" />
                 시간표 공유
@@ -278,6 +274,13 @@ export function DashboardHeader({
                   </DropdownMenuItem>
                 </>
               )}
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => router.push('/profile#notifications')} className="gap-2 rounded-lg py-2.5 font-bold">
+                <MaterialIcon icon="notifications" size={16} color="#2563eb" />
+                알림 설정
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
