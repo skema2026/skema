@@ -7,6 +7,15 @@ import { useAuthStore } from '@/store/authStore';
 import { api } from '@/lib/api';
 import { User } from '@/types';
 
+function ServiceWorkerRegistrar() {
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, []);
+  return null;
+}
+
 function AuthHydrator() {
   const { token, user, setUser, logout, _hasHydrated } = useAuthStore();
 
@@ -38,6 +47,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ServiceWorkerRegistrar />
       <AuthHydrator />
       {children}
       <ReactQueryDevtools initialIsOpen={false} />
