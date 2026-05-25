@@ -159,7 +159,7 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, star
       <div style={{
         fontSize:       isCompact ? 10 : 11,
         fontWeight:     700,
-        color:          '#111827',
+        color:          '#374151',
         overflow:       'hidden',
         textOverflow:   'ellipsis',
         whiteSpace:     'nowrap',
@@ -169,7 +169,7 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, star
         {s.title}
       </div>
       {!isCompact && (
-        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>
+        <div style={{ fontSize: 10, color: '#4b5563', marginTop: 1 }}>
           {s.start_time}–{s.end_time}
         </div>
       )}
