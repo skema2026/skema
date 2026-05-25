@@ -57,15 +57,16 @@ def _is_notif_enabled(db, user_id: int, ntype: str) -> bool:
         return True
 
 
-def _push(db, user_id: int, ntype: str, title: str, body: str, related_id: int | None = None):
+def _push(db, user_id: int, ntype: str, title: str, body: str, related_id: int | None = None, send_push: bool = True):
     """알림 1건 저장. 중복(같은 날 같은 type+title) 방지."""
     from app.notification.models import Notification
     from app.notification.service import send_push_to_user
+    from zoneinfo import ZoneInfo
 
     if not _is_notif_enabled(db, user_id, ntype):
         return
 
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.now(ZoneInfo("Asia/Seoul")).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
     exists = (
         db.query(Notification)
         .filter(
@@ -87,14 +88,15 @@ def _push(db, user_id: int, ntype: str, title: str, body: str, related_id: int |
     )
     db.add(notif)
     db.flush()
-    send_push_to_user(
-        db,
-        user_id,
-        title,
-        body,
-        url="/dashboard",
-        ntype=ntype,
-    )
+    if send_push:
+        send_push_to_user(
+            db,
+            user_id,
+            title,
+            body,
+            url="/dashboard",
+            ntype=ntype,
+        )
 
 
 def job_weekly_report():
@@ -181,7 +183,8 @@ def job_reminders():
 
     db = _get_db()
     try:
-        now = datetime.now()
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("Asia/Seoul"))
         today_str = now.strftime("%Y-%m-%d")
         today_dow = now.weekday()
         now_min = now.hour * 60 + now.minute
@@ -216,14 +219,15 @@ def job_reminders():
                         f"{diff}분 후 [{s.start_time}~{s.end_time}] 일정이 시작됩니다.",
                         related_id=s.id,
                     )
-
-                if end_min < now_min and not s.is_completed:
+                elif end_min < now_min and not s.is_completed:
                     _push(
                         db, user.id, "reminder",
                         f"미완료: {s.title}",
-                        f"[{s.start_time}~{s.end_time}] 일정이 아직 완료되지 않았습니다. 확인해보세요.",
+                        f"[{s.start_time}~{s.end_time}] 일정이 아직 완료되지 않았습니다.",
                         related_id=s.id,
+                        send_push=False,
                     )
+
 
         db.commit()
         logger.info("job_reminders: processed for %d users at %s", len(users), now.strftime("%H:%M"))
@@ -310,7 +314,7 @@ def start_scheduler():
         _scheduler = BackgroundScheduler(timezone="Asia/Seoul")
         _scheduler.add_job(job_weekly_report, CronTrigger(day_of_week="mon", hour=8, minute=0))
         _scheduler.add_job(job_daily_motivation, CronTrigger(hour=9, minute=0))
-        _scheduler.add_job(job_reminders, CronTrigger(minute="*/30"))
+        _scheduler.add_job(job_reminders, CronTrigger(minute="*/30"), misfire_grace_time=60)
         _scheduler.add_job(job_comparison, CronTrigger(day_of_week="wed", hour=10, minute=0))
 
         _scheduler.start()
