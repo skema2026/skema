@@ -1,22 +1,27 @@
 # SKEMA — AI 기반 개인 시간표·학습 관리
 
-> Scheme에서 따온 이름, SKEMA. 학생의 시간표와 학습 일정을 스마트하게 관리하고, AI가 복습 계획·준비도 분석·동기부여까지 도와줍니다.
+> Scheme에서 따온 이름, SKEMA. 학생의 시간표와 학습 일정을 스마트하게 관리하고, AI가 일정 파싱·채팅·준비도 분석까지 도와줍니다.
 
 ---
 
 ## 주요 기능
 
 - **시간표 OCR**: 시간표 이미지를 업로드하면 AI가 자동으로 일정을 파싱·등록
-- **일정·과목 CRUD**: 과목명, 요일/시간, 장소, 메모, 우선순위, 유형(수업/자율학습/과제/활동/개인)
-- **시험 일정 관리**: 중간·기말·퀴즈 등 별도 관리, 시험 전날 복습 블록 자동 생성
-- **복습 스케줄러**: 수업 완료 시 다음 날 빈 시간에 복습 일정 자동 배치
-- **준비도 경보**: 시험 D-7/D-3 기준 연결 일정 수행률 분석 + AI 진단 피드백
-- **주간 AI 편지**: 이번 주 학습 패턴을 분석해 개인화된 편지 자동 생성
-- **카카오톡 알림**: 오늘 일정 요약을 카카오톡 메시지로 발송
+- **일정 CRUD**: 과목명, 요일/시간, 장소, 메모, 우선순위, 유형(수업/자율학습/과제/활동/개인)
+- **시험 일정 관리**: 중간·기말·퀴즈 등 시험 일정 별도 관리
+- **이벤트 관리**: 수업·시험 외 별도 이벤트 일정 등록
+- **AI 채팅**: 일정 기반 맥락을 이해하는 AI 어시스턴트 (GPT-4.1)
+- **준비도 진단**: 시험 연결 일정 수행률 분석 + AI 피드백
+- **대시보드**: 오늘 일정 요약, 다음 일정, 빈 시간대 시각화
+- **알림 센터**: 앱 내 알림 목록, 읽음 처리, 알림 설정(유형별 ON/OFF)
+- **웹 푸시 알림**: Service Worker 기반 OS 푸시 알림 (Android 즉시 / iOS PWA 필요)
+  - 일정 시작 30분 전 리마인더
+  - 매일 09:00 동기부여 메시지
+  - 매주 월요일 주간 수행률 리포트
+  - 매주 수요일 평균 대비 비교 알림
+- **카카오 알림**: 카카오톡으로 일정 요약 메시지 발송
 - **일정 공유**: 읽기 전용 공유 토큰으로 시간표 URL 공유
-- **충돌 감지**: 시간이 겹치는 일정 자동 감지 및 경고
-- **유형별 분석·주간 리포트**: 요일별/유형별 수행률 시각화
-- **OAuth 로그인**: Kakao OAuth + JWT 인증
+- **OAuth 로그인**: Kakao OAuth + 이메일/비밀번호 JWT 인증
 
 ---
 
@@ -29,23 +34,9 @@
 | 백엔드 | FastAPI (Python 3.11+), SQLAlchemy ORM, Alembic |
 | 데이터베이스 | MySQL 8.0 |
 | 인증 | JWT (python-jose, bcrypt) + Kakao OAuth 2.0 |
-| AI | OpenAI GPT-4.1 (채팅·OCR·분석) |
-| 알림 | APScheduler (백그라운드 주기 작업) + Kakao 메시지 API |
+| AI | OpenAI GPT-4.1 (채팅·OCR·준비도 분석) |
+| 알림 | APScheduler (푸시 스케줄러) + Web Push API (VAPID) + Kakao 메시지 API |
 | 운영 | Docker, Docker Compose |
-
----
-
-## 브랜치 구조
-
-```
-main                  — 배포 기준 브랜치 (Docker Compose로 운영)
-dev                   — 기능 통합 브랜치 (PR 대상)
-feature/<이름>        — 기능 개발 단위 브랜치
-refactor/<이름>       — 리팩토링 브랜치
-```
-
-> PR은 `feature/*` → `dev` → `main` 순서로 머지합니다.  
-> `main` 직접 push는 지양하고, 반드시 PR 리뷰 후 머지합니다.
 
 ---
 
@@ -84,7 +75,6 @@ docker compose logs -f
 
 # 특정 서비스 로그만 보기
 docker compose logs -f backend
-docker compose logs -f frontend
 
 # 중지 (컨테이너만 제거, 볼륨 유지)
 docker compose down
@@ -105,25 +95,18 @@ docker compose down -v
 
 #### 개발 모드 (`docker-compose.dev.yml`)
 
-코드 변경 시 자동 재시작(hot-reload)이 활성화됩니다. DB는 별도 실행 필요 (로컬 MySQL 또는 프로덕션 compose의 `db` 서비스 사용).
+코드 변경 시 자동 재시작(hot-reload)이 활성화됩니다.
 
 ```bash
-# 개발 서버 실행 (hot-reload 포함)
-docker compose -f docker-compose.dev.yml up --build
+# DB + 백엔드만 컨테이너로 실행 (프런트는 로컬 dev 서버 사용)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db backend
 
-# 백그라운드 실행
-docker compose -f docker-compose.dev.yml up -d --build
+# 프런트 dev 서버 별도 실행
+cd frontend-next && npm run dev
 
-# 중지
-docker compose -f docker-compose.dev.yml down
+# 백엔드 재시작
+docker compose -f docker-compose.yml -f docker-compose.dev.yml restart backend
 ```
-
-> 개발 모드에서는 DB 서비스가 포함되지 않습니다.  
-> 로컬 MySQL을 사용하거나, 프로덕션 compose로 DB만 먼저 실행하세요:
-> ```bash
-> docker compose up -d db   # DB 컨테이너만 먼저 실행
-> docker compose -f docker-compose.dev.yml up --build
-> ```
 
 ---
 
@@ -135,32 +118,7 @@ docker compose exec backend bash
 
 # DB 마이그레이션 수동 실행
 docker compose exec backend alembic upgrade head
-
-# 프런트엔드 컨테이너 셸 접속
-docker compose exec frontend sh
 ```
-
----
-
-### 웹앱 운영 배포
-
-운영 서버에서는 Caddy가 HTTPS 인증서를 자동 발급하고, Next.js 프런트엔드와 FastAPI 백엔드를 도메인별로 프록시합니다.
-
-```bash
-cp .env.production.example .env.production
-# .env.production에 실제 도메인, 비밀번호, API 키 입력
-./scripts/deploy-prod.sh
-```
-
-기본 구성:
-
-| 서비스 | 예시 URL |
-|--------|----------|
-| 웹앱 | https://skema.example.com |
-| 백엔드 API | https://api.skema.example.com |
-| Swagger 문서 | https://api.skema.example.com/docs |
-
-자세한 서버 준비, DNS, OAuth callback 설정은 [docs/webapp-deploy.md](docs/webapp-deploy.md)를 참고하세요.
 
 ---
 
@@ -180,9 +138,51 @@ uvicorn app.main:app --reload
 
 ```bash
 cd frontend-next
+cp .env.local.example .env.local   # 없으면 직접 생성 (아래 참고)
 npm install
 npm run dev
 ```
+
+`frontend-next/.env.local`:
+```
+NEXT_PUBLIC_API_URL=/proxy
+INTERNAL_API_URL=http://localhost:8000
+```
+
+---
+
+### 모바일 테스트 (ngrok)
+
+모바일(Android/iPhone)에서 로컬 개발 서버를 테스트할 때 사용합니다.
+
+1. ngrok 설치 및 계정 연동
+   ```bash
+   winget install ngrok.ngrok
+   ngrok config add-authtoken <토큰>
+   ```
+
+2. ngrok 실행 (프런트 dev 서버가 켜진 상태에서)
+   ```bash
+   ngrok http 3000
+   ```
+   → 표시된 `https://xxxx.ngrok-free.app` URL 메모
+
+3. `frontend-next/next.config.ts`의 `allowedDevOrigins` 업데이트
+   ```ts
+   allowedDevOrigins: ['xxxx.ngrok-free.app'],
+   ```
+
+4. 루트 `.env` 업데이트
+   ```
+   CORS_ORIGINS=http://localhost:3000,https://xxxx.ngrok-free.app
+   FRONTEND_URL=https://xxxx.ngrok-free.app
+   ```
+
+5. 백엔드 재시작 후 모바일에서 ngrok URL 접속
+
+> **iOS 푸시 알림**: Safari에서 공유 버튼 → "홈 화면에 추가" 후 해당 아이콘으로 실행해야 동작 (iOS 16.4+ 필요)  
+> **Android 푸시 알림**: Chrome 브라우저 탭에서 바로 동작  
+> **ngrok 무료 플랜**: 재실행 시 URL이 바뀌므로 3~5단계 반복 필요
 
 ---
 
@@ -198,20 +198,19 @@ SECRET_KEY=your-secret-key
 # AI
 OPENAI_API_KEY=...
 
+# Web Push (VAPID)
+VAPID_PRIVATE_KEY=...
+VAPID_PUBLIC_KEY=...
+VAPID_CLAIMS_EMAIL=mailto:your@email.com
+
 # OAuth
-NAVER_CLIENT_ID=...
-NAVER_CLIENT_SECRET=...
 KAKAO_CLIENT_ID=...
 KAKAO_CLIENT_SECRET=...
 
 # URL
 FRONTEND_URL=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:8000
-BACKEND_URL=http://localhost:8000
+CORS_ORIGINS=http://localhost:3000
 ```
-
-네이버 개발자센터의 Callback URL은 `BACKEND_URL` 뒤에 `/auth/naver/callback`을 붙인 값과 정확히 일치해야 합니다.
-예: `http://localhost:8000/auth/naver/callback`
 
 ---
 
@@ -220,6 +219,7 @@ BACKEND_URL=http://localhost:8000
 ```
 capstone-design-2026-1/
 ├── docker-compose.yml
+├── docker-compose.dev.yml
 ├── .env.example
 ├── backend/
 │   ├── Dockerfile
@@ -227,33 +227,40 @@ capstone-design-2026-1/
 │   ├── alembic.ini
 │   ├── alembic/versions/       # DB 마이그레이션 이력
 │   └── app/
-│       ├── main.py             # FastAPI 진입점
+│       ├── main.py             # FastAPI 진입점 + 라우터 등록
 │       ├── ai_chat/            # AI 채팅·준비도 진단 API
-│       ├── auth/               # JWT + OAuth 인증
-│       ├── eta/                # 시간표 OCR 파서
+│       ├── auth/               # JWT + OAuth 인증, 프로필
+│       ├── eta/                # 시간표 이미지 OCR 파서
 │       ├── kakao/              # 카카오 OAuth·메시지 API
-│       ├── notification/       # APScheduler 알림 작업
-│       ├── schedule/           # 일정·시험 CRUD
+│       ├── notification/       # APScheduler 푸시 스케줄러 + 알림 CRUD
+│       ├── schedule/           # 일정·시험·이벤트 CRUD
 │       ├── share/              # 공유 토큰
-│       ├── syllabus/           # 강의계획서 업로드
+│       ├── admin/              # 관리자 API
 │       ├── core/               # 설정, JWT, LLM 유틸
 │       └── db/                 # DB 세션·베이스
 └── frontend-next/
     ├── Dockerfile
+    ├── public/
+    │   └── sw.js               # Service Worker (웹 푸시)
     └── src/
         ├── app/
         │   ├── (auth)/         # 로그인·회원가입
-        │   ├── (app)/          # 대시보드·온보딩
-        │   └── share/[token]/  # 공유 시간표(읽기 전용)
+        │   ├── (app)/
+        │   │   ├── dashboard/  # 대시보드 (오늘 일정·AI 채팅)
+        │   │   ├── onboarding/ # 최초 시간표 등록
+        │   │   ├── notifications/ # 알림 센터
+        │   │   ├── profile/    # 프로필 설정
+        │   │   ├── report/     # 주간 리포트
+        │   │   └── ai_chat/    # AI 채팅
+        │   └── share/[token]/  # 공유 시간표 (읽기 전용)
         ├── components/
         │   ├── timetable/      # 시간표 뷰
         │   ├── class-form/     # 과목 추가·수정 폼
-        │   ├── exam/           # 시험 일정 목록
-        │   ├── settings/       # 설정 모달
+        │   ├── ai-chat/        # AI 채팅 컴포넌트
         │   └── ui/             # shadcn/ui 공통 컴포넌트
-        ├── hooks/              # useSchedules, useExams, useProfile 등
-        ├── store/              # authStore, uiStore (Zustand)
-        ├── lib/                # Axios 클라이언트, 서버 fetch, 포맷터
+        ├── hooks/              # useSchedules, useExams, useProfile, usePushNotifications 등
+        ├── store/              # authStore (Zustand)
+        ├── lib/                # Axios 클라이언트, 서버 fetch
         └── types/              # 공통 TypeScript 타입
 ```
 
@@ -263,16 +270,25 @@ capstone-design-2026-1/
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| POST | `/auth/register` | 회원가입 |
+| POST | `/auth/signup` | 회원가입 |
 | POST | `/auth/login` | JWT 로그인 |
-| GET | `/auth/oauth/kakao` | Kakao OAuth |
+| GET | `/auth/{provider}/authorize` | OAuth 로그인 (kakao) |
 | GET/PUT | `/users/me` | 내 정보 조회/수정 |
+| GET/PUT | `/profiles` | 프로필 조회/수정 |
 | GET/POST | `/schedules` | 일정 목록/추가 |
 | PUT/DELETE | `/schedules/{id}` | 일정 수정/삭제 |
-| GET | `/schedules/conflicts` | 시간 충돌 감지 |
 | GET/POST | `/exam-schedules` | 시험 일정 조회/추가 |
-| POST | `/eta/parse` | 시간표 이미지 OCR |
+| GET/POST | `/events` | 이벤트 조회/추가 |
+| POST | `/eta/parse-image` | 시간표 이미지 OCR |
+| POST | `/eta/save-schedules` | OCR 결과 일정 저장 |
+| POST | `/ai/chat` | AI 채팅 |
 | POST | `/ai/readiness-summary` | 시험 준비도 AI 진단 |
-| POST | `/kakao/notify/schedule-summary` | 카카오톡 일정 알림 |
-| POST | `/share` | 공유 토큰 생성 |
+| GET | `/notifications` | 알림 목록 |
+| GET/PUT | `/notifications/prefs` | 알림 설정 조회/수정 |
+| GET | `/push/public-key` | VAPID 공개키 |
+| POST | `/push/subscriptions` | 푸시 구독 등록 |
+| DELETE | `/push/subscriptions` | 푸시 구독 해제 |
+| POST | `/push/test` | 테스트 푸시 발송 |
+| POST | `/share-tokens` | 공유 토큰 생성 |
 | GET | `/share/{token}` | 공유 시간표 조회 |
+| POST | `/kakao/notify/schedule-summary` | 카카오톡 일정 알림 |
