@@ -425,7 +425,7 @@ export default function ProfileClient() {
           </section>
 
           {/* ── 알림 설정 ── */}
-          <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
+          <section id="notifications" className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600">
                 <MaterialIcon icon="notifications" size={22} color="#fff" />
