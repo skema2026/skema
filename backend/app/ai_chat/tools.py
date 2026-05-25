@@ -185,6 +185,27 @@ TOOLS_SPEC = [
             "required": ["exam_id"],
         },
     },
+    {
+        "name": "generate_review_schedule",
+        "description": (
+            "에빙하우스 망각 곡선에 기반한 복습 일정을 자동으로 생성합니다. "
+            "사용자가 '복습 일정 만들어줘', '복습 계획 짜줘', '에빙하우스', "
+            "'복습 스케줄', '망각 곡선' 등을 언급하면 이 툴을 사용하세요. "
+            "학습일로부터 1·3·7·14·30일 후에 복습 일정을 배치합니다. "
+            "시험일이 있으면 시험 전날까지만 생성합니다."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subject": {"type": "string", "description": "과목/주제명 (예: '알고리즘', '운영체제 2단원')"},
+                "learn_date": {"type": "string", "description": "최초 학습 날짜 YYYY-MM-DD. 미입력 시 오늘"},
+                "exam_date": {"type": "string", "description": "시험 날짜 YYYY-MM-DD (선택). 있으면 시험 전날까지만 복습 생성"},
+                "duration_minutes": {"type": "integer", "description": "복습당 소요 시간(분), 기본 60"},
+                "preferred_start_time": {"type": "string", "description": "선호 복습 시작 시간 HH:MM (선택). 없으면 빈 시간에 자동 배치"},
+            },
+            "required": ["subject"],
+        },
+    },
 ]
 
 

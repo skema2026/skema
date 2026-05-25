@@ -2,6 +2,10 @@ import { Suspense } from 'react';
 import { SharedTimetable } from './SharedTimetable';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
+export function generateStaticParams() {
+  return [];
+}
+
 interface Props {
   params: Promise<{ token: string }>;
 }

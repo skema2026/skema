@@ -76,6 +76,11 @@ def run_ai_agent(
 ## 시험 일정 등록
 - 사용자가 시험(중간/기말/자격증/토익 등)을 언급하면 반드시 add_exam_schedule 사용
 
+## 에빙하우스 복습 일정
+- 사용자가 복습 계획·복습 일정·망각 곡선을 요청하면 generate_review_schedule 사용
+- 학습일 기준 +1·3·7·14·30일에 복습 일정을 자동 배치한다
+- 시험일을 함께 말하면 exam_date도 전달할 것
+
 작업 완료 후 결과를 간결하게 안내하세요."""
 
     messages: list[dict] = [{"role": "system", "content": system_prompt}]

@@ -23,6 +23,7 @@ from app.auth.models import UserProfile
 from app.schedule.models import ExamSchedule, Schedule
 from app.schedule.service import create_exam_record, create_schedule_record
 from app.core.time_utils import DAY_NAMES, minutes_to_time, overlap, time_to_minutes
+from app.core.ebbinghaus import review_dates, review_label
 
 logger = logging.getLogger(__name__)
 
@@ -437,5 +438,104 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         db.delete(e)
         db.commit()
         return f"🗑️ 시험 '{exam_title}' 삭제 완료!"
+
+    elif tool_name == "generate_review_schedule":
+        from datetime import datetime as _dt4
+        subject = tool_input["subject"]
+        duration = int(tool_input.get("duration_minutes", 60))
+        preferred_start = tool_input.get("preferred_start_time")
+        wake, sleep = _get_user_wake_sleep(db, user_id)
+
+        # 학습일 파싱
+        learn_str = tool_input.get("learn_date")
+        try:
+            learn_date = _dt4.strptime(learn_str, "%Y-%m-%d").date() if learn_str else today
+        except ValueError:
+            return f"❌ 학습 날짜 형식이 올바르지 않습니다: {learn_str} (YYYY-MM-DD)"
+
+        # 시험일 파싱
+        exam_str = tool_input.get("exam_date")
+        exam_date = None
+        if exam_str:
+            try:
+                exam_date = _dt4.strptime(exam_str, "%Y-%m-%d").date()
+            except ValueError:
+                return f"❌ 시험 날짜 형식이 올바르지 않습니다: {exam_str} (YYYY-MM-DD)"
+
+        # 에빙하우스 복습 날짜 계산
+        dates = review_dates(learn_date, exam_date)
+        if not dates:
+            return (
+                f"😅 '{subject}' 복습 일정을 생성할 수 있는 날짜가 없습니다.\n"
+                f"(학습일: {learn_date}, 시험일: {exam_date})"
+            )
+
+        color = _subject_color(subject)
+        created_lines: list[str] = []
+        skipped_lines: list[str] = []
+
+        for idx, rev_date in enumerate(dates):
+            label = f"[{review_label(idx)}] {subject}"
+            dow = rev_date.weekday()
+            date_str = rev_date.strftime("%Y-%m-%d")
+            existing = _day_schedules(db, user_id, dow, date_str)
+            busy = sorted(
+                (time_to_minutes(s.start_time), time_to_minutes(s.end_time))
+                for s in existing
+            )
+
+            # 선호 시간 우선, 없으면 빈 슬롯에서 자동 탐색
+            start_m: int | None = None
+            if preferred_start:
+                pref_m = time_to_minutes(preferred_start)
+                conflicts = any(
+                    not (pref_m + duration <= bs or be <= pref_m)
+                    for bs, be in busy
+                )
+                if not conflicts and wake <= pref_m and pref_m + duration <= sleep:
+                    start_m = pref_m
+
+            if start_m is None:
+                cursor = max(_DEFAULT_START_HOUR * 60, wake)
+                for bs, be in busy:
+                    if cursor + duration <= bs:
+                        start_m = cursor
+                        break
+                    cursor = max(cursor, be + _BLOCK_BUFFER_MINS)
+                if start_m is None and cursor + duration <= sleep:
+                    start_m = cursor
+
+            if start_m is None:
+                skipped_lines.append(f"  • {date_str}({DAY_NAMES[dow]}) — 빈 시간 없음")
+                continue
+
+            s = create_schedule_record(db, user_id, {
+                "title": label,
+                "day_of_week": dow,
+                "date": date_str,
+                "start_time": _m2t(start_m),
+                "end_time": _m2t(start_m + duration),
+                "color": color,
+                "schedule_type": "study",
+                "schedule_source": "ai_generated",
+                "priority": 1,
+            })
+            created_lines.append(
+                f"  • {date_str}({DAY_NAMES[dow]}) {s.start_time}~{s.end_time}  [ID:{s.id}]"
+            )
+
+        result_lines = [
+            f"📚 '{subject}' 에빙하우스 복습 일정 생성 완료!\n",
+            f"  학습일: {learn_date}" + (f"  |  시험일: {exam_date}" if exam_date else ""),
+            f"  복습 간격: 학습일 기준 +1·3·7·14·30일\n",
+        ]
+        if created_lines:
+            result_lines.append(f"✅ 생성된 복습 ({len(created_lines)}회):")
+            result_lines.extend(created_lines)
+        if skipped_lines:
+            result_lines.append(f"\n⚠️ 빈 시간 없어 건너뜀 ({len(skipped_lines)}회):")
+            result_lines.extend(skipped_lines)
+
+        return "\n".join(result_lines)
 
     return f"❌ 알 수 없는 도구: {tool_name}"

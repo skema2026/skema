@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 
@@ -10,19 +10,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { token, _hasHydrated, setUser, logout } = useAuthStore();
   const [checking, setChecking] = useState(true);
-  const isInitialized = useRef(false);
 
   useEffect(() => {
     // Zustand persist가 localStorage에서 token을 복원할 때까지 대기
-    if (!_hasHydrated || isInitialized.current) return;
-
-    isInitialized.current = true;
+    if (!_hasHydrated) return;
 
     if (!token) {
+      setChecking(false);
       router.replace('/login');
       return;
     }
 
+    setChecking(true);
     api
       .get('/users/me')
       .then(({ data }) => {
@@ -33,11 +32,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.replace('/login');
       })
       .finally(() => {
-        if (useAuthStore.getState().token) {
-          setChecking(false);
-        }
+        setChecking(false);
       });
-  }, [_hasHydrated, token, router, setUser, logout]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_hasHydrated, token]);
 
   if (checking) {
     return (
