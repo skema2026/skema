@@ -208,6 +208,7 @@ export default function OnboardingPage() {
   const [personalSchedules, setPersonalSchedules] = useState<PersonalSchedule[]>([]);
   // external-exam 입력 폼 임시 상태
   const [examDraft, setExamDraft] = useState<Omit<ExternalExam, '_id'>>({ name: '', date: '' });
+  const [examError, setExamError] = useState('');
   // 공부 블록 자동 생성 설정
   const [studyStartDays, setStudyStartDays] = useState<number>(14);
   const [studyDaysPerWeek, setStudyDaysPerWeek] = useState<number>(3);
@@ -1038,10 +1039,17 @@ export default function OnboardingPage() {
   // 추가 시험 입력 화면
   if (phase === 'external-exam') {
     const fmtHours = (h: number) => h < 1 ? `${h * 60}분` : h % 1 === 0 ? `${h}시간` : `${Math.floor(h)}시간 ${(h % 1) * 60}분`;
-    const canAddExam = examDraft.name.trim() && examDraft.date;
 
     const addExam = () => {
-      if (!canAddExam) return;
+      if (!examDraft.name.trim()) {
+        setExamError('시험명을 입력해주세요');
+        return;
+      }
+      if (!examDraft.date) {
+        setExamError('날짜를 선택해주세요');
+        return;
+      }
+      setExamError('');
       setExternalExams((prev) => [...prev, { ...examDraft, _id: `ex-${Date.now()}` }]);
       setExamDraft({ name: '', date: '' });
     };
@@ -1073,7 +1081,7 @@ export default function OnboardingPage() {
               style={{ borderColor: '#ebeef1' }}
               placeholder="시험명 (예: 중간고사, 토익)"
               value={examDraft.name}
-              onChange={(e) => setExamDraft((d) => ({ ...d, name: e.target.value }))}
+              onChange={(e) => { setExamDraft((d) => ({ ...d, name: e.target.value })); setExamError(''); }}
               onFocus={(e) => e.target.style.borderColor = '#2563eb'}
               onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
               onKeyDown={(e) => { if (e.key === 'Enter') addExam(); }}
@@ -1082,18 +1090,21 @@ export default function OnboardingPage() {
               type="date"
               min={todayStr}
               className="px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
-              style={{ borderColor: '#ebeef1', width: 148 }}
+              style={{ borderColor: examError && !examDraft.date ? '#ef4444' : '#ebeef1', width: 148 }}
               value={examDraft.date}
-              onChange={(e) => setExamDraft((d) => ({ ...d, date: e.target.value }))}
-              onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-              onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
+              onChange={(e) => { setExamDraft((d) => ({ ...d, date: e.target.value })); setExamError(''); }}
+              onFocus={(e) => { e.target.style.borderColor = examError && !examDraft.date ? '#ef4444' : '#2563eb'; }}
+              onBlur={(e) => { e.target.style.borderColor = examError && !examDraft.date ? '#ef4444' : '#ebeef1'; }}
             />
-            <button onClick={addExam} disabled={!canAddExam}
+            <button onClick={addExam}
               className="px-4 py-2.5 rounded-xl text-sm font-bold text-white flex-shrink-0"
-              style={{ background: canAddExam ? '#2563eb' : '#d1d5db', cursor: canAddExam ? 'pointer' : 'not-allowed' }}>
+              style={{ background: '#2563eb', cursor: 'pointer' }}>
               추가
             </button>
           </div>
+          {examError && (
+            <p className="mt-1 text-xs font-bold" style={{ color: '#ef4444' }}>⚠ {examError}</p>
+          )}
 
           {externalExams.length > 0 && (
             <div className="space-y-2 mb-4">

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Timetable, getWeekStart } from '@/components/timetable/Timetable';
 import { ClassForm } from '@/components/class-form/ClassForm';
-import { useSchedules } from '@/hooks/useSchedules';
+import { useSchedules, useToggleComplete } from '@/hooks/useSchedules';
 import { useExams } from '@/hooks/useExams';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuthStore } from '@/store/authStore';
@@ -205,6 +205,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const { openClassForm, isShareModalOpen, openShareModal, closeShareModal } = useUIStore();
   const { data: schedules = [] } = useSchedules(initialSchedules);
   const { data: exams = [] } = useExams();
+  const toggleComplete = useToggleComplete();
   const { data: profile } = useProfile(initialProfile ?? undefined);
 
   const [shareToken, setShareToken] = useState<string | null>(null);
@@ -624,7 +625,7 @@ useEffect(() => {
         <main className="min-h-0 flex-1 overflow-y-auto bg-[#f8f9ff] p-4 sm:p-5">
           <div className="mx-auto flex max-w-[1500px] flex-col gap-4">
             <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-              <div className="flex min-w-0 flex-col rounded-2xl border border-blue-100 bg-white p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
+              <div className="flex min-w-0 flex-col rounded-2xl border border-blue-100 bg-sky-50 p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-black text-blue-600">{todayLabel}</p>
@@ -675,7 +676,7 @@ useEffect(() => {
                   </div>
                 </div>
 
-                <div className="mt-5 min-h-[calc(100vh-170px)] flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-white">
+                <div className="mt-5 min-h-[calc(100vh-170px)] flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-sky-50">
                   {timetableView === 'week' && (
                     <div
                       ref={timetableRef}
@@ -695,8 +696,23 @@ useEffect(() => {
                               {formatLongDate(dayDate)}
                             </h2>
                             <p className="mt-1 text-sm font-bold text-slate-500">
-                              {minutesToTime(wakeStartMinutes)} 기상 기준 · 일정 {daySchedules.length}개 · 빈 시간 {dayFreeWindows.length}개
+                              일정 {daySchedules.length}개 · 완료 {daySchedules.filter(s => s.is_completed).length}개
                             </p>
+                            {daySchedules.length > 0 && (() => {
+                              const doneCnt = daySchedules.filter(s => s.is_completed).length;
+                              const pct = Math.round((doneCnt / daySchedules.length) * 100);
+                              return (
+                                <div className="mt-2">
+                                  <div className="h-1.5 w-full rounded-full bg-slate-100">
+                                    <div
+                                      className="h-full rounded-full bg-emerald-400 transition-all"
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  <p className="mt-0.5 text-[11px] font-bold text-slate-400">{pct}% 완료</p>
+                                </div>
+                              );
+                            })()}
                           </div>
                           <button
                             type="button"
@@ -831,29 +847,43 @@ useEffect(() => {
                                     {period.schedules.map((schedule) => {
                                       const start = timeToMinutes(schedule.start_time);
                                       const end = timeToMinutes(schedule.end_time);
+                                      const done = schedule.is_completed;
                                       return (
-                                        <button
+                                        <div
                                           key={schedule.id}
-                                          type="button"
-                                          onClick={() => openClassForm(schedule)}
-                                          className="w-full rounded-lg border border-blue-50 bg-[#fbfdff] p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
-                                          style={{ borderLeft: `5px solid ${schedule.color || '#2563eb'}` }}
+                                          className={`flex items-start gap-3 rounded-lg border p-3 transition ${done ? 'border-slate-100 bg-slate-50' : 'border-blue-50 bg-[#fbfdff] shadow-sm'}`}
+                                          style={{ borderLeft: `4px solid ${done ? '#cbd5e1' : (schedule.color || '#2563eb')}` }}
                                         >
-                                          <span className="flex flex-wrap items-center justify-between gap-2">
-                                            <span className="min-w-0">
-                                              <span className="block truncate text-base font-black text-slate-950">{schedule.title}</span>
-                                              <span className="mt-1 block truncate text-xs font-bold text-slate-500">
-                                                {schedule.location || schedule.schedule_type}
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleComplete.mutate({ id: schedule.id, is_completed: !done })}
+                                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${done ? 'border-emerald-400 bg-emerald-400' : 'border-slate-300 hover:border-blue-400'}`}
+                                          >
+                                            {done && (
+                                              <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                              </svg>
+                                            )}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => openClassForm(schedule)}
+                                            className="min-w-0 flex-1 text-left"
+                                          >
+                                            <span className={`block truncate text-sm font-black ${done ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+                                              {schedule.title}
+                                            </span>
+                                            <span className="mt-0.5 flex flex-wrap items-center gap-2">
+                                              <span className="text-xs font-bold text-blue-600">
+                                                {schedule.start_time}–{schedule.end_time}
                                               </span>
+                                              {schedule.location && (
+                                                <span className="text-xs font-bold text-slate-400">{schedule.location}</span>
+                                              )}
+                                              <span className="text-xs font-bold text-slate-300">{formatDuration(start, end)}</span>
                                             </span>
-                                            <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-black text-blue-700">
-                                              {schedule.start_time}-{schedule.end_time}
-                                            </span>
-                                          </span>
-                                          <span className="mt-3 block text-xs font-bold text-slate-400">
-                                            {formatDuration(start, end)}
-                                          </span>
-                                        </button>
+                                          </button>
+                                        </div>
                                       );
                                     })}
                                   </div>
@@ -952,7 +982,9 @@ useEffect(() => {
                         {monthDays.map((date) => {
                           const dateStr = toLocalDateString(date);
                           const items = getSchedulesForDate(date, 'month');
-                          const dayExamCount = exams.filter((exam) => exam.exam_date === dateStr).length;
+                          const classItems = items.filter((s) => s.schedule_type === 'class');
+                          const nonClassItems = items.filter((s) => s.schedule_type !== 'class');
+                          const dayExams = exams.filter((exam) => exam.exam_date === dateStr);
                           const isToday = dateStr === todayStr;
                           const isCurrentMonth = date.getMonth() === monthDate.getMonth();
 
@@ -972,31 +1004,42 @@ useEffect(() => {
                                     : 'border-slate-100 bg-slate-50/70 opacity-60'
                               }`}
                             >
-                              <div className="mb-2 flex items-center justify-between">
+                              <div className="mb-1.5 flex items-center justify-between">
                                 <span className={`text-xs font-black ${isToday ? 'text-blue-700' : 'text-slate-600'}`}>
                                   {date.getDate()}
                                 </span>
-                                {dayExamCount > 0 && (
+                                {dayExams.length > 0 && (
                                   <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-700">
                                     시험
                                   </span>
                                 )}
                               </div>
-                              <div className="space-y-1">
-                                {items.slice(0, 3).map((schedule) => (
+                              <div className="space-y-0.5">
+                                {classItems.slice(0, 2).map((schedule) => (
                                   <span
                                     key={`${dateStr}-${schedule.id}`}
-                                    className="block truncate rounded bg-blue-600/10 px-1.5 py-1 text-[10px] font-bold text-blue-800"
+                                    className="block truncate rounded bg-blue-600/10 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
                                   >
-                                    {schedule.start_time} {schedule.title}
+                                    {schedule.title}
                                   </span>
                                 ))}
-                                {items.length > 3 && (
-                                  <span className="block text-[10px] font-black text-slate-400">
-                                    +{items.length - 3}개
-                                  </span>
-                                )}
                               </div>
+                              {nonClassItems.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-0.5">
+                                  {nonClassItems.slice(0, 5).map((schedule) => (
+                                    <span
+                                      key={`dot-${dateStr}-${schedule.id}`}
+                                      className="h-2 w-2 rounded-full"
+                                      style={{ background: schedule.color || '#6366f1' }}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                              {(classItems.length > 2 || nonClassItems.length > 5) && (
+                                <span className="mt-0.5 block text-[10px] font-black text-slate-400">
+                                  +{Math.max(0, classItems.length - 2) + Math.max(0, nonClassItems.length - 5)}개
+                                </span>
+                              )}
                             </button>
                           );
                         })}
