@@ -21,7 +21,7 @@
   - 매주 수요일 평균 대비 비교 알림
 - **카카오 알림**: 카카오톡으로 일정 요약 메시지 발송
 - **일정 공유**: 읽기 전용 공유 토큰으로 시간표 URL 공유
-- **OAuth 로그인**: Kakao OAuth + 이메일/비밀번호 JWT 인증
+- **OAuth 로그인**: Kakao · Naver OAuth + 이메일/비밀번호 JWT 인증
 
 ---
 
@@ -206,6 +206,8 @@ VAPID_CLAIMS_EMAIL=mailto:your@email.com
 # OAuth
 KAKAO_CLIENT_ID=...
 KAKAO_CLIENT_SECRET=...
+NAVER_CLIENT_ID=...
+NAVER_CLIENT_SECRET=...
 
 # URL
 FRONTEND_URL=http://localhost:3000
@@ -272,7 +274,7 @@ capstone-design-2026-1/
 |--------|------|------|
 | POST | `/auth/signup` | 회원가입 |
 | POST | `/auth/login` | JWT 로그인 |
-| GET | `/auth/{provider}/authorize` | OAuth 로그인 (kakao) |
+| GET | `/auth/{provider}/authorize` | OAuth 로그인 (kakao, naver) |
 | GET/PUT | `/users/me` | 내 정보 조회/수정 |
 | GET/PUT | `/profiles` | 프로필 조회/수정 |
 | GET/POST | `/schedules` | 일정 목록/추가 |
