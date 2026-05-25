@@ -1,20 +1,20 @@
 self.addEventListener('push', (event) => {
-  let data = {};
+  if (!event.data) return;
+
+  let payload;
   try {
-    data = event.data ? event.data.json() : {};
+    payload = event.data.json();
   } catch {
-    data = {};
+    payload = { title: 'SKEMA', body: event.data.text(), url: '/dashboard' };
   }
 
-  const title = data.title || 'SKEMA 알림';
+  const title = payload.title || 'SKEMA';
   const options = {
-    body: data.body || '새 알림이 도착했습니다.',
+    body: payload.body || '',
     icon: '/skema-icon.svg',
     badge: '/skema-icon.svg',
-    data: {
-      url: data.url || '/dashboard',
-      type: data.type || 'notification',
-    },
+    data: { url: payload.url || '/dashboard' },
+    vibrate: [200, 100, 200],
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -22,21 +22,20 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = new URL(event.notification.data?.url || '/dashboard', self.location.origin).href;
-
-  event.waitUntil((async () => {
-    const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const client of clientList) {
-      if ('focus' in client) {
-        await client.focus();
-        if ('navigate' in client) {
-          return client.navigate(targetUrl);
+  const url = event.notification.data?.url || '/dashboard';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(url) && 'focus' in client) {
+          return client.focus();
         }
-        return;
       }
-    }
-    if (self.clients.openWindow) {
-      return self.clients.openWindow(targetUrl);
-    }
-  })());
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
 });
+
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(clients.claim()));
