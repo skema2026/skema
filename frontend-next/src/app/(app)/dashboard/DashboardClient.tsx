@@ -246,6 +246,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
+  const [isFreeTimeDialogOpen, setIsFreeTimeDialogOpen] = useState(false);
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
   const queryClient = useQueryClient();
   const timetableRef = useRef<HTMLDivElement | null>(null);
@@ -1094,6 +1095,7 @@ useEffect(() => {
                       detail={`최장 ${longestFreeWindow ? formatDuration(longestFreeWindow.start, longestFreeWindow.end) : '없음'}`}
                       icon="schedule"
                       tone="slate"
+                      onClick={todayFreeWindows.length > 0 ? () => setIsFreeTimeDialogOpen(true) : undefined}
                     />
                     <StatusSummaryCard
                       label="확인 필요"
@@ -1259,6 +1261,25 @@ useEffect(() => {
           </section>
         </div>
       )}
+
+      <Dialog open={isFreeTimeDialogOpen} onOpenChange={setIsFreeTimeDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>오늘 빈 시간</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <p className="text-xs font-bold text-slate-500 mb-3">총 {formatMinutesDuration(todayAvailableMinutes)} 사용 가능</p>
+            {todayFreeWindows.map((window, i) => (
+              <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                <span className="text-sm font-black text-slate-950">
+                  {minutesToTime(window.start)} – {minutesToTime(window.end)}
+                </span>
+                <span className="text-xs font-bold text-slate-400">{formatDuration(window.start, window.end)}</span>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isIssueDialogOpen} onOpenChange={setIsIssueDialogOpen}>
         <DialogContent className="max-w-sm">
