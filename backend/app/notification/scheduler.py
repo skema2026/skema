@@ -185,8 +185,8 @@ def job_reminders():
         today_str = now.strftime("%Y-%m-%d")
         today_dow = now.weekday()
         now_min = now.hour * 60 + now.minute
-        window_start = (now_min + 20) % 1440
-        window_end = (now_min + 40) % 1440
+        window_start = (now_min + 1) % 1440
+        window_end = (now_min + 31) % 1440
 
         users = db.query(User).filter(User.is_active == True).all()  # noqa: E712
         for user in users:
