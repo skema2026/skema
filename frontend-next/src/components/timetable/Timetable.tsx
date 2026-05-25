@@ -139,7 +139,7 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, star
         left:          2,
         right:         2,
         height,
-        background:    `${color}65`,
+        background:    `${color}99`,
         borderRadius:  7,
         borderLeft:    `3px solid ${color}`,
         padding:       isCompact ? '1px 5px' : '4px 7px',
@@ -159,7 +159,7 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, star
       <div style={{
         fontSize:       isCompact ? 10 : 11,
         fontWeight:     700,
-        color:          color,
+        color:          '#111827',
         overflow:       'hidden',
         textOverflow:   'ellipsis',
         whiteSpace:     'nowrap',
@@ -169,14 +169,14 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, star
         {s.title}
       </div>
       {!isCompact && (
-        <div style={{ fontSize: 10, color: `${color}aa`, marginTop: 1 }}>
+        <div style={{ fontSize: 10, color: '#374151', marginTop: 1 }}>
           {s.start_time}–{s.end_time}
         </div>
       )}
       {!isCompact && s.location && (
         <div style={{
           fontSize:     9,
-          color:        `${color}99`,
+          color:        '#6b7280',
           marginTop:    1,
           overflow:     'hidden',
           textOverflow: 'ellipsis',
