@@ -247,6 +247,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [weekOffset, setWeekOffset] = useState(0);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const [isFreeTimeDialogOpen, setIsFreeTimeDialogOpen] = useState(false);
+  const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
   const queryClient = useQueryClient();
   const timetableRef = useRef<HTMLDivElement | null>(null);
@@ -1088,6 +1089,7 @@ useEffect(() => {
                         : '오늘 남은 일정 없음'}
                       icon="event_available"
                       tone="blue"
+                      onClick={remainingToday.length > 0 ? () => setIsRemainingDialogOpen(true) : undefined}
                     />
                     <StatusSummaryCard
                       label="오늘 빈 시간"
@@ -1261,6 +1263,22 @@ useEffect(() => {
           </section>
         </div>
       )}
+
+      <Dialog open={isRemainingDialogOpen} onOpenChange={setIsRemainingDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>오늘 남은 일정</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            {remainingToday.map((s) => (
+              <div key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                <span className="truncate text-sm font-black text-slate-950 mr-2">{s.title}</span>
+                <span className="shrink-0 text-xs font-bold text-slate-400">{s.start_time}–{s.end_time}</span>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isFreeTimeDialogOpen} onOpenChange={setIsFreeTimeDialogOpen}>
         <DialogContent className="max-w-sm">
