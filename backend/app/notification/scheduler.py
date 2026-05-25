@@ -225,7 +225,6 @@ def job_reminders():
                         f"미완료: {s.title}",
                         f"[{s.start_time}~{s.end_time}] 일정이 아직 완료되지 않았습니다.",
                         related_id=s.id,
-                        send_push=False,
                     )
 
 
