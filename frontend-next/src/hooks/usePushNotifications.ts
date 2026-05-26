@@ -14,17 +14,32 @@ function urlBase64ToUint8Array(base64: string): ArrayBuffer {
 
 export type PushPermission = 'default' | 'granted' | 'denied' | 'unsupported';
 
+const getCurrentPushPermission = (): PushPermission => {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'unsupported';
+  }
+  return Notification.permission as PushPermission;
+};
+
+const getStoredReminderEnabled = () => (
+  typeof window === 'undefined'
+    ? true
+    : localStorage.getItem('skema_notif_enabled') !== 'false'
+);
+
+const getStoredReminderMinutes = () => {
+  if (typeof window === 'undefined') return 30;
+  const minutes = parseInt(localStorage.getItem('skema_notif_minutes') || '30', 10);
+  return Number.isFinite(minutes) ? minutes : 30;
+};
+
 export function usePushNotifications() {
-  const [permission, setPermission] = useState<PushPermission>('default');
+  const [permission, setPermission] = useState<PushPermission>(getCurrentPushPermission);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setPermission('unsupported');
-      return;
-    }
-    setPermission(Notification.permission as PushPermission);
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
     if ('serviceWorker' in navigator && Notification.permission === 'granted') {
       navigator.serviceWorker.ready.then((reg) =>
         reg.pushManager.getSubscription().then((sub) => setIsSubscribed(!!sub))
@@ -131,14 +146,8 @@ export function useNotificationPrefs() {
 }
 
 export function useReminderSettings() {
-  const [enabled, setEnabled] = useState(true);
-  const [minutes, setMinutes] = useState(30);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setEnabled(localStorage.getItem('skema_notif_enabled') !== 'false');
-    setMinutes(parseInt(localStorage.getItem('skema_notif_minutes') || '30', 10));
-  }, []);
+  const [enabled, setEnabled] = useState(getStoredReminderEnabled);
+  const [minutes, setMinutes] = useState(getStoredReminderMinutes);
 
   const setNotifEnabled = useCallback((val: boolean) => {
     setEnabled(val);

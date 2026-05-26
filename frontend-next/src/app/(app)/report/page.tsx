@@ -98,7 +98,6 @@ export default function ReportPage() {
   const monday = getWeekMonday(weekOffset);
   const { days, allDone, allTotal, allMins, overallPct, typeStats } = computeWeekStats(schedules, monday);
   const isCurrentWeek = weekOffset === 0;
-  const maxDayMins = Math.max(...days.map((d) => d.mins), 1);
 
   const overallColor =
     overallPct === null ? '#94a3b8'

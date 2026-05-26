@@ -16,7 +16,7 @@ import { recurringDayToIndex } from '@/lib/recurringDay';
 import { scheduleVisibleIn } from '@/lib/scheduleViewScope';
 import { minutesToTime, timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
-import { Schedule, UserProfile } from '@/types';
+import { ExamSchedule, Schedule, UserProfile } from '@/types';
 import {
   Dialog,
   DialogContent,
@@ -48,17 +48,20 @@ const VIEW_LABELS: { key: TimetableView; label: string }[] = [
 const toLocalDateString = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
+const SHORT_WEEKDAY_FORMATTER = new Intl.DateTimeFormat('ko-KR', { weekday: 'short' });
+const LONG_WEEKDAY_FORMATTER = new Intl.DateTimeFormat('ko-KR', { weekday: 'long' });
+const LONG_DATE_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
+  month: 'long',
+  day: 'numeric',
+  weekday: 'long',
+});
+
 const getLocalDow = (date: Date) => {
   const day = date.getDay();
   return day === 0 ? 6 : day - 1;
 };
 
-const formatLongDate = (date: Date) =>
-  new Intl.DateTimeFormat('ko-KR', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-  }).format(date);
+const formatLongDate = (date: Date) => LONG_DATE_FORMATTER.format(date);
 
 const DEFAULT_WAKE_TIME = '07:00';
 const DAY_END_MINUTES = 24 * 60;
@@ -224,6 +227,321 @@ const formatMinutesDuration = (minutes: number) => {
   return `${remain}분`;
 };
 
+type WeekAgendaDay = {
+  date: Date;
+  dateStr: string;
+  schedules: Schedule[];
+  exams: ExamSchedule[];
+};
+
+function MobileWeekAgenda({
+  days,
+  todayStr,
+  onScheduleClick,
+  onDayClick,
+}: {
+  days: WeekAgendaDay[];
+  todayStr: string;
+  onScheduleClick: (schedule: Schedule) => void;
+  onDayClick: (date: Date) => void;
+}) {
+  const activeDays = days.filter((day) => day.schedules.length > 0 || day.exams.length > 0);
+
+  return (
+    <div className="space-y-3 bg-[#f8fbff] p-3">
+      <div className="grid grid-cols-7 gap-1.5">
+        {days.map((day) => {
+          const isToday = day.dateStr === todayStr;
+          const count = day.schedules.length + day.exams.length;
+          return (
+            <button
+              key={day.dateStr}
+              type="button"
+              onClick={() => onDayClick(day.date)}
+              className={`min-w-0 rounded-xl border px-1 py-2 text-center transition ${
+                isToday
+                  ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                  : count
+                    ? 'border-blue-100 bg-white text-slate-800'
+                    : 'border-slate-100 bg-white/70 text-slate-400'
+              }`}
+            >
+              <p className="text-[11px] font-black leading-none">
+                {SHORT_WEEKDAY_FORMATTER.format(day.date)}
+              </p>
+              <p className="mt-1 text-sm font-black leading-none">{day.date.getDate()}</p>
+              <p className={`mt-1 text-[10px] font-black leading-none ${isToday ? 'text-blue-100' : count ? 'text-blue-600' : 'text-slate-300'}`}>
+                {count ? `${count}개` : '-'}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {activeDays.length === 0 ? (
+        <div className="rounded-2xl border border-blue-100 bg-white px-4 py-8 text-center">
+          <p className="text-sm font-black text-slate-700">이번 주 일정이 없습니다</p>
+          <p className="mt-1 text-xs font-bold text-slate-400">상단 + 버튼으로 일정을 추가할 수 있어요</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {activeDays.map((day) => {
+            const isToday = day.dateStr === todayStr;
+            return (
+              <section
+                key={`agenda-${day.dateStr}`}
+                className={`rounded-2xl border bg-white p-3 shadow-sm ${isToday ? 'border-blue-300' : 'border-blue-100'}`}
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black text-blue-600">
+                      {isToday ? '오늘' : LONG_WEEKDAY_FORMATTER.format(day.date)}
+                    </p>
+                    <h3 className="mt-0.5 text-base font-black text-slate-950">
+                      {day.date.getMonth() + 1}월 {day.date.getDate()}일
+                    </h3>
+                  </div>
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">
+                    {day.schedules.length + day.exams.length}개
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {day.exams.map((exam) => (
+                    <div key={`mobile-exam-${exam.id}`} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <MaterialIcon icon="school" size={16} color="#d97706" />
+                        <p className="min-w-0 flex-1 truncate text-sm font-black text-amber-900">{exam.title}</p>
+                        <span className="text-xs font-black text-amber-700">{exam.exam_time || '종일'}</span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {day.schedules.map((schedule) => (
+                    <button
+                      key={`mobile-week-${day.dateStr}-${schedule.id}`}
+                      type="button"
+                      onClick={() => onScheduleClick(schedule)}
+                      className={`w-full rounded-xl border px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50 ${
+                        schedule.is_completed ? 'border-slate-100 bg-slate-50 opacity-70' : 'border-blue-100 bg-[#fbfdff]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-[72px] shrink-0 text-xs font-black text-blue-700">
+                          {schedule.start_time}
+                          <span className="block text-[11px] font-bold text-slate-400">{schedule.end_time}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate text-sm font-black ${schedule.is_completed ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+                            {schedule.title}
+                          </p>
+                          <p className="mt-0.5 truncate text-[11px] font-bold text-slate-400">
+                            {schedule.location || (schedule.schedule_type === 'study' ? '공부 일정' : '일정')}
+                          </p>
+                        </div>
+                        <MaterialIcon icon={schedule.is_completed ? 'check_circle' : 'chevron_right'} size={16} color={schedule.is_completed ? '#94a3b8' : '#2563eb'} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MobileMonthAgenda({
+  monthLabel,
+  wakeStartLabel,
+  days,
+  monthDate,
+  todayStr,
+  onScheduleClick,
+  onDayClick,
+}: {
+  monthLabel: string;
+  wakeStartLabel: string;
+  days: WeekAgendaDay[];
+  monthDate: Date;
+  todayStr: string;
+  onScheduleClick: (schedule: Schedule) => void;
+  onDayClick: (date: Date) => void;
+}) {
+  const currentMonthDays = days.filter((day) => day.date.getMonth() === monthDate.getMonth());
+  const activeDays = currentMonthDays.filter((day) => day.schedules.length > 0 || day.exams.length > 0);
+  const totalSchedules = activeDays.reduce((sum, day) => sum + day.schedules.length, 0);
+  const totalExams = activeDays.reduce((sum, day) => sum + day.exams.length, 0);
+
+  return (
+    <div className="space-y-3 bg-[#f8fbff] p-3">
+      <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-black text-blue-600">월간 요약</p>
+            <h2 className="mt-0.5 text-lg font-black text-slate-950">{monthLabel}</h2>
+          </div>
+          <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700">
+            {wakeStartLabel} 기준
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-blue-50 px-3 py-2">
+            <p className="text-[10px] font-black text-blue-500">일정</p>
+            <p className="mt-0.5 text-base font-black text-slate-950">{totalSchedules}개</p>
+          </div>
+          <div className="rounded-xl bg-amber-50 px-3 py-2">
+            <p className="text-[10px] font-black text-amber-600">시험</p>
+            <p className="mt-0.5 text-base font-black text-slate-950">{totalExams}개</p>
+          </div>
+          <div className="rounded-xl bg-slate-50 px-3 py-2">
+            <p className="text-[10px] font-black text-slate-500">바쁜 날</p>
+            <p className="mt-0.5 text-base font-black text-slate-950">{activeDays.length}일</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
+        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] font-black text-slate-400">
+          {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
+            <div key={day} className="py-1">{day}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((day) => {
+            const isToday = day.dateStr === todayStr;
+            const isCurrentMonth = day.date.getMonth() === monthDate.getMonth();
+            const count = day.schedules.length + day.exams.length;
+
+            return (
+              <button
+                key={`mobile-month-${day.dateStr}`}
+                type="button"
+                onClick={() => onDayClick(day.date)}
+                className={`aspect-square min-w-0 rounded-xl border p-1 text-left transition ${
+                  isToday
+                    ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                    : isCurrentMonth
+                      ? count
+                        ? 'border-blue-100 bg-blue-50/70 text-slate-800'
+                        : 'border-slate-100 bg-white text-slate-500'
+                      : 'border-transparent bg-slate-50/50 text-slate-300'
+                }`}
+              >
+                <div className="flex h-full flex-col justify-between">
+                  <span className="text-xs font-black leading-none">{day.date.getDate()}</span>
+                  {count > 0 && (
+                    <div className="flex items-center gap-0.5">
+                      {day.exams.length > 0 && (
+                        <span className={`h-1.5 w-1.5 rounded-full ${isToday ? 'bg-amber-200' : 'bg-amber-400'}`} />
+                      )}
+                      {day.schedules.slice(0, 3).map((schedule) => (
+                        <span
+                          key={`mobile-month-dot-${day.dateStr}-${schedule.id}`}
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ background: isToday ? '#bfdbfe' : schedule.color || '#2563eb' }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <p className="text-xs font-black text-slate-500">일정 있는 날짜</p>
+          <p className="text-[11px] font-bold text-slate-400">날짜를 누르면 하루 보기</p>
+        </div>
+
+        {activeDays.length === 0 ? (
+          <div className="rounded-2xl border border-blue-100 bg-white px-4 py-8 text-center shadow-sm">
+            <p className="text-sm font-black text-slate-700">이번 달 일정이 없습니다</p>
+            <p className="mt-1 text-xs font-bold text-slate-400">상단 + 버튼으로 새 일정을 추가할 수 있어요</p>
+          </div>
+        ) : (
+          activeDays.map((day) => {
+            const isToday = day.dateStr === todayStr;
+            return (
+              <section key={`mobile-month-agenda-${day.dateStr}`} className={`rounded-2xl border bg-white p-3 shadow-sm ${isToday ? 'border-blue-300' : 'border-blue-100'}`}>
+                <button
+                  type="button"
+                  onClick={() => onDayClick(day.date)}
+                  className="mb-2 flex w-full items-center justify-between gap-3 text-left"
+                >
+                  <div>
+                    <p className="text-[11px] font-black text-blue-600">
+                      {isToday ? '오늘' : LONG_WEEKDAY_FORMATTER.format(day.date)}
+                    </p>
+                    <h3 className="mt-0.5 text-base font-black text-slate-950">
+                      {day.date.getMonth() + 1}월 {day.date.getDate()}일
+                    </h3>
+                  </div>
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">
+                    {day.schedules.length + day.exams.length}개
+                  </span>
+                </button>
+
+                <div className="space-y-1.5">
+                  {day.exams.map((exam) => (
+                    <div key={`mobile-month-exam-${exam.id}`} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <MaterialIcon icon="school" size={16} color="#d97706" />
+                        <p className="min-w-0 flex-1 truncate text-sm font-black text-amber-900">{exam.title}</p>
+                        <span className="text-xs font-black text-amber-700">{exam.exam_time || '시험'}</span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {day.schedules.slice(0, 4).map((schedule) => (
+                    <button
+                      key={`mobile-month-schedule-${day.dateStr}-${schedule.id}`}
+                      type="button"
+                      onClick={() => onScheduleClick(schedule)}
+                      className="w-full rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-[72px] shrink-0 text-xs font-black text-blue-700">
+                          {schedule.start_time}
+                          <span className="block text-[11px] font-bold text-slate-400">{schedule.end_time}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate text-sm font-black ${schedule.is_completed ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+                            {schedule.title}
+                          </p>
+                          <p className="mt-0.5 truncate text-[11px] font-bold text-slate-400">
+                            {schedule.location || (schedule.schedule_type === 'study' ? '공부 일정' : '일정')}
+                          </p>
+                        </div>
+                        <MaterialIcon icon="chevron_right" size={16} color="#2563eb" />
+                      </div>
+                    </button>
+                  ))}
+
+                  {day.schedules.length > 4 && (
+                    <button
+                      type="button"
+                      onClick={() => onDayClick(day.date)}
+                      className="w-full rounded-xl bg-slate-50 px-3 py-2 text-center text-xs font-black text-slate-500"
+                    >
+                      나머지 {day.schedules.length - 4}개 하루 보기에서 확인
+                    </button>
+                  )}
+                </div>
+              </section>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardClient({ initialSchedules, initialProfile }: Props) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
@@ -351,12 +669,14 @@ useEffect(() => {
   const monthDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const monthLabel = `${monthDate.getFullYear()}년 ${monthDate.getMonth() + 1}월`;
 
-  const getSchedulesForDate = (date: Date, target: 'day' | 'month' = 'day') => {
+  const getSchedulesForDate = (date: Date, target: TimetableView = 'day') => {
     const dateStr = toLocalDateString(date);
     const dow = getLocalDow(date);
-    const dated = schedules.filter((s) => scheduleVisibleIn(s, target) && s.date === dateStr);
+    const isVisibleForTarget = (schedule: Schedule) =>
+      scheduleVisibleIn(schedule, target) || (target === 'week' && schedule.schedule_type === 'study');
+    const dated = schedules.filter((s) => isVisibleForTarget(s) && s.date === dateStr);
     const recurring = schedules.filter((s) => (
-      scheduleVisibleIn(s, target) && !s.date && recurringDayToIndex(s.recurring_day) === dow
+      isVisibleForTarget(s) && !s.date && recurringDayToIndex(s.recurring_day) === dow
     ));
     const datedKeys = new Set(dated.map((s) => `${s.title}|${s.start_time}`));
 
@@ -368,6 +688,17 @@ useEffect(() => {
 
   const daySchedules = getSchedulesForDate(dayDate);
   const weekSchedules = schedules.filter((schedule) => scheduleVisibleIn(schedule, 'week') || schedule.schedule_type === 'study');
+  const weekAgendaDays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+    const dateStr = toLocalDateString(date);
+    return {
+      date,
+      dateStr,
+      schedules: getSchedulesForDate(date, 'week'),
+      exams: exams.filter((exam) => exam.exam_date === dateStr),
+    };
+  });
   const dayExams = exams.filter((exam) => exam.exam_date === toLocalDateString(dayDate));
   const dayFreeWindows = findFreeWindows(daySchedules, wakeStartMinutes).slice(0, 4);
   const dayConflictSchedules = getOverlappingSchedules(daySchedules);
@@ -418,11 +749,7 @@ useEffect(() => {
   const getDaysUntil = (date: string) =>
     Math.ceil((new Date(`${date}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000);
   const formatDday = (days: number) => (days <= 0 ? 'D-day' : `D-${days}`);
-  const todayLabel = new Intl.DateTimeFormat('ko-KR', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-  }).format(now);
+  const todayLabel = formatLongDate(now);
   const weekEndDate = new Date(weekStart);
   weekEndDate.setDate(weekStart.getDate() + 6);
   const weekLabel = `${weekStart.getMonth() + 1}.${weekStart.getDate()} - ${weekEndDate.getMonth() + 1}.${weekEndDate.getDate()}`;
@@ -599,6 +926,13 @@ useEffect(() => {
     if (timetableView === 'month') setMonthOffset((offset) => offset + direction);
   };
 
+  const showDayViewForDate = (date: Date) => {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diff = Math.round((date.getTime() - today.getTime()) / 86400000);
+    setDayOffset(diff);
+    setTimetableView('day');
+  };
+
   const resetCalendar = () => {
     setDayOffset(0);
     setWeekOffset(0);
@@ -612,6 +946,15 @@ useEffect(() => {
     const date = new Date(monthGridStart);
     date.setDate(monthGridStart.getDate() + index);
     return date;
+  });
+  const monthAgendaDays = monthDays.map((date) => {
+    const dateStr = toLocalDateString(date);
+    return {
+      date,
+      dateStr,
+      schedules: getSchedulesForDate(date, 'month'),
+      exams: exams.filter((exam) => exam.exam_date === dateStr),
+    };
   });
   const currentViewScheduleCount =
     timetableView === 'day' ? daySchedules.length :
@@ -645,6 +988,7 @@ useEffect(() => {
           onOpenAdminLogs={() => router.push('/admin/login-logs')}
           onLogout={handleLogout}
           onAddSchedule={() => openClassForm()}
+          onOpenSetlog={() => router.push('/setlog')}
           onReschedule={handleReschedule}
           onUploadTimetable={() => setIsEtaReimportOpen(true)}
           isRegenerating={isRegenerating}
@@ -704,14 +1048,24 @@ useEffect(() => {
                   </div>
                 </div>
 
-                <div className="mt-5 min-h-[calc(100vh-170px)] flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-sky-50">
+                <div className="mt-4 flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-sky-50 sm:mt-5 sm:min-h-[calc(100vh-170px)]">
                   {timetableView === 'week' && (
-                    <div
-                      ref={timetableRef}
-                      className="max-h-[calc(100vh-220px)] overflow-y-auto"
-                    >
-                      <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} startTime="00:00" />
-                    </div>
+                    <>
+                      <div className="sm:hidden">
+                        <MobileWeekAgenda
+                          days={weekAgendaDays}
+                          todayStr={todayStr}
+                          onScheduleClick={openClassForm}
+                          onDayClick={showDayViewForDate}
+                        />
+                      </div>
+                      <div
+                        ref={timetableRef}
+                        className="hidden max-h-[calc(100vh-220px)] overflow-y-auto sm:block"
+                      >
+                        <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} startTime="00:00" />
+                      </div>
+                    </>
                   )}
 
                   {timetableView === 'day' && (
@@ -994,85 +1348,94 @@ useEffect(() => {
                   )}
 
                   {timetableView === 'month' && (
-                    <div className="h-full overflow-y-auto bg-white p-4">
-                      <div className="mb-3 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3">
-                        <span className="text-sm font-black text-slate-950">{monthLabel}</span>
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700">
-                          {minutesToTime(wakeStartMinutes)} 기준
-                        </span>
+                    <>
+                      <div className="sm:hidden">
+                        <MobileMonthAgenda
+                          monthLabel={monthLabel}
+                          wakeStartLabel={minutesToTime(wakeStartMinutes)}
+                          days={monthAgendaDays}
+                          monthDate={monthDate}
+                          todayStr={todayStr}
+                          onScheduleClick={openClassForm}
+                          onDayClick={showDayViewForDate}
+                        />
                       </div>
-                      <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs font-black text-slate-500">
-                        {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
-                          <div key={day} className="rounded-md bg-blue-50 py-2">{day}</div>
-                        ))}
-                      </div>
-                      <div className="grid min-h-[540px] grid-cols-7 gap-2">
-                        {monthDays.map((date) => {
-                          const dateStr = toLocalDateString(date);
-                          const items = getSchedulesForDate(date, 'month');
-                          const classItems = items.filter((s) => s.schedule_type === 'class');
-                          const nonClassItems = items.filter((s) => s.schedule_type !== 'class');
-                          const dayExams = exams.filter((exam) => exam.exam_date === dateStr);
-                          const isToday = dateStr === todayStr;
-                          const isCurrentMonth = date.getMonth() === monthDate.getMonth();
+                      <div className="hidden h-full overflow-y-auto bg-white p-4 sm:block">
+                        <div className="mb-3 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3">
+                          <span className="text-sm font-black text-slate-950">{monthLabel}</span>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700">
+                            {minutesToTime(wakeStartMinutes)} 기준
+                          </span>
+                        </div>
+                        <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs font-black text-slate-500">
+                          {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
+                            <div key={day} className="rounded-md bg-blue-50 py-2">{day}</div>
+                          ))}
+                        </div>
+                        <div className="grid min-h-[540px] grid-cols-7 gap-2">
+                          {monthDays.map((date) => {
+                            const dateStr = toLocalDateString(date);
+                            const items = getSchedulesForDate(date, 'month');
+                            const classItems = items.filter((s) => s.schedule_type === 'class');
+                            const nonClassItems = items.filter((s) => s.schedule_type !== 'class');
+                            const dayExams = exams.filter((exam) => exam.exam_date === dateStr);
+                            const isToday = dateStr === todayStr;
+                            const isCurrentMonth = date.getMonth() === monthDate.getMonth();
 
-                          return (
-                            <button
-                              key={dateStr}
-                              onClick={() => {
-                                const diff = Math.round((date.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
-                                setDayOffset(diff);
-                                setTimetableView('day');
-                              }}
-                              className={`min-h-[112px] rounded-lg border p-2 text-left transition hover:border-blue-300 hover:bg-blue-50 ${
-                                isToday
-                                  ? 'border-blue-500 bg-blue-50'
-                                  : isCurrentMonth
-                                    ? 'border-blue-100 bg-white'
-                                    : 'border-slate-100 bg-slate-50/70 opacity-60'
-                              }`}
-                            >
-                              <div className="mb-1.5 flex items-center justify-between">
-                                <span className={`text-xs font-black ${isToday ? 'text-blue-700' : 'text-slate-600'}`}>
-                                  {date.getDate()}
-                                </span>
-                                {dayExams.length > 0 && (
-                                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-700">
-                                    시험
+                            return (
+                              <button
+                                key={dateStr}
+                                onClick={() => showDayViewForDate(date)}
+                                className={`min-h-[112px] rounded-lg border p-2 text-left transition hover:border-blue-300 hover:bg-blue-50 ${
+                                  isToday
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : isCurrentMonth
+                                      ? 'border-blue-100 bg-white'
+                                      : 'border-slate-100 bg-slate-50/70 opacity-60'
+                                }`}
+                              >
+                                <div className="mb-1.5 flex items-center justify-between">
+                                  <span className={`text-xs font-black ${isToday ? 'text-blue-700' : 'text-slate-600'}`}>
+                                    {date.getDate()}
                                   </span>
-                                )}
-                              </div>
-                              <div className="space-y-0.5">
-                                {classItems.slice(0, 2).map((schedule) => (
-                                  <span
-                                    key={`${dateStr}-${schedule.id}`}
-                                    className="block truncate rounded bg-blue-600/10 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
-                                  >
-                                    {schedule.title}
-                                  </span>
-                                ))}
-                              </div>
-                              {nonClassItems.length > 0 && (
-                                <div className="mt-1 flex flex-wrap gap-0.5">
-                                  {nonClassItems.slice(0, 5).map((schedule) => (
+                                  {dayExams.length > 0 && (
+                                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-700">
+                                      시험
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="space-y-0.5">
+                                  {classItems.slice(0, 2).map((schedule) => (
                                     <span
-                                      key={`dot-${dateStr}-${schedule.id}`}
-                                      className="h-2 w-2 rounded-full"
-                                      style={{ background: schedule.color || '#6366f1' }}
-                                    />
+                                      key={`${dateStr}-${schedule.id}`}
+                                      className="block truncate rounded bg-blue-600/10 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
+                                    >
+                                      {schedule.title}
+                                    </span>
                                   ))}
                                 </div>
-                              )}
-                              {(classItems.length > 2 || nonClassItems.length > 5) && (
-                                <span className="mt-0.5 block text-[10px] font-black text-slate-400">
-                                  +{Math.max(0, classItems.length - 2) + Math.max(0, nonClassItems.length - 5)}개
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
+                                {nonClassItems.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap gap-0.5">
+                                    {nonClassItems.slice(0, 5).map((schedule) => (
+                                      <span
+                                        key={`dot-${dateStr}-${schedule.id}`}
+                                        className="h-2 w-2 rounded-full"
+                                        style={{ background: schedule.color || '#6366f1' }}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                                {(classItems.length > 2 || nonClassItems.length > 5) && (
+                                  <span className="mt-0.5 block text-[10px] font-black text-slate-400">
+                                    +{Math.max(0, classItems.length - 2) + Math.max(0, nonClassItems.length - 5)}개
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               </div>

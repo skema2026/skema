@@ -4,7 +4,7 @@ const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
   output: isProd ? "standalone" : undefined,
-  allowedDevOrigins: ['e14a-221-141-114-186.ngrok-free.app'],
+  allowedDevOrigins: ['purebred-filter-oval.ngrok-free.dev'],
   async rewrites() {
     if (isProd) return [];
     return [

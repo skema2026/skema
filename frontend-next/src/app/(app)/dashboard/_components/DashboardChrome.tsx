@@ -113,6 +113,7 @@ type DashboardHeaderProps = {
   onOpenAdminLogs: () => void;
   onLogout: () => void;
   onAddSchedule: () => void;
+  onOpenSetlog: () => void;
   onReschedule: () => void;
   onUploadTimetable: () => void;
   isRegenerating: boolean;
@@ -129,6 +130,7 @@ export function DashboardHeader({
   onOpenAdminLogs,
   onLogout,
   onAddSchedule,
+  onOpenSetlog,
   onReschedule,
   onUploadTimetable,
   isRegenerating,
@@ -193,6 +195,15 @@ export function DashboardHeader({
         >
           <MaterialIcon icon="add" size={16} color="#fff" />
           <span className="hide-mobile">일정 추가</span>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenSetlog}
+          title="셋로그 MVP"
+          className="flex items-center gap-2 rounded-lg bg-slate-950 px-5 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800"
+        >
+          <MaterialIcon icon="photo_camera" size={16} color="#fff" />
+          <span className="hide-mobile">셋로그</span>
         </button>
         <button
           type="button"
