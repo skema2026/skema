@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
 type ScreenKey = 'onboarding' | 'home' | 'create' | 'join' | 'today' | 'camera' | 'clip' | 'vlog' | 'archive' | 'settings' | 'privacy';
@@ -45,20 +44,6 @@ type Clip = {
   reactions: Record<string, number>;
   comments: string[];
 };
-
-const SCREENS: { key: ScreenKey; label: string; icon: string }[] = [
-  { key: 'onboarding', label: '온보딩', icon: 'person' },
-  { key: 'home', label: '홈', icon: 'widgets' },
-  { key: 'create', label: '방 만들기', icon: 'add' },
-  { key: 'join', label: '초대 참여', icon: 'link_off' },
-  { key: 'today', label: '오늘', icon: 'schedule' },
-  { key: 'camera', label: '촬영', icon: 'photo_camera' },
-  { key: 'clip', label: '클립', icon: 'chat' },
-  { key: 'vlog', label: '브이로그', icon: 'auto_awesome' },
-  { key: 'archive', label: '기록', icon: 'calendar_month' },
-  { key: 'settings', label: '설정', icon: 'tune' },
-  { key: 'privacy', label: '안전', icon: 'lock' },
-];
 
 const DEFAULT_ROOM: Room = {
   id: 'room-campus',
@@ -116,26 +101,6 @@ const DEFAULT_CLIPS: Clip[] = [
   },
 ];
 
-const API_GROUPS = [
-  'POST /log-rooms',
-  'POST /log-rooms/join',
-  'GET /log-rooms/{room_id}/today',
-  'POST /capture-slots/{slot_id}/clips/upload-url',
-  'POST /capture-slots/{slot_id}/clips/complete',
-  'POST /log-rooms/{room_id}/vlogs/{day_key}/compose',
-];
-
-const CHECKLIST = [
-  '인증/닉네임 온보딩',
-  '그룹 생성/초대코드 참여',
-  '2-3초 실시간 촬영',
-  'signed URL 영상 업로드',
-  '오늘 타임라인',
-  '푸시 알림',
-  'FFmpeg 공동 브이로그',
-  '캘린더 과거 기록',
-];
-
 const todayLabel = new Intl.DateTimeFormat('ko-KR', {
   month: 'long',
   day: 'numeric',
@@ -150,20 +115,10 @@ function makeInviteCode() {
   return `HOUR-${Math.floor(10 + Math.random() * 89)}`;
 }
 
-function SectionTitle({ eyebrow, title, desc }: { eyebrow: string; title: string; desc: string }) {
-  return (
-    <div className="mb-5">
-      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-600">{eyebrow}</p>
-      <h2 className="mt-1 text-2xl font-black text-slate-950">{title}</h2>
-      <p className="mt-2 text-sm font-bold leading-6 text-slate-500">{desc}</p>
-    </div>
-  );
-}
-
 function PhoneFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[390px] overflow-hidden rounded-[28px] border border-slate-200 bg-slate-950 p-2 shadow-2xl shadow-blue-950/20">
-      <div className="h-[720px] overflow-y-auto rounded-[22px] bg-[#f7f9ff]">
+    <div className="mx-auto min-h-dvh w-full max-w-[430px] bg-[#f7f9ff] shadow-2xl shadow-blue-950/10 sm:my-4 sm:min-h-[760px] sm:overflow-hidden sm:rounded-[30px] sm:border sm:border-slate-200">
+      <div className="h-dvh overflow-y-auto bg-[#f7f9ff] sm:h-[760px]">
         {children}
       </div>
     </div>
@@ -873,6 +828,41 @@ function PrivacyMock({ setScreen }: MockProps) {
   );
 }
 
+function BottomNav({ screen, setScreen }: { screen: ScreenKey; setScreen: (screen: ScreenKey) => void }) {
+  const items: { key: ScreenKey; label: string; icon: string }[] = [
+    { key: 'home', label: '홈', icon: 'widgets' },
+    { key: 'today', label: '오늘', icon: 'schedule' },
+    { key: 'camera', label: '촬영', icon: 'photo_camera' },
+    { key: 'archive', label: '기록', icon: 'calendar_month' },
+    { key: 'settings', label: '설정', icon: 'tune' },
+  ];
+
+  if (screen === 'onboarding') return null;
+
+  return (
+    <nav className="sticky bottom-0 z-20 border-t border-blue-50 bg-white/95 px-2 py-2 backdrop-blur">
+      <div className="grid grid-cols-5 gap-1">
+        {items.map((item) => {
+          const active = screen === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setScreen(item.key)}
+              className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-[10px] font-black transition ${
+                active ? 'bg-blue-600 text-white' : 'text-slate-400'
+              }`}
+            >
+              <MaterialIcon icon={item.icon} size={18} color={active ? '#fff' : '#94a3b8'} />
+              <span className="mt-1">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 function ScreenPreview(props: MockProps) {
   const screens: Record<ScreenKey, ReactNode> = {
     onboarding: <OnboardingMock {...props} />,
@@ -888,11 +878,19 @@ function ScreenPreview(props: MockProps) {
     privacy: <PrivacyMock {...props} />,
   };
 
-  return <PhoneFrame>{screens[props.screen]}</PhoneFrame>;
+  return (
+    <PhoneFrame>
+      <div className="flex min-h-full flex-col">
+        <div className="min-h-0 flex-1">
+          {screens[props.screen]}
+        </div>
+        <BottomNav screen={props.screen} setScreen={props.setScreen} />
+      </div>
+    </PhoneFrame>
+  );
 }
 
 export default function SetlogPage() {
-  const router = useRouter();
   const [screen, setScreen] = useState<ScreenKey>('onboarding');
   const [nickname, setNickname] = useState('나');
   const [notifPermission, setNotifPermission] = useState<PermissionState>('idle');
@@ -915,7 +913,6 @@ export default function SetlogPage() {
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? rooms[0];
   const selectedClip = clips.find((clip) => clip.id === selectedClipId);
-  const selectedScreen = useMemo(() => SCREENS.find((item) => item.key === screen), [screen]);
 
   const requestNotification = async () => {
     if (!('Notification' in window)) {
@@ -1044,120 +1041,8 @@ export default function SetlogPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f8fc]">
-      <header className="sticky top-0 z-30 border-b border-blue-100 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard')}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100"
-              aria-label="대시보드로 돌아가기"
-            >
-              <MaterialIcon icon="arrow_back" size={20} color="#475569" />
-            </button>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600">
-              <MaterialIcon icon="photo_camera" size={20} color="#fff" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-lg font-black text-slate-950">HourRoom MVP</p>
-              <p className="truncate text-xs font-bold text-slate-500">친구들과 만드는 3초 공동 브이로그</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setScreen('camera')}
-            className="hidden rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-sm sm:inline-flex"
-          >
-            바로 촬영
-          </button>
-        </div>
-      </header>
-
-      <main className="mx-auto grid max-w-7xl gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <section className="min-w-0 space-y-5">
-          <div className="rounded-3xl border border-blue-100 bg-white p-5 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-            <SectionTitle
-              eyebrow="MVP"
-              title="닫힌 친구 그룹용 시간 기록 앱"
-              desc="이제 단순 설명이 아니라 방 생성, 초대 참여, 카메라 촬영, 타임라인 반영, 반응/댓글, 브이로그 합성 시뮬레이션까지 직접 눌러볼 수 있습니다."
-            />
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                ['Private Rooms', `${rooms.length}개 룸 · 초대코드 기반`],
-                ['Live Capture', '브라우저 카메라로 3초 촬영'],
-                ['Daily Vlog', `${clips.length}개 클립으로 합성`],
-              ].map(([title, desc]) => (
-                <div key={title} className="rounded-2xl bg-blue-50 p-4">
-                  <p className="text-sm font-black text-slate-950">{title}</p>
-                  <p className="mt-1 text-xs font-bold text-slate-500">{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-blue-100 bg-white p-5 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-            <SectionTitle
-              eyebrow="Screens"
-              title="앱 화면"
-              desc="왼쪽 버튼을 누르면 오른쪽 휴대폰 프리뷰가 해당 화면으로 바뀝니다."
-            />
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {SCREENS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setScreen(item.key)}
-                  className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
-                    screen === item.key
-                      ? 'border-blue-500 bg-blue-50 shadow-sm'
-                      : 'border-blue-100 bg-white hover:border-blue-300 hover:bg-blue-50'
-                  }`}
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
-                    <MaterialIcon icon={item.icon} size={17} color="#fff" />
-                  </span>
-                  <span className="text-sm font-black text-slate-900">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-5 xl:grid-cols-2">
-            <section className="rounded-3xl border border-blue-100 bg-white p-5 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-              <SectionTitle eyebrow="API" title="핵심 API" desc="실서비스 전환 시 현재 FastAPI 백엔드에 추가할 엔드포인트입니다." />
-              <div className="space-y-2">
-                {API_GROUPS.map((api) => (
-                  <code key={api} className="block rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-blue-100">
-                    {api}
-                  </code>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-3xl border border-blue-100 bg-white p-5 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-              <SectionTitle eyebrow="Build" title="구현 순서" desc="MVP 출시까지의 단계별 체크리스트입니다." />
-              <div className="space-y-2">
-                {CHECKLIST.map((item, index) => (
-                  <div key={item} className="flex items-center gap-3 rounded-xl bg-[#fbfdff] p-3">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-xs font-black text-blue-700">{index + 1}</span>
-                    <span className="text-sm font-black text-slate-800">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        </section>
-
-        <aside className="lg:sticky lg:top-20 lg:self-start">
-          <div className="mb-3 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-            <p className="text-[11px] font-black text-blue-600">LIVE PREVIEW</p>
-            <h2 className="mt-1 text-lg font-black text-slate-950">{selectedScreen?.label}</h2>
-            <p className="mt-1 text-xs font-bold text-slate-400">브라우저에서 바로 조작 가능한 모바일 MVP입니다.</p>
-          </div>
-          <ScreenPreview {...mockProps} />
-        </aside>
-      </main>
+    <div className="min-h-dvh bg-[#eaf1ff] sm:flex sm:items-center sm:justify-center sm:p-4">
+      <ScreenPreview {...mockProps} />
     </div>
   );
 }
