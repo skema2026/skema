@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
 type ScreenKey = 'onboarding' | 'home' | 'create' | 'join' | 'today' | 'camera' | 'clip' | 'vlog' | 'archive' | 'settings' | 'privacy';
-type PermissionState = 'idle' | 'granted' | 'blocked';
+type PermissionState = 'idle' | 'choosing' | 'granted' | 'blocked';
 type ClipStatus = 'ready' | 'missing';
 
 type Member = {
@@ -210,6 +210,8 @@ type MockProps = {
   cameraPermission: PermissionState;
   requestNotification: () => void;
   requestCamera: () => void;
+  chooseNotificationPermission: (state: Exclude<PermissionState, 'choosing'>) => void;
+  chooseCameraPermission: (state: Exclude<PermissionState, 'choosing'>) => void;
   members: Member[];
   rooms: Room[];
   activeRoom: Room;
@@ -232,6 +234,27 @@ type MockProps = {
   addCapturedClip: (payload: { videoUrl?: string; caption: string }) => void;
 };
 
+function PermissionChoices({ onChoose }: { onChoose: (state: Exclude<PermissionState, 'choosing'>) => void }) {
+  return (
+    <div className="mt-2 grid grid-cols-3 gap-2">
+      {[
+        ['granted', '허용'],
+        ['idle', '나중에'],
+        ['blocked', '차단'],
+      ].map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => onChoose(value as Exclude<PermissionState, 'choosing'>)}
+          className="h-10 rounded-xl border border-blue-100 bg-white text-xs font-black text-slate-700 shadow-sm"
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function OnboardingMock({
   nickname,
   setNickname,
@@ -239,8 +262,24 @@ function OnboardingMock({
   cameraPermission,
   requestNotification,
   requestCamera,
+  chooseNotificationPermission,
+  chooseCameraPermission,
   setScreen,
 }: MockProps) {
+  const permissionLabel = (state: PermissionState) => {
+    if (state === 'granted') return '허용됨';
+    if (state === 'blocked') return '차단됨';
+    if (state === 'choosing') return '선택 중';
+    return '대기';
+  };
+
+  const permissionTone = (state: PermissionState): 'green' | 'red' | 'amber' | 'slate' => {
+    if (state === 'granted') return 'green';
+    if (state === 'blocked') return 'red';
+    if (state === 'choosing') return 'amber';
+    return 'slate';
+  };
+
   return (
     <div>
       <AppHeader title="HourRoom 시작" subtitle="비공개 3초 공동 브이로그" />
@@ -262,18 +301,30 @@ function OnboardingMock({
           />
         </label>
         <div className="mt-4 space-y-3">
-          <button type="button" onClick={requestNotification} className="flex w-full items-center justify-between rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-            <span className="text-sm font-black text-slate-900">알림 권한 요청</span>
-            <StatusPill tone={notifPermission === 'granted' ? 'green' : notifPermission === 'blocked' ? 'red' : 'slate'}>
-              {notifPermission === 'granted' ? '허용됨' : notifPermission === 'blocked' ? '차단됨' : '대기'}
-            </StatusPill>
-          </button>
-          <button type="button" onClick={requestCamera} className="flex w-full items-center justify-between rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-            <span className="text-sm font-black text-slate-900">카메라/마이크 권한</span>
-            <StatusPill tone={cameraPermission === 'granted' ? 'green' : cameraPermission === 'blocked' ? 'red' : 'slate'}>
-              {cameraPermission === 'granted' ? '허용됨' : cameraPermission === 'blocked' ? '차단됨' : '대기'}
-            </StatusPill>
-          </button>
+          <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+            <button type="button" onClick={requestNotification} className="flex w-full items-center justify-between">
+              <span className="text-left text-sm font-black text-slate-900">
+                알림 권한 요청
+                <span className="mt-1 block text-xs font-bold text-slate-400">누를 때마다 다시 선택할 수 있어요</span>
+              </span>
+              <StatusPill tone={permissionTone(notifPermission)}>
+                {permissionLabel(notifPermission)}
+              </StatusPill>
+            </button>
+            {notifPermission === 'choosing' && <PermissionChoices onChoose={chooseNotificationPermission} />}
+          </div>
+          <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+            <button type="button" onClick={requestCamera} className="flex w-full items-center justify-between">
+              <span className="text-left text-sm font-black text-slate-900">
+                카메라/마이크 권한
+                <span className="mt-1 block text-xs font-bold text-slate-400">누를 때마다 다시 선택할 수 있어요</span>
+              </span>
+              <StatusPill tone={permissionTone(cameraPermission)}>
+                {permissionLabel(cameraPermission)}
+              </StatusPill>
+            </button>
+            {cameraPermission === 'choosing' && <PermissionChoices onChoose={chooseCameraPermission} />}
+          </div>
         </div>
         <button
           type="button"
@@ -914,22 +965,32 @@ export default function SetlogPage() {
   const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? rooms[0];
   const selectedClip = clips.find((clip) => clip.id === selectedClipId);
 
-  const requestNotification = async () => {
-    if (!('Notification' in window)) {
-      setNotifPermission('blocked');
-      return;
-    }
-    const result = await Notification.requestPermission();
-    setNotifPermission(result === 'granted' ? 'granted' : 'blocked');
+  const requestNotification = () => {
+    setNotifPermission('choosing');
   };
 
-  const requestCamera = async () => {
+  const requestCamera = () => {
+    setCameraPermission('choosing');
+  };
+
+  const chooseNotificationPermission = async (state: Exclude<PermissionState, 'choosing'>) => {
+    setNotifPermission(state);
+    if (state !== 'granted' || !('Notification' in window)) return;
+    try {
+      await Notification.requestPermission();
+    } catch {
+      // Browser-level permission may already be fixed; the demo selection remains editable.
+    }
+  };
+
+  const chooseCameraPermission = async (state: Exclude<PermissionState, 'choosing'>) => {
+    setCameraPermission(state);
+    if (state !== 'granted') return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       stream.getTracks().forEach((track) => track.stop());
-      setCameraPermission('granted');
     } catch {
-      setCameraPermission('blocked');
+      // Browser-level permission may already be fixed; the demo selection remains editable.
     }
   };
 
@@ -1018,6 +1079,8 @@ export default function SetlogPage() {
     cameraPermission,
     requestNotification,
     requestCamera,
+    chooseNotificationPermission,
+    chooseCameraPermission,
     members,
     rooms,
     activeRoom,
