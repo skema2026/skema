@@ -1171,7 +1171,7 @@ export default function OnboardingPage() {
                 style={{ borderColor: '#ebeef1', background: 'rgba(255,255,255,0.6)' }}
                 placeholder="예: 중간고사, 토익"
                 value={examDraft.name}
-                onChange={(e) => updateExamDraft({ name: e.target.value })}
+                onChange={(e) => updateExamDraft({ name: e.target.value }, true)}
                 onFocus={(e) => e.target.style.borderColor = '#2563eb'}
                 onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
                 onKeyDown={(e) => { if (e.key === 'Enter' && externalExams.length > 0) registerExam(); }}
@@ -1179,17 +1179,24 @@ export default function OnboardingPage() {
             </label>
             <label className="block min-w-0">
               <span className="mb-1 block text-[11px] font-bold" style={{ color: examError && !examDraft.date ? '#ef4444' : '#334155' }}>시험 날짜</span>
-              <input
-                type="date"
-                min={todayStr}
-                className="h-12 w-full px-3 text-base border-2 rounded-xl outline-none"
-                style={{ borderColor: examError && !examDraft.date ? '#ef4444' : '#ebeef1', background: 'rgba(255,255,255,0.6)' }}
-                value={examDraft.date}
-                onChange={(e) => updateExamDraft({ date: e.target.value }, true)}
-                onFocus={(e) => { e.target.style.borderColor = examError && !examDraft.date ? '#ef4444' : '#2563eb'; }}
-                onBlur={(e) => { e.target.style.borderColor = examError && !examDraft.date ? '#ef4444' : '#ebeef1'; }}
-                aria-label="시험 날짜"
-              />
+              <div
+                className="relative flex h-12 w-full items-center gap-2 overflow-hidden rounded-xl border-2 px-3"
+                style={{ borderColor: examError && !examDraft.date ? '#ef4444' : '#ebeef1', background: 'rgba(255,255,255,0.72)' }}
+              >
+                <MaterialIcon icon="event" size={17} color={examDraft.date ? '#2563eb' : '#64748b'} />
+                <span className="min-w-0 flex-1 truncate text-base font-bold" style={{ color: examDraft.date ? '#181c1e' : '#64748b' }}>
+                  {examDraft.date || '시험 날짜 선택'}
+                </span>
+                <MaterialIcon icon="expand_more" size={18} color="#64748b" />
+                <input
+                  type="date"
+                  min={todayStr}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  value={examDraft.date}
+                  onChange={(e) => updateExamDraft({ date: e.target.value }, true)}
+                  aria-label="시험 날짜 선택"
+                />
+              </div>
             </label>
             {externalExams.length > 0 && (
               <button onClick={() => registerExam()}
