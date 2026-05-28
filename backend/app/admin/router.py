@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import repository as auth_repo
+from app.auth import repository
 from app.auth.models import User
 from app.core.security import get_current_admin_user, get_db
 
@@ -53,7 +53,7 @@ def list_login_logs(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin_user),
 ):
-    return auth_repo.list_login_logs(db, limit=limit, offset=offset)
+    return repository.list_login_logs(db, limit=limit, offset=offset)
 
 
 @router.get("/users", response_model=list[AdminUserResponse])
@@ -63,7 +63,7 @@ def list_users(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin_user),
 ):
-    return auth_repo.list_users(db, limit=limit, offset=offset)
+    return repository.list_users(db, limit=limit, offset=offset)
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -78,8 +78,8 @@ def delete_user(
             detail="현재 로그인한 관리자 계정은 삭제할 수 없습니다.",
         )
 
-    user = auth_repo.get_user_by_id(db, user_id)
+    user = repository.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="회원을 찾을 수 없습니다.")
 
-    auth_repo.delete_user(db, user)
+    repository.delete_user(db, user)

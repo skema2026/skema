@@ -1,46 +1,65 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+# backend/app/notification/models.py
+from datetime import datetime
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-
 from app.db.database import Base
+from pydantic import BaseModel
 
+
+# ── ORM Models ────────────────────────────────────────────────
 
 class Notification(Base):
-    """
-    사용자 알림.
-    type:
-      weekly_report  — 주간 수행률 / 미완료 / 다음주 미리보기
-      reminder       — 일정 시작 전 / 미완료 재촉
-      motivation     — 동기부여 메시지
-      comparison     — 사용자 평균 대비 비교
-    """
     __tablename__ = "notifications"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    type = Column(String(30), nullable=False)
-    title = Column(String(200), nullable=False)
-    body = Column(Text, nullable=False)
-    is_read = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    related_schedule_id = Column(Integer, ForeignKey("schedules.id", ondelete="SET NULL"), nullable=True)
-
-    user = relationship("User")
+    id              = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id         = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    type            = Column(String(50), nullable=False)
+    title           = Column(String(255), nullable=False)
+    body            = Column(Text, nullable=True)
+    is_read         = Column(Boolean, default=False, nullable=False)
+    created_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
+    related_schedule_id = Column(BigInteger, ForeignKey("schedules.id", ondelete="SET NULL"), nullable=True)
 
 
 class PushSubscription(Base):
-    """Web Push 구독 정보. 브라우저/기기별로 1건씩 저장한다."""
     __tablename__ = "push_subscriptions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    endpoint = Column(String(512), nullable=False, unique=True, index=True)
-    p256dh = Column(String(255), nullable=False)
-    auth = Column(String(255), nullable=False)
-    user_agent = Column(String(512), nullable=True)
-    fail_count = Column(Integer, nullable=False, default=0, server_default="0")
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    last_success_at = Column(DateTime(timezone=True), nullable=True)
+    id            = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id       = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    endpoint      = Column(Text, nullable=False)
+    p256dh        = Column(Text, nullable=False)
+    auth          = Column(Text, nullable=False)
+    user_agent    = Column(String(255), nullable=True)
+    fail_count    = Column(Integer, default=0, nullable=False)
+    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_success_at = Column(DateTime, nullable=True)
 
-    user = relationship("User")
+
+# ── Pydantic Schemas ──────────────────────────────────────────
+
+class NotificationResponse(BaseModel):
+    id:                  int
+    type:                str
+    title:               str
+    body:                str | None
+    is_read:             bool
+    created_at:          datetime
+    related_schedule_id: int | None
+
+    model_config = {"from_attributes": True}
+
+
+class NotificationUnreadCount(BaseModel):
+    unread_count: int
+
+
+class PushSubscriptionIn(BaseModel):
+    endpoint: str
+    p256dh:   str
+    auth:     str
+    user_agent: str | None = None
+
+
+class PushKeys(BaseModel):
+    public_key: str

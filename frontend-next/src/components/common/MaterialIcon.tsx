@@ -105,6 +105,7 @@ const ICONS: Record<string, LucideIcon> = {
   menu_book: GraduationCap,
   nights_stay: MoonStar,
   nightlife: MoonStar,
+  notifications: BellRing,
   notifications_active: BellRing,
   pending: Clock3,
   person: User,

@@ -35,8 +35,17 @@ export default function NotificationsClient() {
         >
           <MaterialIcon icon="arrow_back" size={18} color="#64748b" />
         </button>
-        <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <MaterialIcon icon="notifications" size={15} color="#fff" filled />
+        <div style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '10px',
+          background: 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 8px 18px rgba(37, 99, 235, 0.24)',
+        }}>
+          <MaterialIcon icon="notifications" size={18} color="#fff" filled />
         </div>
         <span style={{ fontWeight: 800, fontSize: '18px', color: '#0f172a' }}>알림 설정</span>
       </header>

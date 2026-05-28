@@ -363,6 +363,7 @@ export default function ProfileClient() {
                   <Input
                     id="wake-time"
                     type="time"
+                    step="300"
                     value={profileForm.sleep_end}
                     onChange={(event) => updateProfileDraft({ sleep_end: event.target.value })}
                     className="h-12 rounded-xl border-blue-100 bg-slate-50 px-4 text-base font-black"
@@ -373,6 +374,7 @@ export default function ProfileClient() {
                   <Input
                     id="sleep-time"
                     type="time"
+                    step="300"
                     value={profileForm.sleep_start}
                     onChange={(event) => updateProfileDraft({ sleep_start: event.target.value })}
                     className="h-12 rounded-xl border-blue-100 bg-slate-50 px-4 text-base font-black"

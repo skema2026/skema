@@ -432,6 +432,7 @@ export function ClassForm() {
               <Input
                 id="start_time"
                 type="time"
+                step="300"
                 value={form.start_time}
                 onChange={(e) => setForm({ ...form, start_time: e.target.value })}
                 className={cn(fieldClassName, errors.start_time && 'border-red-500 focus-visible:ring-red-100')}
@@ -443,6 +444,7 @@ export function ClassForm() {
               <Input
                 id="end_time"
                 type="time"
+                step="300"
                 value={form.end_time}
                 onChange={(e) => setForm({ ...form, end_time: e.target.value })}
                 className={cn(fieldClassName, errors.end_time && 'border-red-500 focus-visible:ring-red-100')}

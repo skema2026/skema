@@ -642,7 +642,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
             pointerEvents:  'none',
           }}>
             <p style={{ fontSize: 14, fontWeight: 700, color: '#475569' }}>이번 주 일정이 없습니다</p>
-            <p style={{ fontSize: 12, color: '#94a3b8' }}>헤더의 "+ 일정 추가" 버튼을 눌러 첫 일정을 추가해보세요</p>
+            <p style={{ fontSize: 12, color: '#94a3b8' }}>헤더의 &quot;+ 일정 추가&quot; 버튼을 눌러 첫 일정을 추가해보세요</p>
           </div>
         )}
         {/* Time gutter — :00 labels + :30 minor marks */}

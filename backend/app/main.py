@@ -109,7 +109,7 @@ app.include_router(schedule_router)     # /schedules/*, /exam-schedules/*
 app.include_router(share_router)        # /share-tokens/*, /share/{token}
 app.include_router(ai_chat_router)      # /ai/chat, /ai-chat-logs/*
 app.include_router(eta_router)          # /eta/parse-image, /eta/save-schedules
-app.include_router(notification_router) # /notifications/*, /push/*
+app.include_router(notification_router) # /notifications/*        # /push/*
 app.include_router(kakao_router)        # /kakao/status, /kakao/notify
 
 

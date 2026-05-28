@@ -1,19 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export type NotifPermission = 'default' | 'granted' | 'denied' | 'unsupported';
 
-export function useNotificationPermission() {
-  const [permission, setPermission] = useState<NotifPermission>('default');
+const getCurrentPermission = (): NotifPermission => {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'unsupported';
+  }
+  return Notification.permission as NotifPermission;
+};
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setPermission('unsupported');
-      return;
-    }
-    setPermission(Notification.permission as NotifPermission);
-  }, []);
+export function useNotificationPermission() {
+  const [permission, setPermission] = useState<NotifPermission>(getCurrentPermission);
 
   const requestPermission = async (): Promise<NotifPermission> => {
     if (typeof window === 'undefined' || !('Notification' in window)) {

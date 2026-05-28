@@ -710,20 +710,20 @@ export default function OnboardingPage() {
 
     return (
       <>
-      <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
+      <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-start overflow-y-auto px-4 py-5 sm:justify-center sm:p-6">
         <div className="w-full max-w-2xl">
           {/* Header */}
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-start gap-3 mb-6">
             <button
               onClick={() => setPhase('eta-upload')}
-              className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-xl flex shrink-0 items-center justify-center transition-colors"
               style={{ background: '#fff', border: '1px solid #ebeef1' }}
             >
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
-            <div>
-              <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>시간표 확인 및 수정</h2>
-              <p className="text-xs" style={{ color: '#3f4b61' }}>2단계 / 5단계 · AI 분석 결과를 확인하고 수정해주세요</p>
+            <div className="min-w-0">
+              <h2 className="text-lg font-extrabold leading-tight" style={{ color: '#181c1e' }}>시간표 확인 및 수정</h2>
+              <p className="mt-1 text-xs leading-relaxed" style={{ color: '#3f4b61' }}>2단계 / 5단계 · AI 분석 결과를 확인하고 수정해주세요</p>
             </div>
           </div>
 
@@ -757,7 +757,7 @@ export default function OnboardingPage() {
           {/* Entry list */}
           <div className="rounded-2xl overflow-hidden mb-4" style={{ background: '#fff', border: '1px solid #ebeef1', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
             {/* Table header */}
-            <div className="grid gap-2 px-4 py-2.5 text-xs font-bold" style={{
+            <div className="hidden gap-2 px-4 py-2.5 text-xs font-bold sm:grid" style={{
               gridTemplateColumns: '2fr 80px 90px 90px 1fr 36px',
               borderBottom: '1px solid #f1f4f7',
               background: '#fafbfc',
@@ -778,81 +778,156 @@ export default function OnboardingPage() {
             )}
 
             {etaEntries.map((entry, idx) => (
-              <div
-                key={entry._id}
-                className="grid gap-2 px-4 py-2.5 items-center"
-                style={{
-                  gridTemplateColumns: '2fr 80px 90px 90px 1fr 36px',
-                  borderBottom: idx < etaEntries.length - 1 ? '1px solid #f1f4f7' : 'none',
-                }}
-              >
-                {/* 과목명 */}
-                <input
-                  type="text"
-                  value={entry.subject_name}
-                  onChange={(e) => updateEntry(entry._id, 'subject_name', e.target.value)}
-                  placeholder="과목명을 입력하세요"
-                  className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none transition-colors"
-                  style={{ borderColor: entry.subject_name ? '#ebeef1' : '#fca5a5', background: '#fafbfc' }}
-                  onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                  onBlur={(e) => e.target.style.borderColor = entry.subject_name ? '#ebeef1' : '#fca5a5'}
-                />
-                {/* 요일 */}
-                <select
-                  value={entry.day_of_week}
-                  onChange={(e) => updateEntry(entry._id, 'day_of_week', Number(e.target.value))}
-                  className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
-                  style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
-                >
-                  {DAY_LABELS.map((d, i) => (
-                    <option key={i} value={i}>{d}요일</option>
-                  ))}
-                </select>
-                {/* 시작 시간 */}
-                <input
-                  type="text"
-                  value={entry.start_time}
-                  onChange={(e) => updateEntry(entry._id, 'start_time', e.target.value)}
-                  onBlur={(e) => {
-                    const norm = normalizeTimeString(e.target.value);
-                    if (norm) updateEntry(entry._id, 'start_time', norm);
+              <div key={entry._id}>
+                <div
+                  className="hidden gap-2 px-4 py-2.5 items-center sm:grid"
+                  style={{
+                    gridTemplateColumns: '2fr 80px 90px 90px 1fr 36px',
+                    borderBottom: idx < etaEntries.length - 1 ? '1px solid #f1f4f7' : 'none',
                   }}
-                  placeholder="09:00"
-                  pattern="[0-9]{2}:[0-9]{2}"
-                  className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
-                  style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
-                />
-                {/* 종료 시간 */}
-                <input
-                  type="text"
-                  value={entry.end_time}
-                  onChange={(e) => updateEntry(entry._id, 'end_time', e.target.value)}
-                  onBlur={(e) => {
-                    const norm = normalizeTimeString(e.target.value);
-                    if (norm) updateEntry(entry._id, 'end_time', norm);
-                  }}
-                  placeholder="11:00"
-                  pattern="[0-9]{2}:[0-9]{2}"
-                  className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
-                  style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
-                />
-                {/* 강의실 */}
-                <input
-                  type="text"
-                  value={entry.location ?? ''}
-                  onChange={(e) => updateEntry(entry._id, 'location', e.target.value)}
-                  placeholder="강의실"
-                  className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
-                  style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
-                />
-                {/* 삭제 */}
-                <button
-                  onClick={() => removeEntry(entry._id)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                  style={{ background: '#fef2f2' }}
                 >
-                  <MaterialIcon icon="delete" size={14} color="#ef4444" />
-                </button>
+                  {/* 과목명 */}
+                  <input
+                    type="text"
+                    value={entry.subject_name}
+                    onChange={(e) => updateEntry(entry._id, 'subject_name', e.target.value)}
+                    placeholder="과목명을 입력하세요"
+                    className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none transition-colors"
+                    style={{ borderColor: entry.subject_name ? '#ebeef1' : '#fca5a5', background: '#fafbfc' }}
+                    onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                    onBlur={(e) => e.target.style.borderColor = entry.subject_name ? '#ebeef1' : '#fca5a5'}
+                  />
+                  {/* 요일 */}
+                  <select
+                    value={entry.day_of_week}
+                    onChange={(e) => updateEntry(entry._id, 'day_of_week', Number(e.target.value))}
+                    className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
+                    style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
+                  >
+                    {DAY_LABELS.map((d, i) => (
+                      <option key={i} value={i}>{d}요일</option>
+                    ))}
+                  </select>
+                  {/* 시작 시간 */}
+                  <input
+                    type="time"
+                    step="300"
+                    value={entry.start_time}
+                    onChange={(e) => updateEntry(entry._id, 'start_time', e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
+                    style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
+                  />
+                  {/* 종료 시간 */}
+                  <input
+                    type="time"
+                    step="300"
+                    value={entry.end_time}
+                    onChange={(e) => updateEntry(entry._id, 'end_time', e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
+                    style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
+                  />
+                  {/* 강의실 */}
+                  <input
+                    type="text"
+                    value={entry.location ?? ''}
+                    onChange={(e) => updateEntry(entry._id, 'location', e.target.value)}
+                    placeholder="강의실"
+                    className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none"
+                    style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
+                  />
+                  {/* 삭제 */}
+                  <button
+                    onClick={() => removeEntry(entry._id)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                    style={{ background: '#fef2f2' }}
+                    aria-label="과목 삭제"
+                  >
+                    <MaterialIcon icon="delete" size={14} color="#ef4444" />
+                  </button>
+                </div>
+
+                <div
+                  className="p-3 sm:hidden"
+                  style={{ borderBottom: idx < etaEntries.length - 1 ? '1px solid #f1f4f7' : 'none' }}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-xs font-extrabold" style={{ color: '#64748b' }}>과목 {idx + 1}</p>
+                    <button
+                      onClick={() => removeEntry(entry._id)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors"
+                      style={{ background: '#fef2f2' }}
+                      aria-label="과목 삭제"
+                    >
+                      <MaterialIcon icon="delete" size={16} color="#ef4444" />
+                    </button>
+                  </div>
+
+                  <label className="mb-3 block">
+                    <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>과목명</span>
+                    <input
+                      type="text"
+                      value={entry.subject_name}
+                      onChange={(e) => updateEntry(entry._id, 'subject_name', e.target.value)}
+                      placeholder="과목명을 입력하세요"
+                      className="h-11 w-full rounded-xl border px-3 text-base outline-none transition-colors"
+                      style={{ borderColor: entry.subject_name ? '#ebeef1' : '#fca5a5', background: '#fafbfc' }}
+                      onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                      onBlur={(e) => e.target.style.borderColor = entry.subject_name ? '#ebeef1' : '#fca5a5'}
+                    />
+                  </label>
+
+                  <div className="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+                    <label className="block min-w-0">
+                      <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>요일</span>
+                      <select
+                        value={entry.day_of_week}
+                        onChange={(e) => updateEntry(entry._id, 'day_of_week', Number(e.target.value))}
+                        className="h-11 w-full rounded-xl border px-3 text-base outline-none"
+                        style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
+                      >
+                        {DAY_LABELS.map((d, i) => (
+                          <option key={i} value={i}>{d}요일</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block min-w-0">
+                      <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>강의실</span>
+                      <input
+                        type="text"
+                        value={entry.location ?? ''}
+                        onChange={(e) => updateEntry(entry._id, 'location', e.target.value)}
+                        placeholder="강의실"
+                        className="h-11 w-full rounded-xl border px-3 text-base outline-none"
+                        style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+                    <label className="block min-w-0">
+                      <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>시작</span>
+                      <input
+                        type="time"
+                        step="300"
+                        value={entry.start_time}
+                        onChange={(e) => updateEntry(entry._id, 'start_time', e.target.value)}
+                        className="h-11 w-full rounded-xl border px-3 text-base outline-none"
+                        style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
+                      />
+                    </label>
+                    <label className="block min-w-0">
+                      <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>종료</span>
+                      <input
+                        type="time"
+                        step="300"
+                        value={entry.end_time}
+                        onChange={(e) => updateEntry(entry._id, 'end_time', e.target.value)}
+                        className="h-11 w-full rounded-xl border px-3 text-base outline-none"
+                        style={{ borderColor: '#ebeef1', background: '#fafbfc' }}
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -860,17 +935,19 @@ export default function OnboardingPage() {
           {etaImagePreview && (
             <div className="rounded-xl mb-4" style={{ background: '#fafbfc', border: '1px solid #ebeef1' }}>
               {/* Header */}
-              <div className="flex items-center justify-between px-3 py-2.5" style={{ borderBottom: '1px solid #f1f4f7' }}>
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:py-2.5" style={{ borderBottom: '1px solid #f1f4f7' }}>
+                <div className="flex min-w-0 items-start gap-2 sm:items-center">
                   <MaterialIcon icon="image" size={16} color="#2563eb" filled />
-                  <p className="text-xs font-bold" style={{ color: '#181c1e' }}>업로드한 원본 이미지</p>
-                  <p className="text-xs" style={{ color: '#3f4b61' }}>이미지가 맞는지 확인해주세요</p>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold" style={{ color: '#181c1e' }}>업로드한 원본 이미지</p>
+                    <p className="mt-0.5 text-xs leading-relaxed" style={{ color: '#3f4b61' }}>이미지가 맞는지 확인해주세요</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-stretch gap-2 sm:flex sm:items-center">
                   <button
                     onClick={handleReParseEtaImage}
                     disabled={etaParsing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                    className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all"
                     style={{
                       background: etaParsing ? '#c3d0ff' : '#eef1ff',
                       color: '#2563eb',
@@ -893,7 +970,7 @@ export default function OnboardingPage() {
                   </button>
                   <button
                     onClick={() => setEtaImageExpanded((v) => !v)}
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    className="flex min-h-10 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition-all"
                     style={{ background: '#f1f4f7', color: '#334155', border: '1px solid #ebeef1', cursor: 'pointer' }}
                     title={etaImageExpanded ? '이미지 접기' : '이미지 펼치기'}
                   >
@@ -902,7 +979,7 @@ export default function OnboardingPage() {
                   </button>
                   <button
                     onClick={() => setPhase('eta-upload')}
-                    className="text-xs font-semibold"
+                    className="min-h-10 rounded-lg px-2 text-xs font-semibold"
                     style={{ color: '#3f4b61', background: 'none', border: 'none', cursor: 'pointer' }}
                   >
                     원본 이미지
@@ -932,7 +1009,7 @@ export default function OnboardingPage() {
           )}
 
           {/* Footer */}
-          <div className="flex gap-3">
+          <div className="sticky bottom-0 -mx-4 flex gap-3 bg-white/80 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
             <button
               onClick={() => { setEtaEntries([]); setPhase('external-exam'); }}
               className="flex-1 py-3 rounded-xl text-sm font-semibold border"
@@ -1040,18 +1117,29 @@ export default function OnboardingPage() {
   if (phase === 'external-exam') {
     const fmtHours = (h: number) => h < 1 ? `${h * 60}분` : h % 1 === 0 ? `${h}시간` : `${Math.floor(h)}시간 ${(h % 1) * 60}분`;
 
-    const addExam = () => {
-      if (!examDraft.name.trim()) {
+    const registerExam = (draft: Omit<ExternalExam, '_id'> = examDraft) => {
+      if (!draft.name.trim()) {
         setExamError('시험명을 입력해주세요');
-        return;
+        return false;
       }
-      if (!examDraft.date) {
+      if (!draft.date) {
         setExamError('날짜를 선택해주세요');
-        return;
+        return false;
       }
       setExamError('');
-      setExternalExams((prev) => [...prev, { ...examDraft, _id: `ex-${Date.now()}` }]);
+      setExternalExams((prev) => [...prev, { name: draft.name.trim(), date: draft.date, _id: `ex-${Date.now()}` }]);
       setExamDraft({ name: '', date: '' });
+      return true;
+    };
+
+    const updateExamDraft = (patch: Partial<Omit<ExternalExam, '_id'>>, autoRegister = false) => {
+      const nextDraft = { ...examDraft, ...patch };
+      setExamError('');
+      if (autoRegister && externalExams.length === 0 && nextDraft.name.trim() && nextDraft.date) {
+        registerExam(nextDraft);
+        return;
+      }
+      setExamDraft(nextDraft);
     };
 
     return (
@@ -1075,32 +1163,48 @@ export default function OnboardingPage() {
             <span style={{ color: '#94a3b8', fontWeight: 400 }}>없으면 건너뛰어도 됩니다</span>
           </p>
 
-          <div className="flex gap-2 mb-3">
-            <input
-              className="flex-1 px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
-              style={{ borderColor: '#ebeef1' }}
-              placeholder="시험명 (예: 중간고사, 토익)"
-              value={examDraft.name}
-              onChange={(e) => { setExamDraft((d) => ({ ...d, name: e.target.value })); setExamError(''); }}
-              onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-              onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
-              onKeyDown={(e) => { if (e.key === 'Enter') addExam(); }}
-            />
-            <input
-              type="date"
-              min={todayStr}
-              className="px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
-              style={{ borderColor: examError && !examDraft.date ? '#ef4444' : '#ebeef1', width: 148 }}
-              value={examDraft.date}
-              onChange={(e) => { setExamDraft((d) => ({ ...d, date: e.target.value })); setExamError(''); }}
-              onFocus={(e) => { e.target.style.borderColor = examError && !examDraft.date ? '#ef4444' : '#2563eb'; }}
-              onBlur={(e) => { e.target.style.borderColor = examError && !examDraft.date ? '#ef4444' : '#ebeef1'; }}
-            />
-            <button onClick={addExam}
-              className="px-4 py-2.5 rounded-xl text-sm font-bold text-white flex-shrink-0"
-              style={{ background: '#2563eb', cursor: 'pointer' }}>
-              추가
-            </button>
+          <div className="grid grid-cols-1 gap-2 mb-3 sm:grid-cols-[minmax(0,1fr)_170px_auto]">
+            <label className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-bold" style={{ color: '#334155' }}>시험명</span>
+              <input
+                className="h-12 w-full px-3 text-base border-2 rounded-xl outline-none"
+                style={{ borderColor: '#ebeef1', background: 'rgba(255,255,255,0.6)' }}
+                placeholder="예: 중간고사, 토익"
+                value={examDraft.name}
+                onChange={(e) => updateExamDraft({ name: e.target.value }, true)}
+                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
+                onKeyDown={(e) => { if (e.key === 'Enter' && externalExams.length > 0) registerExam(); }}
+              />
+            </label>
+            <label className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-bold" style={{ color: examError && !examDraft.date ? '#ef4444' : '#334155' }}>시험 날짜</span>
+              <div
+                className="relative flex h-12 w-full items-center gap-2 overflow-hidden rounded-xl border-2 px-3"
+                style={{ borderColor: examError && !examDraft.date ? '#ef4444' : '#ebeef1', background: 'rgba(255,255,255,0.72)' }}
+              >
+                <MaterialIcon icon="event" size={17} color={examDraft.date ? '#2563eb' : '#64748b'} />
+                <span className="min-w-0 flex-1 truncate text-base font-bold" style={{ color: examDraft.date ? '#181c1e' : '#64748b' }}>
+                  {examDraft.date || '시험 날짜 선택'}
+                </span>
+                <MaterialIcon icon="expand_more" size={18} color="#64748b" />
+                <input
+                  type="date"
+                  min={todayStr}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  value={examDraft.date}
+                  onChange={(e) => updateExamDraft({ date: e.target.value }, true)}
+                  aria-label="시험 날짜 선택"
+                />
+              </div>
+            </label>
+            {externalExams.length > 0 && (
+              <button onClick={() => registerExam()}
+                className="h-12 self-end rounded-xl px-4 text-sm font-bold text-white"
+                style={{ background: '#2563eb', cursor: 'pointer' }}>
+                시험 추가
+              </button>
+            )}
           </div>
           {examError && (
             <p className="mt-1 text-xs font-bold" style={{ color: '#ef4444' }}>⚠ {examError}</p>
@@ -1285,7 +1389,7 @@ export default function OnboardingPage() {
             <div className="flex gap-2">
               <label className="flex-1">
                 <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>시작 시간</span>
-                <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
+                <input type="time" step="300" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
                   style={{ borderColor: '#e2e8f0' }}
                   value={scheduleDraft.start_time}
                   onChange={(e) => setScheduleDraft((d) => ({ ...d, start_time: e.target.value }))}
@@ -1296,7 +1400,7 @@ export default function OnboardingPage() {
                 <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>
                   종료 시간{isOvernight && <span className="ml-1 text-[10px] px-1 py-0.5 rounded" style={{ background: '#ede9fe', color: '#7c3aed' }}>다음날</span>}
                 </span>
-                <input type="time" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
+                <input type="time" step="300" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
                   style={{ borderColor: scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0' }}
                   value={scheduleDraft.end_time}
                   onChange={(e) => setScheduleDraft((d) => ({ ...d, end_time: e.target.value }))}
@@ -1421,9 +1525,6 @@ export default function OnboardingPage() {
       finishOnboarding({}, { sleep_start: sleepStart, sleep_end: sleepEnd });
     };
 
-    const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
-    const fmtHour = (h: number) => `${String(h).padStart(2, '0')}:00`;
-
     return (
       <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-md">
@@ -1453,33 +1554,25 @@ export default function OnboardingPage() {
             <div className="flex gap-2">
               <label className="flex-1">
                 <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>취침 시간</span>
-                <select
+                <input
+                  type="time"
+                  step="300"
                   value={sleepStart}
                   onChange={(e) => setSleepStart(e.target.value)}
                   className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
                   style={{ borderColor: '#ebeef1', background: '#fff', color: '#181c1e' }}
-                >
-                  {HOUR_OPTIONS.map((h) => (
-                    <option key={h} value={fmtHour(h)}>
-                      {h === 0 ? '자정 (00:00)' : h < 12 ? `오전 ${h}시` : h === 12 ? '정오 (12:00)' : `오후 ${h - 12}시 (${String(h).padStart(2,'0')}:00)`}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
               <label className="flex-1">
                 <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>기상 시간</span>
-                <select
+                <input
+                  type="time"
+                  step="300"
                   value={sleepEnd}
                   onChange={(e) => setSleepEnd(e.target.value)}
                   className="w-full px-3 py-2.5 text-sm rounded-xl border-2 outline-none"
                   style={{ borderColor: '#ebeef1', background: '#fff', color: '#181c1e' }}
-                >
-                  {HOUR_OPTIONS.map((h) => (
-                    <option key={h} value={fmtHour(h)}>
-                      {h === 0 ? '자정 (00:00)' : h < 12 ? `오전 ${h}시` : h === 12 ? '정오 (12:00)' : `오후 ${h - 12}시 (${String(h).padStart(2,'0')}:00)`}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
             </div>
 
