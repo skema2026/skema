@@ -28,6 +28,14 @@ export function useLogin() {
   });
 }
 
+export function useDeleteAccount() {
+  return useMutation({
+    mutationFn: async () => {
+      await api.delete('/users/me');
+    },
+  });
+}
+
 export function useRegister() {
   return useMutation({
     mutationFn: async ({

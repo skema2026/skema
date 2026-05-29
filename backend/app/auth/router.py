@@ -110,6 +110,15 @@ def update_me(
     return _serialize_current_user(updated)
 
 
+@router.delete("/users/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_me(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """현재 인증된 사용자의 계정을 영구 삭제합니다."""
+    repository.delete_user(db, current_user)
+
+
 # ── 프로필 ────────────────────────────────────────────────────────────────────
 
 @router.get("/profiles", response_model=ProfileResponse)

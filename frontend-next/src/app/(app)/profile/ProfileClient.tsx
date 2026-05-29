@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
+import { useDeleteAccount } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import type { User } from '@/types';
@@ -51,10 +52,10 @@ export default function ProfileClient() {
   const { user, setUser, logout } = useAuthStore();
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
-
-
+  const deleteAccount = useDeleteAccount();
 
   const [accountForm, setAccountForm] = useState<AccountForm>({ username: '', email: '' });
+  const [isDeleteConfirm, setIsDeleteConfirm] = useState(false);
   const [profileDraft, setProfileDraft] = useState<ProfileForm | null>(null);
   const [accountSaving, setAccountSaving] = useState(false);
 
@@ -157,6 +158,17 @@ export default function ProfileClient() {
     router.replace('/login');
   };
 
+  const handleDeleteAccount = () => {
+    deleteAccount.mutate(undefined, {
+      onSuccess: () => {
+        logout();
+        router.replace('/login');
+        toast.success('계정이 삭제되었습니다');
+      },
+      onError: () => toast.error('계정 삭제 중 오류가 발생했습니다'),
+    });
+  };
+
   return (
     <div className="min-h-screen bg-[#f8fbff]">
       <header className="sticky top-0 z-20 border-b border-blue-100 bg-white/95 backdrop-blur">
@@ -249,6 +261,37 @@ export default function ProfileClient() {
                 로그아웃
                 <MaterialIcon icon="close" size={16} color="#dc2626" />
               </button>
+              {!isDeleteConfirm ? (
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteConfirm(true)}
+                  className="flex w-full items-center justify-between rounded-xl border border-red-200 px-4 py-3 text-sm font-black text-red-400 transition hover:bg-red-50"
+                >
+                  회원탈퇴
+                  <MaterialIcon icon="delete_forever" size={16} color="#f87171" />
+                </button>
+              ) : (
+                <div className="rounded-xl border border-red-300 bg-red-50 p-3">
+                  <p className="mb-2 text-xs font-black text-red-700">정말 탈퇴하시겠어요? 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsDeleteConfirm(false)}
+                      className="flex-1 rounded-lg border border-slate-200 bg-white py-2 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteAccount}
+                      disabled={deleteAccount.isPending}
+                      className="flex-1 rounded-lg bg-red-600 py-2 text-xs font-black text-white transition hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {deleteAccount.isPending ? '삭제 중...' : '탈퇴 확인'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         </aside>

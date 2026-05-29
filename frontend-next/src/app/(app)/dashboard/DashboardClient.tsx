@@ -354,54 +354,18 @@ function MobileWeekAgenda({
 }
 
 function MobileMonthAgenda({
-  monthLabel,
-  wakeStartLabel,
   days,
   monthDate,
   todayStr,
-  onScheduleClick,
   onDayClick,
 }: {
-  monthLabel: string;
-  wakeStartLabel: string;
   days: WeekAgendaDay[];
   monthDate: Date;
   todayStr: string;
-  onScheduleClick: (schedule: Schedule) => void;
   onDayClick: (date: Date) => void;
 }) {
-  const currentMonthDays = days.filter((day) => day.date.getMonth() === monthDate.getMonth());
-  const activeDays = currentMonthDays.filter((day) => day.schedules.length > 0 || day.exams.length > 0);
-  const totalSchedules = activeDays.reduce((sum, day) => sum + day.schedules.length, 0);
-  const totalExams = activeDays.reduce((sum, day) => sum + day.exams.length, 0);
-
   return (
-    <div className="space-y-3 bg-[#f8fbff] p-3">
-      <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-black text-blue-600">월간 요약</p>
-            <h2 className="mt-0.5 text-lg font-black text-slate-950">{monthLabel}</h2>
-          </div>
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700">
-            {wakeStartLabel} 기준
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl bg-blue-50 px-3 py-2">
-            <p className="text-[10px] font-black text-blue-500">일정</p>
-            <p className="mt-0.5 text-base font-black text-slate-950">{totalSchedules}개</p>
-          </div>
-          <div className="rounded-xl bg-amber-50 px-3 py-2">
-            <p className="text-[10px] font-black text-amber-600">시험</p>
-            <p className="mt-0.5 text-base font-black text-slate-950">{totalExams}개</p>
-          </div>
-          <div className="rounded-xl bg-slate-50 px-3 py-2">
-            <p className="text-[10px] font-black text-slate-500">바쁜 날</p>
-            <p className="mt-0.5 text-base font-black text-slate-950">{activeDays.length}일</p>
-          </div>
-        </div>
-      </div>
+    <div className="bg-[#f8fbff] p-3">
 
       <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
         <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] font-black text-slate-400">
@@ -453,91 +417,6 @@ function MobileMonthAgenda({
         </div>
       </div>
 
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between px-1">
-          <p className="text-xs font-black text-slate-500">일정 있는 날짜</p>
-          <p className="text-[11px] font-bold text-slate-400">날짜를 누르면 하루 보기</p>
-        </div>
-
-        {activeDays.length === 0 ? (
-          <div className="rounded-2xl border border-blue-100 bg-white px-4 py-8 text-center shadow-sm">
-            <p className="text-sm font-black text-slate-700">이번 달 일정이 없습니다</p>
-            <p className="mt-1 text-xs font-bold text-slate-400">상단 + 버튼으로 새 일정을 추가할 수 있어요</p>
-          </div>
-        ) : (
-          activeDays.map((day) => {
-            const isToday = day.dateStr === todayStr;
-            return (
-              <section key={`mobile-month-agenda-${day.dateStr}`} className={`rounded-2xl border bg-white p-3 shadow-sm ${isToday ? 'border-blue-300' : 'border-blue-100'}`}>
-                <button
-                  type="button"
-                  onClick={() => onDayClick(day.date)}
-                  className="mb-2 flex w-full items-center justify-between gap-3 text-left"
-                >
-                  <div>
-                    <p className="text-[11px] font-black text-blue-600">
-                      {isToday ? '오늘' : LONG_WEEKDAY_FORMATTER.format(day.date)}
-                    </p>
-                    <h3 className="mt-0.5 text-base font-black text-slate-950">
-                      {day.date.getMonth() + 1}월 {day.date.getDate()}일
-                    </h3>
-                  </div>
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">
-                    {day.schedules.length + day.exams.length}개
-                  </span>
-                </button>
-
-                <div className="space-y-1.5">
-                  {day.exams.map((exam) => (
-                    <div key={`mobile-month-exam-${exam.id}`} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <MaterialIcon icon="school" size={16} color="#d97706" />
-                        <p className="min-w-0 flex-1 truncate text-sm font-black text-amber-900">{exam.title}</p>
-                        <span className="text-xs font-black text-amber-700">{exam.exam_time || '시험'}</span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {day.schedules.slice(0, 4).map((schedule) => (
-                    <button
-                      key={`mobile-month-schedule-${day.dateStr}-${schedule.id}`}
-                      type="button"
-                      onClick={() => onScheduleClick(schedule)}
-                      className="w-full rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-[72px] shrink-0 text-xs font-black text-blue-700">
-                          {schedule.start_time}
-                          <span className="block text-[11px] font-bold text-slate-400">{schedule.end_time}</span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className={`truncate text-sm font-black ${schedule.is_completed ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
-                            {schedule.title}
-                          </p>
-                          <p className="mt-0.5 truncate text-[11px] font-bold text-slate-400">
-                            {schedule.location || (schedule.schedule_type === 'study' ? '공부 일정' : '일정')}
-                          </p>
-                        </div>
-                        <MaterialIcon icon="chevron_right" size={16} color="#2563eb" />
-                      </div>
-                    </button>
-                  ))}
-
-                  {day.schedules.length > 4 && (
-                    <button
-                      type="button"
-                      onClick={() => onDayClick(day.date)}
-                      className="w-full rounded-xl bg-slate-50 px-3 py-2 text-center text-xs font-black text-slate-500"
-                    >
-                      나머지 {day.schedules.length - 4}개 하루 보기에서 확인
-                    </button>
-                  )}
-                </div>
-              </section>
-            );
-          })
-        )}
-      </div>
     </div>
   );
 }
@@ -1351,12 +1230,9 @@ useEffect(() => {
                     <>
                       <div className="sm:hidden">
                         <MobileMonthAgenda
-                          monthLabel={monthLabel}
-                          wakeStartLabel={minutesToTime(wakeStartMinutes)}
                           days={monthAgendaDays}
                           monthDate={monthDate}
                           todayStr={todayStr}
-                          onScheduleClick={openClassForm}
                           onDayClick={showDayViewForDate}
                         />
                       </div>
