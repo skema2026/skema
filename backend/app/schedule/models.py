@@ -46,6 +46,7 @@ class Schedule(Base):
     linked_exam_id = Column(Integer, ForeignKey("exam_schedules.id", ondelete="SET NULL"), nullable=True, index=True)
     original_generated_title = Column(String(200), nullable=True)
     view_scope = Column(String(30), nullable=True, default="day_week", server_default="day_week")
+    deleted_by_user = Column(Boolean, nullable=True, default=False, server_default="0")
 
     user = relationship("User", back_populates="schedules")
     exam_schedules = relationship(

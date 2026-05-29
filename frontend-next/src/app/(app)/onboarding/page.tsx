@@ -208,6 +208,7 @@ export default function OnboardingPage() {
   const [personalSchedules, setPersonalSchedules] = useState<PersonalSchedule[]>([]);
   // external-exam 입력 폼 임시 상태
   const [examDraft, setExamDraft] = useState<Omit<ExternalExam, '_id'>>({ name: '', date: '' });
+  const examDateRef = useRef<HTMLInputElement>(null);
   const [examError, setExamError] = useState('');
   // 공부 블록 자동 생성 설정
   const [studyStartDays, setStudyStartDays] = useState<number>(14);
@@ -1180,8 +1181,9 @@ export default function OnboardingPage() {
             <label className="block min-w-0">
               <span className="mb-1 block text-[11px] font-bold" style={{ color: examError && !examDraft.date ? '#ef4444' : '#334155' }}>시험 날짜</span>
               <div
-                className="relative flex h-12 w-full items-center gap-2 overflow-hidden rounded-xl border-2 px-3"
+                className="relative flex h-12 w-full items-center gap-2 rounded-xl border-2 px-3 cursor-pointer"
                 style={{ borderColor: examError && !examDraft.date ? '#ef4444' : '#ebeef1', background: 'rgba(255,255,255,0.72)' }}
+                onClick={() => examDateRef.current?.showPicker?.() ?? examDateRef.current?.click()}
               >
                 <MaterialIcon icon="event" size={17} color={examDraft.date ? '#2563eb' : '#64748b'} />
                 <span className="min-w-0 flex-1 truncate text-base font-bold" style={{ color: examDraft.date ? '#181c1e' : '#64748b' }}>
@@ -1189,9 +1191,11 @@ export default function OnboardingPage() {
                 </span>
                 <MaterialIcon icon="expand_more" size={18} color="#64748b" />
                 <input
+                  ref={examDateRef}
                   type="date"
                   min={todayStr}
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  style={{ zIndex: 1 }}
                   value={examDraft.date}
                   onChange={(e) => updateExamDraft({ date: e.target.value }, true)}
                   aria-label="시험 날짜 선택"

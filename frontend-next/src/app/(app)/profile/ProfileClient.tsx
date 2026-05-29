@@ -256,19 +256,17 @@ export default function ProfileClient() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex w-full items-center justify-between rounded-xl border border-red-100 px-4 py-3 text-sm font-black text-red-600 transition hover:bg-red-50"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-50"
               >
                 로그아웃
-                <MaterialIcon icon="close" size={16} color="#dc2626" />
               </button>
               {!isDeleteConfirm ? (
                 <button
                   type="button"
                   onClick={() => setIsDeleteConfirm(true)}
-                  className="flex w-full items-center justify-between rounded-xl border border-red-200 px-4 py-3 text-sm font-black text-red-400 transition hover:bg-red-50"
+                  className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-700"
                 >
                   회원탈퇴
-                  <MaterialIcon icon="delete_forever" size={16} color="#f87171" />
                 </button>
               ) : (
                 <div className="rounded-xl border border-red-300 bg-red-50 p-3">

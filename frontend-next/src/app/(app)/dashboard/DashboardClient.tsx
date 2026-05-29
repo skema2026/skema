@@ -746,23 +746,22 @@ useEffect(() => {
   };
 
   const handleReschedule = async () => {
-    setAiAction('reschedule');
     setIsRegenerating(true);
     try {
-      const { data } = await api.post<{ reply: string }>('/ai/chat', {
-        message: '미완료 일정을 오늘 이후 빈 시간에 자동으로 재배치해줘',
-        messages: [],
-      });
+      const { data } = await api.post<{ moved: number; today_tasks: { id: number; title: string }[] }>(
+        '/schedules/collect-incomplete',
+      );
       invalidateAll();
-      toast.success(data.reply.includes('재배치했습니다') ? '일정이 재배치되었습니다' : '재배치 완료');
-      setAiReview({
-        title: '일정 재배치 결과',
-        reply: data.reply.trim() || '미완료 일정을 빈 시간 기준으로 재배치했습니다.',
-      });
+      if (data.moved > 0) {
+        toast.success(`미완료 일정 ${data.moved}개를 오늘 할 일로 옮겼습니다`);
+      } else if (data.today_tasks.length > 0) {
+        toast.success(`오늘 할 일 ${data.today_tasks.length}개가 있습니다`);
+      } else {
+        toast.success('미완료 일정이 없습니다');
+      }
     } catch {
-      toast.error('재배치 중 오류가 발생했습니다');
+      toast.error('오류가 발생했습니다');
     } finally {
-      setAiAction(null);
       setIsRegenerating(false);
     }
   };
@@ -1013,20 +1012,33 @@ useEffect(() => {
                           </button>
 
                           <div className="rounded-lg border border-blue-100 bg-white p-4 text-left shadow-sm">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
-                              <MaterialIcon icon="schedule" size={18} color="#2563eb" />
-                            </span>
-                            <span className="mt-3 block text-xs font-black text-blue-600">가장 가까운 빈 시간</span>
-                            <span className="mt-1 block truncate text-base font-black text-slate-950">
-                              {dayFreeWindows[0]
-                                ? `${minutesToTime(dayFreeWindows[0].start)}-${minutesToTime(dayFreeWindows[0].end)}`
-                                : '빈 시간이 없습니다'}
-                            </span>
-                            <span className="mt-1 block truncate text-xs font-bold text-slate-500">
-                              {dayFreeWindows[0]
-                                ? `${formatDuration(dayFreeWindows[0].start, dayFreeWindows[0].end)} 활용 가능`
-                                : '일정을 조정하면 확보할 수 있습니다'}
-                            </span>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-black text-blue-600">오늘 해야할 일</span>
+                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700">
+                                {daySchedules.filter(s => !s.is_completed).length}개
+                              </span>
+                            </div>
+                            {daySchedules.filter(s => !s.is_completed).length === 0 ? (
+                              <p className="text-xs font-bold text-slate-400 mt-2">미완료 일정이 없습니다</p>
+                            ) : (
+                              <div className="space-y-1.5 mt-1">
+                                {daySchedules.filter(s => !s.is_completed).slice(0, 4).map(s => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => openClassForm(s)}
+                                    className="flex w-full items-center gap-2 rounded-lg border border-blue-50 bg-[#fbfdff] px-2.5 py-1.5 text-left hover:bg-blue-50"
+                                  >
+                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: s.color || '#2563eb' }} />
+                                    <span className="min-w-0 flex-1 truncate text-xs font-black text-slate-950">{s.title}</span>
+                                    <span className="shrink-0 text-[10px] font-bold text-slate-400">{s.start_time}</span>
+                                  </button>
+                                ))}
+                                {daySchedules.filter(s => !s.is_completed).length > 4 && (
+                                  <p className="text-[10px] font-bold text-slate-400 text-center">+{daySchedules.filter(s => !s.is_completed).length - 4}개 더</p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1356,9 +1368,9 @@ useEffect(() => {
                         <span className="text-[10px] font-black text-blue-100">AI 작업</span>
                         <MaterialIcon icon="smart_toy" size={13} color="#fff" />
                       </span>
-                      <span className="mt-1 block text-sm font-black">바로 정리</span>
+                      <span className="mt-1 block text-sm font-black">오늘 할 일로</span>
                       <span className="block truncate text-[10px] font-bold text-blue-100">
-                        빈 시간·겹침·시험 자동 처리
+                        미완료 일정 오늘로 이동
                       </span>
                     </button>
                   </div>
