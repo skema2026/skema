@@ -941,19 +941,9 @@ useEffect(() => {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-xs font-black text-blue-600">하루 진행표</p>
-                            {isSelectedDayToday ? (
-                              <h2 className="mt-0.5 text-xl font-black text-slate-950">{formatLongDate(dayDate)}</h2>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => { setDayOffset(0); setTimetableView('day'); }}
-                                className="mt-0.5 flex items-center gap-1.5 text-left"
-                              >
-                                <h2 className="text-xl font-black text-slate-950">{formatLongDate(dayDate)}</h2>
-                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600">오늘로</span>
-                              </button>
-                            )}
+                            <h2 className="mt-0.5 text-xl font-black text-slate-950">{formatLongDate(dayDate)}</h2>
                           </div>
+                          <div className="flex shrink-0 items-center gap-1">
                           <button
                             type="button"
                             onClick={() => {
@@ -990,7 +980,7 @@ ${scheduleLines}
                               runAiCommand('today-plan', prompt, '하루 시간표를 정리했습니다');
                             }}
                             disabled={aiAction !== null}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-l-lg bg-blue-600 px-3 py-1.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
                           >
                             <MaterialIcon icon="smart_toy" size={15} color="#fff" />
                             {aiAction === 'today-plan' ? '정리 중...' : '하루 정리'}
@@ -1014,10 +1004,12 @@ ${scheduleLines}
                               );
                             }}
                             disabled={aiAction !== null}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-r-lg border-l border-blue-500 bg-blue-600 px-3 py-1.5 text-sm font-black text-blue-100 shadow-sm transition hover:bg-blue-700"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-1.5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
                           >
+                            <MaterialIcon icon="event" size={15} color="#fff" />
                             {aiAction === 'tomorrow-plan' ? '준비 중...' : '내일 준비'}
                           </button>
+                          </div>
                         </div>
 
                         {/* 2행: 완료율 + 진행바 */}
