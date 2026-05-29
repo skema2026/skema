@@ -25,7 +25,6 @@ from app.share.router import router as share_router
 from app.ai_chat.router import router as ai_chat_router
 from app.eta.router import router as eta_router
 from app.notification.router import router as notification_router
-from app.kakao.router import router as kakao_router
 from app.core.config import settings
 
 
@@ -110,7 +109,6 @@ app.include_router(share_router)        # /share-tokens/*, /share/{token}
 app.include_router(ai_chat_router)      # /ai/chat, /ai-chat-logs/*
 app.include_router(eta_router)          # /eta/parse-image, /eta/save-schedules
 app.include_router(notification_router) # /notifications/*        # /push/*
-app.include_router(kakao_router)        # /kakao/status, /kakao/notify
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────

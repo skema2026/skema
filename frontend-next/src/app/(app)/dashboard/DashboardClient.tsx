@@ -990,10 +990,33 @@ ${scheduleLines}
                               runAiCommand('today-plan', prompt, '하루 시간표를 정리했습니다');
                             }}
                             disabled={aiAction !== null}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-l-lg bg-blue-600 px-3 py-1.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
                           >
                             <MaterialIcon icon="smart_toy" size={15} color="#fff" />
                             {aiAction === 'today-plan' ? '정리 중...' : '하루 정리'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextDay = new Date(dayDate);
+                              nextDay.setDate(dayDate.getDate() + 1);
+                              const nextDayStr = toLocalDateString(nextDay);
+                              const nextSchedules = getSchedulesForDate(nextDay, 'day');
+                              const nextExams = exams.filter(e => e.exam_date === nextDayStr);
+                              const scheduleLines = nextSchedules.length > 0
+                                ? nextSchedules.map(s => `- ${s.title} ${s.start_time}-${s.end_time}`).join('\n')
+                                : '- 일정 없음';
+                              const examLine = nextExams.length > 0 ? `내일 시험: ${nextExams.map(e => e.title).join(', ')}` : '';
+                              runAiCommand(
+                                'tomorrow-plan',
+                                `내일(${nextDayStr}) 준비해야 할 것을 정리해줘.\n${examLine}\n내일 일정:\n${scheduleLines}\n\n오늘 미완료 일정: ${remainingToday.length}개\n\n내일을 위해 오늘 미리 해둘 것, 챙길 것, 주의할 점을 2-3가지로 짧게 알려줘.`,
+                                '내일 준비 사항을 정리했습니다',
+                              );
+                            }}
+                            disabled={aiAction !== null}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-r-lg border-l border-blue-500 bg-blue-600 px-3 py-1.5 text-sm font-black text-blue-100 shadow-sm transition hover:bg-blue-700"
+                          >
+                            {aiAction === 'tomorrow-plan' ? '준비 중...' : '내일 준비'}
                           </button>
                         </div>
 
