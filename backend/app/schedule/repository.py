@@ -6,7 +6,11 @@ from app.schedule.models import Event, ExamSchedule, Schedule
 # ── Schedule ──────────────────────────────────────────────────────────────────
 
 def get_schedules(db: Session, user_id: int) -> list[Schedule]:
-    return db.query(Schedule).filter(Schedule.user_id == user_id).all()
+    return (
+        db.query(Schedule)
+        .filter(Schedule.user_id == user_id, Schedule.deleted_by_user.isnot(True))
+        .all()
+    )
 
 
 def get_schedule(db: Session, schedule_id: int, user_id: int) -> Schedule | None:

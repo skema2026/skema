@@ -45,6 +45,16 @@ const VIEW_LABELS: { key: TimetableView; label: string }[] = [
   { key: 'month', label: '월간' },
 ];
 
+const SCHEDULE_TYPE_COLORS: Record<string, string> = {
+  class:      '#3b82f6', // 파랑 - 수업
+  study:      '#059669', // 초록 - 공부
+  assignment: '#f59e0b', // 노랑 - 과제
+  activity:   '#8b5cf6', // 보라 - 활동
+  personal:   '#ec4899', // 분홍 - 개인
+  event:      '#f97316', // 주황 - 이벤트
+};
+const getTypeColor = (type: string | undefined) => SCHEDULE_TYPE_COLORS[type ?? ''] ?? '#6366f1';
+
 const toLocalDateString = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
@@ -443,6 +453,8 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
+  const [examForStudyBlocks, setExamForStudyBlocks] = useState<{ id: number; title: string; exam_date: string } | null>(null);
+  const [studyHoursPerDay, setStudyHoursPerDay] = useState(2);
   const [isFreeTimeDialogOpen, setIsFreeTimeDialogOpen] = useState(false);
   const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
@@ -679,38 +691,25 @@ useEffect(() => {
   const issueCount = issueItems.length;
   const situationAiActions = [
     {
-      key: 'free-plan',
-      label: '오늘 빈 시간 활용',
-      desc: `${formatMinutesDuration(todayAvailableMinutes)} 안에 할 일을 배치`,
-      icon: 'schedule',
+      key: 'weekly-summary',
+      label: '이번 주 요약',
+      desc: '완료율·미룬 일정·집중 시간대 분석',
+      icon: 'bar_chart',
       onClick: () => runAiCommand(
-        'free-plan',
-        '오늘 시간표의 빈 시간을 분석해서 지금 할 수 있는 일과 배치하면 좋은 일정을 추천해줘',
-        '오늘 빈 시간 활용안을 정리했습니다',
+        'weekly-summary',
+        '이번 주 시간표 전체를 분석해서 완료율, 자주 미뤄진 일정 패턴, 집중이 잘 된 시간대를 파악하고 간결하게 피드백해줘',
+        '이번 주 요약을 정리했습니다',
       ),
     },
     {
-      key: 'issues',
-      label: issueCount > 0 ? '확인 필요 정리' : '오늘 일정 점검',
-      desc: issueCount > 0 ? `${issueCount}개 항목을 AI로 점검` : '겹침과 미완료를 확인',
-      icon: 'warning',
+      key: 'study-blocks',
+      label: '공부 블록 자동 추가',
+      desc: '시험까지 빈 시간에 공부 일정 생성',
+      icon: 'menu_book',
       onClick: () => runAiCommand(
-        'issues',
-        '오늘 시간표에서 겹친 일정, 지나간 미완료 일정, 확인해야 할 항목을 점검하고 해결 방법을 제안해줘',
-        '확인 필요 항목을 점검했습니다',
-      ),
-    },
-    {
-      key: upcomingExam ? 'exam-plan' : 'tomorrow',
-      label: upcomingExam ? '시험 준비 배치' : '내일 준비하기',
-      desc: upcomingExam ? `${upcomingExam.title} 기준` : '내일 필요한 일 확인',
-      icon: upcomingExam ? 'quiz' : 'tips_and_updates',
-      onClick: () => runAiCommand(
-        upcomingExam ? 'exam-plan' : 'tomorrow',
-        upcomingExam
-          ? '다가오는 시험 일정과 현재 시간표를 보고 시험 준비 학습 일정을 빈 시간에 자동으로 생성해줘'
-          : '내일 시간표와 오늘 남은 일정을 보고 미리 준비해야 할 일을 정리해줘',
-        upcomingExam ? '시험 준비 일정을 시간표에 반영했습니다' : '내일 준비할 일을 정리했습니다',
+        'study-blocks',
+        '등록된 시험 일정을 확인하고, 시험까지 남은 기간을 기준으로 빈 시간에 공부 블록을 자동으로 추가해줘. 기존 일정과 충돌하지 않도록 확인하면서 추가해줘.',
+        '공부 블록을 시간표에 추가했습니다',
       ),
     },
   ];
@@ -949,97 +948,197 @@ useEffect(() => {
                   {timetableView === 'day' && (
                     <div className="h-full overflow-y-auto bg-[#f8fbff] p-4">
                       <div className="mb-4 rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
+                        {/* 1행: 날짜 + 버튼 */}
+                        <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-xs font-black text-blue-600">하루 진행표</p>
-                            <h2 className="mt-1 text-2xl font-black text-slate-950">
-                              {formatLongDate(dayDate)}
-                            </h2>
-                            <p className="mt-1 text-sm font-bold text-slate-500">
-                              일정 {daySchedules.length}개 · 완료 {daySchedules.filter(s => s.is_completed).length}개
-                            </p>
-                            {daySchedules.length > 0 && (() => {
-                              const doneCnt = daySchedules.filter(s => s.is_completed).length;
-                              const pct = Math.round((doneCnt / daySchedules.length) * 100);
-                              return (
-                                <div className="mt-2">
-                                  <div className="h-1.5 w-full rounded-full bg-slate-100">
-                                    <div
-                                      className="h-full rounded-full bg-emerald-400 transition-all"
-                                      style={{ width: `${pct}%` }}
-                                    />
-                                  </div>
-                                  <p className="mt-0.5 text-[11px] font-bold text-slate-400">{pct}% 완료</p>
-                                </div>
-                              );
-                            })()}
+                            {isSelectedDayToday ? (
+                              <h2 className="mt-0.5 text-xl font-black text-slate-950">{formatLongDate(dayDate)}</h2>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => { setDayOffset(0); setTimetableView('day'); }}
+                                className="mt-0.5 flex items-center gap-1.5 text-left"
+                              >
+                                <h2 className="text-xl font-black text-slate-950">{formatLongDate(dayDate)}</h2>
+                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600">오늘로</span>
+                              </button>
+                            )}
                           </div>
                           <button
                             type="button"
-                            onClick={() => runAiCommand(
-                              'today-plan',
-                              '선택한 하루 시간표를 기준으로 오늘 해야 할 일, 빈 시간 활용, 겹침 여부를 정리해줘',
-                              '하루 시간표를 정리했습니다',
-                            )}
+                            onClick={() => {
+                              const isToday = toLocalDateString(dayDate) === todayStr;
+                              const doneCnt = daySchedules.filter(s => s.is_completed).length;
+                              const pct = daySchedules.length > 0 ? Math.round((doneCnt / daySchedules.length) * 100) : 0;
+                              const scheduleLines = daySchedules.length > 0
+                                ? daySchedules.map(s => `- [${s.is_completed ? '완료' : '미완료'}] ${s.title} ${s.start_time}-${s.end_time} (${s.schedule_type ?? '일정'})`).join('\n')
+                                : '- 일정 없음';
+                              const examLine = upcomingExam ? `다가오는 시험: ${upcomingExam.title} D-${getDaysUntil(upcomingExam.exam_date)}` : '';
+                              const sleepLine = `기상/취침: ${wakeStartTime} / ${profile?.sleep_start ?? '23:00'}`;
+
+                              const prompt = isToday
+                                ? `현재 시각: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}
+날짜: ${toLocalDateString(dayDate)}
+완료율: ${doneCnt}/${daySchedules.length}개 (${pct}%)
+${sleepLine}
+${examLine}
+
+오늘 일정:
+${scheduleLines}
+
+위 정보를 바탕으로 ① 지금 당장 할 것 ② 남은 빈 시간 활용 ③ 주의할 점을 각각 1-2문장씩 실용적으로 알려줘.`
+                                : `날짜: ${toLocalDateString(dayDate)}
+완료율: ${doneCnt}/${daySchedules.length}개 (${pct}%)
+${sleepLine}
+${examLine}
+
+해당 날 일정:
+${scheduleLines}
+
+위 일정을 기준으로 ① 이 날 우선순위 ② 빈 시간 활용 ③ 주의할 점을 각각 1-2문장씩 알려줘.`;
+
+                              runAiCommand('today-plan', prompt, '하루 시간표를 정리했습니다');
+                            }}
                             disabled={aiAction !== null}
-                            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
                           >
-                            <MaterialIcon icon="smart_toy" size={18} color="#fff" />
-                            {aiAction === 'today-plan' ? '정리 중...' : 'AI에게 오늘 정리 맡기기'}
+                            <MaterialIcon icon="smart_toy" size={15} color="#fff" />
+                            {aiAction === 'today-plan' ? '정리 중...' : '하루 정리'}
                           </button>
                         </div>
 
-                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        {/* 2행: 완료율 + 진행바 */}
+                        {(() => {
+                          const done = daySchedules.filter(s => s.is_completed).length;
+                          const total = daySchedules.length;
+                          const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                          let msg = '';
+                          if (total === 0) msg = '일정을 추가해보세요';
+                          else if (pct === 100) msg = '모든 일정 완료';
+                          else if (pct >= 70) msg = `거의 다 왔어요 · ${total - done}개 남음`;
+                          else msg = `${done}/${total}개 완료`;
+                          return (
+                            <div className="mt-2 flex items-center gap-3">
+                              <div className="flex-1">
+                                <div className="h-1.5 w-full rounded-full bg-slate-100">
+                                  <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                              <span className="shrink-0 text-[11px] font-bold text-slate-400">{msg}</span>
+                            </div>
+                          );
+                        })()}
+
+                        {/* 3행: 타임라인 바 */}
+                        {daySchedules.length > 0 && (() => {
+                          const dayStart = wakeStartMinutes;
+                          const dayEnd = 24 * 60;
+                          const total = dayEnd - dayStart;
+                          return (
+                            <div className="mt-2">
+                              <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                {daySchedules.map(s => {
+                                  const start = Math.max(timeToMinutes(s.start_time), dayStart);
+                                  const end = Math.min(timeToMinutes(s.end_time), dayEnd);
+                                  if (end <= start) return null;
+                                  const left = ((start - dayStart) / total) * 100;
+                                  const width = ((end - start) / total) * 100;
+                                  const periodColor = getTypeColor(s.schedule_type);
+                                  return (
+                                    <div key={s.id} className="absolute h-full opacity-80"
+                                      style={{ left: `${left}%`, width: `${Math.max(width, 0.5)}%`, background: s.is_completed ? '#86efac' : periodColor }} />
+                                  );
+                                })}
+                              </div>
+                              <div className="mt-0.5 flex justify-between text-[9px] font-bold text-slate-300">
+                                <span>{minutesToTime(dayStart)}</span><span>24:00</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* 4행: 칩 스트립 (시험·겹침·빈시간 등) */}
+                        {(() => {
+                          const chips: { label: string; color: string; bg: string; border: string; onClick?: () => void }[] = [];
+                          if (dayExams.length > 0) dayExams.forEach(e => chips.push({ label: `오늘 시험 · ${e.title}`, color: '#7c2d12', bg: '#fef3c7', border: '#fcd34d' }));
+                          // 시험 D-day 칩 — exam_date 기준 중복 제거
+                          const seenExamDates = new Set<string>();
+                          upcomingExams.filter(e => e.exam_date !== toLocalDateString(dayDate)).forEach(e => {
+                            if (seenExamDates.has(e.exam_date)) return;
+                            seenExamDates.add(e.exam_date);
+                            const d = getDaysUntil(e.exam_date);
+                            if (d <= 14 && d > 0) chips.push({
+                              label: `${e.title} D-${d}`,
+                              color: d <= 3 ? '#991b1b' : '#92400e',
+                              bg: d <= 3 ? '#fee2e2' : '#fef3c7',
+                              border: d <= 3 ? '#fca5a5' : '#fcd34d',
+                              onClick: () => setExamForStudyBlocks({ id: e.id, title: e.title, exam_date: e.exam_date }),
+                            });
+                          });
+                          if (dayConflictSchedules.length > 0) chips.push({ label: `겹치는 일정 ${dayConflictSchedules.length}개`, color: '#9a3412', bg: '#fff7ed', border: '#fdba74' });
+                          if (dayFreeWindows.length > 0) {
+                            const freeMin = dayFreeWindows.reduce((s, w) => s + w.end - w.start, 0);
+                            chips.push({ label: `빈 시간 ${formatMinutesDuration(freeMin)}`, color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe', onClick: () => setIsFreeTimeDialogOpen(true) });
+                          }
+                          if (chips.length === 0) return null;
+                          return (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {chips.map((chip, i) => (
+                                <button key={i} type="button" onClick={chip.onClick}
+                                  className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-black transition hover:opacity-80"
+                                  style={{ color: chip.color, background: chip.bg, border: `1px solid ${chip.border}`, cursor: chip.onClick ? 'pointer' : 'default' }}>
+                                  {chip.label}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()}
+
+                        <div className="mt-3 grid gap-2 grid-cols-3">
                           <button
                             type="button"
                             onClick={() => selectedDayPrimarySchedule ? openClassForm(selectedDayPrimarySchedule) : openClassForm()}
-                            className="rounded-lg border border-blue-100 bg-blue-50/70 p-4 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                            className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-left transition hover:border-blue-300 hover:bg-blue-50"
                           >
-                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white">
-                              <MaterialIcon icon="event" size={18} color="#2563eb" />
-                            </span>
-                            <span className="mt-3 block text-xs font-black text-blue-600">
-                              {isSelectedDayToday ? '다음 일정' : '첫 일정'}
-                            </span>
-                            <span className="mt-1 block truncate text-base font-black text-slate-950">
-                              {selectedDayPrimarySchedule ? selectedDayPrimarySchedule.title : '일정이 없습니다'}
-                            </span>
-                            <span className="mt-1 block truncate text-xs font-bold text-slate-500">
+                            <p className="text-[11px] font-black text-blue-600">{isSelectedDayToday ? '다음 일정' : '첫 일정'}</p>
+                            <p className="mt-0.5 truncate text-sm font-black text-slate-950">
+                              {selectedDayPrimarySchedule ? selectedDayPrimarySchedule.title : '없음'}
+                            </p>
+                            <p className="truncate text-[11px] font-bold text-slate-400">
                               {selectedDayPrimarySchedule
-                                ? `${selectedDayPrimarySchedule.start_time}-${selectedDayPrimarySchedule.end_time}${selectedDayPrimarySchedule.location ? ` · ${selectedDayPrimarySchedule.location}` : ''}`
-                                : '직접 추가하거나 AI에게 요청하세요'}
-                            </span>
+                                ? `${selectedDayPrimarySchedule.start_time}–${selectedDayPrimarySchedule.end_time}`
+                                : '일정 없음'}
+                            </p>
                           </button>
 
-                          <div className="rounded-lg border border-blue-100 bg-white p-4 text-left shadow-sm">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-black text-blue-600">오늘 해야할 일</span>
-                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700">
-                                {daySchedules.filter(s => !s.is_completed).length}개
-                              </span>
-                            </div>
-                            {daySchedules.filter(s => !s.is_completed).length === 0 ? (
-                              <p className="text-xs font-bold text-slate-400 mt-2">미완료 일정이 없습니다</p>
-                            ) : (
-                              <div className="space-y-1.5 mt-1">
-                                {daySchedules.filter(s => !s.is_completed).slice(0, 4).map(s => (
-                                  <button
-                                    key={s.id}
-                                    type="button"
-                                    onClick={() => openClassForm(s)}
-                                    className="flex w-full items-center gap-2 rounded-lg border border-blue-50 bg-[#fbfdff] px-2.5 py-1.5 text-left hover:bg-blue-50"
-                                  >
-                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: s.color || '#2563eb' }} />
-                                    <span className="min-w-0 flex-1 truncate text-xs font-black text-slate-950">{s.title}</span>
-                                    <span className="shrink-0 text-[10px] font-bold text-slate-400">{s.start_time}</span>
-                                  </button>
-                                ))}
-                                {daySchedules.filter(s => !s.is_completed).length > 4 && (
-                                  <p className="text-[10px] font-bold text-slate-400 text-center">+{daySchedules.filter(s => !s.is_completed).length - 4}개 더</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={remainingToday.length > 0 ? () => setIsRemainingDialogOpen(true) : undefined}
+                            className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                          >
+                            <p className="text-[11px] font-black text-blue-600">오늘 해야할 일</p>
+                            <p className="mt-0.5 text-sm font-black text-slate-950">
+                              {remainingToday.length > 0 ? `${remainingToday.length}개` : '모두 완료'}
+                            </p>
+                            <p className="truncate text-[11px] font-bold text-slate-400">
+                              {remainingToday.length > 0 ? remainingToday[0].title : '미완료 없음'}
+                            </p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={issueCount > 0 ? () => setIsIssueDialogOpen(true) : undefined}
+                            className={`rounded-lg border px-3 py-2.5 text-left transition ${issueCount > 0 ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50' : 'border-blue-100 bg-blue-50/70 hover:bg-blue-50'}`}
+                          >
+                            <p className={`text-[11px] font-black ${issueCount > 0 ? 'text-amber-600' : 'text-blue-600'}`}>확인 필요</p>
+                            <p className="mt-0.5 text-sm font-black text-slate-950">
+                              {issueCount > 0 ? `${issueCount}개` : '정상'}
+                            </p>
+                            <p className="truncate text-[11px] font-bold text-slate-400">
+                              {issueItems[0]?.label ?? '이상 없음'}
+                            </p>
+                          </button>
                         </div>
                       </div>
 
@@ -1096,142 +1195,134 @@ useEffect(() => {
                         </div>
                       ) : (
                         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-                          <section className="space-y-3">
-                            {agendaByPeriod.map((period) => (
-                              <div key={period.key} className="rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
-                                <div className="mb-3 flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                                      <MaterialIcon icon={period.icon} size={17} color="#2563eb" />
-                                    </span>
-                                    <h3 className="text-base font-black text-slate-950">{period.label}</h3>
-                                  </div>
-                                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
-                                    {period.schedules.length}개
-                                  </span>
-                                </div>
-
-                                {period.schedules.length === 0 ? (
-                                  <div className="rounded-lg border border-dashed border-blue-100 bg-[#fbfdff] p-4 text-sm font-bold text-slate-400">
-                                    이 시간대에는 일정이 없습니다
-                                  </div>
-                                ) : (
-                                  <div className="space-y-2">
-                                    {period.schedules.map((schedule) => {
-                                      const start = timeToMinutes(schedule.start_time);
-                                      const end = timeToMinutes(schedule.end_time);
-                                      const done = schedule.is_completed;
-                                      return (
-                                        <div
-                                          key={schedule.id}
-                                          className={`flex items-start gap-3 rounded-lg border p-3 transition ${done ? 'border-slate-100 bg-slate-50' : 'border-blue-50 bg-[#fbfdff] shadow-sm'}`}
-                                          style={{ borderLeft: `4px solid ${done ? '#cbd5e1' : (schedule.color || '#2563eb')}` }}
-                                        >
-                                          <button
-                                            type="button"
-                                            onClick={() => toggleComplete.mutate({ id: schedule.id, is_completed: !done })}
-                                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${done ? 'border-emerald-400 bg-emerald-400' : 'border-slate-300 hover:border-blue-400'}`}
-                                          >
-                                            {done && (
-                                              <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
-                                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                              </svg>
-                                            )}
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => openClassForm(schedule)}
-                                            className="min-w-0 flex-1 text-left"
-                                          >
-                                            <span className={`block truncate text-sm font-black ${done ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
-                                              {schedule.title}
-                                            </span>
-                                            <span className="mt-0.5 flex flex-wrap items-center gap-2">
-                                              <span className="text-xs font-bold text-blue-600">
-                                                {schedule.start_time}–{schedule.end_time}
-                                              </span>
-                                              {schedule.location && (
-                                                <span className="text-xs font-bold text-slate-400">{schedule.location}</span>
-                                              )}
-                                              <span className="text-xs font-bold text-slate-300">{formatDuration(start, end)}</span>
-                                            </span>
-                                          </button>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
+                          <section className="rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
+                            <div className="mb-3 flex items-center justify-between">
+                              <h3 className="text-sm font-black text-slate-950">오늘 일정</h3>
+                              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">{daySchedules.length}개</span>
+                            </div>
+                            {daySchedules.length === 0 ? (
+                              <div className="rounded-lg border border-dashed border-blue-100 bg-[#fbfdff] p-4 text-sm font-bold text-slate-400">
+                                일정이 없습니다
                               </div>
-                            ))}
+                            ) : (
+                              <div className="space-y-2">
+                                {daySchedules.map((schedule) => {
+                                  const start = timeToMinutes(schedule.start_time);
+                                  const end = timeToMinutes(schedule.end_time);
+                                  const done = schedule.is_completed;
+                                  const periodColor = getTypeColor(schedule.schedule_type);
+                                  return (
+                                    <div
+                                      key={schedule.id}
+                                      className={`flex items-start gap-3 rounded-lg border p-3 transition ${done ? 'border-slate-100 bg-slate-50' : 'border-blue-50 bg-[#fbfdff] shadow-sm'}`}
+                                      style={{ borderLeft: `4px solid ${done ? '#cbd5e1' : periodColor}` }}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleComplete.mutate({ id: schedule.id, is_completed: !done })}
+                                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${done ? 'border-emerald-400 bg-emerald-400' : 'border-slate-300 hover:border-blue-400'}`}
+                                      >
+                                        {done && (
+                                          <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                          </svg>
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openClassForm(schedule)}
+                                        className="min-w-0 flex-1 text-left"
+                                      >
+                                        <span className={`block truncate text-sm font-black ${done ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+                                          {schedule.title}
+                                        </span>
+                                        <span className="mt-0.5 flex flex-wrap items-center gap-2">
+                                          <span className="text-xs font-bold" style={{ color: done ? '#94a3b8' : periodColor }}>
+                                            {schedule.start_time}–{schedule.end_time}
+                                          </span>
+                                          {schedule.location && (
+                                            <span className="text-xs font-bold text-slate-400">{schedule.location}</span>
+                                          )}
+                                          <span className="text-xs font-bold text-slate-300">{formatDuration(start, end)}</span>
+                                        </span>
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </section>
 
                           <aside className="space-y-3">
+
                             <section className="rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
                               <div className="mb-3 flex items-center gap-2">
                                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                                  <MaterialIcon icon="free_cancellation" size={17} color="#2563eb" />
+                                  <MaterialIcon icon="bar_chart" size={17} color="#2563eb" />
                                 </span>
-                                <h3 className="text-base font-black text-slate-950">빈 시간</h3>
+                                <h3 className="text-base font-black text-slate-950">오늘 리포트</h3>
                               </div>
 
-                              {dayFreeWindows.length === 0 ? (
-                                <p className="rounded-lg border border-dashed border-blue-100 bg-[#fbfdff] p-4 text-sm font-bold text-slate-500">
-                                  확보된 빈 시간이 없습니다.
-                                </p>
-                              ) : (
-                                <div className="space-y-2">
-                                  {dayFreeWindows.map((window) => (
-                                    <div
-                                      key={`${window.start}-${window.end}`}
-                                      className="w-full rounded-lg border border-blue-50 bg-[#fbfdff] p-3 text-left"
-                                    >
-                                      <span className="block text-sm font-black text-slate-950">
-                                        {minutesToTime(window.start)}-{minutesToTime(window.end)}
-                                      </span>
-                                      <span className="mt-1 block text-xs font-bold text-blue-700">
-                                        {formatDuration(window.start, window.end)}
-                                      </span>
+                              {(() => {
+                                const total = daySchedules.length;
+                                const done = daySchedules.filter(s => s.is_completed).length;
+                                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                                const totalMin = daySchedules.reduce((s, sc) => s + Math.max(0, timeToMinutes(sc.end_time) - timeToMinutes(sc.start_time)), 0);
+                                const freeMin = dayFreeWindows.reduce((s, w) => s + (w.end - w.start), 0);
+                                const busyPeriod = (() => {
+                                  const morn = daySchedules.filter(s => timeToMinutes(s.start_time) < 12 * 60).length;
+                                  const aftn = daySchedules.filter(s => { const m = timeToMinutes(s.start_time); return m >= 12 * 60 && m < 18 * 60; }).length;
+                                  const evng = daySchedules.filter(s => timeToMinutes(s.start_time) >= 18 * 60).length;
+                                  if (morn >= aftn && morn >= evng) return '오전';
+                                  if (aftn >= evng) return '오후';
+                                  return '저녁';
+                                })();
+
+                                return (
+                                  <div className="space-y-3">
+                                    <div>
+                                      <div className="mb-1 flex items-center justify-between">
+                                        <span className="text-xs font-black text-slate-500">완료율</span>
+                                        <span className="text-xs font-black text-slate-950">{pct}%</span>
+                                      </div>
+                                      <div className="h-2 w-full rounded-full bg-slate-100">
+                                        <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${pct}%` }} />
+                                      </div>
+                                      <p className="mt-0.5 text-[11px] font-bold text-slate-400">{done}/{total}개 완료</p>
                                     </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => runAiCommand(
-                                  'free-plan',
-                                  '선택한 날짜의 빈 시간을 분석해서 활용하면 좋은 일정이나 할 일을 추천해줘',
-                                  '빈 시간 활용안을 정리했습니다',
-                                )}
-                                disabled={aiAction !== null}
-                                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <MaterialIcon icon="smart_toy" size={15} color="#fff" />
-                                {aiAction === 'free-plan' ? '추천 중...' : '빈 시간 활용 추천'}
-                              </button>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="rounded-lg bg-blue-50 px-3 py-2">
+                                        <p className="text-[10px] font-black text-blue-500">일정 시간</p>
+                                        <p className="mt-0.5 text-sm font-black text-slate-950">{formatMinutesDuration(totalMin)}</p>
+                                      </div>
+                                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                                        <p className="text-[10px] font-black text-slate-500">빈 시간</p>
+                                        <p className="mt-0.5 text-sm font-black text-slate-950">{formatMinutesDuration(freeMin)}</p>
+                                      </div>
+                                    </div>
+                                    {total > 0 && (
+                                      <p className="text-[11px] font-bold text-slate-500">
+                                        오늘은 <span className="font-black text-slate-800">{busyPeriod}</span>에 일정이 집중돼 있어요
+                                      </p>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => runAiCommand(
+                                        'day-report',
+                                        '오늘 하루 일정을 분석해서 완료율, 시간 활용 패턴, 개선할 점을 2~3문장으로 간결하게 평가해줘',
+                                        'AI 평가가 완료됐습니다',
+                                      )}
+                                      disabled={aiAction !== null}
+                                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                      <MaterialIcon icon="smart_toy" size={15} color="#fff" />
+                                      {aiAction === 'day-report' ? '평가 중...' : 'AI 평가 받기'}
+                                    </button>
+                                  </div>
+                                );
+                              })()}
                             </section>
 
-                            <section className="rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
-                              <div className="mb-3 flex items-center gap-2">
-                                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                                  <MaterialIcon icon="tips_and_updates" size={17} color="#2563eb" />
-                                </span>
-                                <h3 className="text-base font-black text-slate-950">AI로 바로 할 수 있는 일</h3>
-                              </div>
-                              <div className="space-y-2">
-                                {situationAiActions.map((action) => (
-                                  <button
-                                    key={action.key}
-                                    type="button"
-                                    onClick={action.onClick}
-                                    disabled={aiAction !== null}
-                                    className="w-full rounded-lg border border-blue-50 bg-[#fbfdff] px-3 py-2 text-left text-xs font-black text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    {aiAction === action.key ? 'AI 처리 중...' : action.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </section>
                           </aside>
                         </div>
                       )}
@@ -1328,98 +1419,28 @@ useEffect(() => {
                 </div>
               </div>
 
-              <aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto">
-                <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-                  <p className="mb-2 text-[11px] font-black text-slate-400">오늘 현황</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <StatusSummaryCard
-                      label="다음 일정"
-                      value={nextSchedule ? nextSchedule.title : '없음'}
-                      detail={nextSchedule
-                        ? `${nextSchedule.start_time}-${nextSchedule.end_time}`
-                        : '오늘 남은 일정 없음'}
-                      icon="event_available"
-                      tone="blue"
-                      onClick={remainingToday.length > 0 ? () => setIsRemainingDialogOpen(true) : undefined}
-                    />
-                    <StatusSummaryCard
-                      label="오늘 빈 시간"
-                      value={formatMinutesDuration(todayAvailableMinutes)}
-                      detail={`최장 ${longestFreeWindow ? formatDuration(longestFreeWindow.start, longestFreeWindow.end) : '없음'}`}
-                      icon="schedule"
-                      tone="slate"
-                      onClick={todayFreeWindows.length > 0 ? () => setIsFreeTimeDialogOpen(true) : undefined}
-                    />
-                    <StatusSummaryCard
-                      label="확인 필요"
-                      value={issueCount > 0 ? `${issueCount}개` : '정상'}
-                      detail={issueItems[0]?.label ?? '이상 없음'}
-                      icon={issueCount > 0 ? 'warning' : 'check_circle'}
-                      tone={issueCount > 0 ? 'amber' : 'green'}
-                      onClick={issueCount > 0 ? () => setIsIssueDialogOpen(true) : undefined}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleReschedule}
-                      disabled={aiAction !== null}
-                      className="rounded-lg border border-blue-100 bg-blue-600 p-3 text-left text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      <span className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] font-black text-blue-100">AI 작업</span>
-                        <MaterialIcon icon="smart_toy" size={13} color="#fff" />
-                      </span>
-                      <span className="mt-1 block text-sm font-black">오늘 할 일로</span>
-                      <span className="block truncate text-[10px] font-bold text-blue-100">
-                        미완료 일정 오늘로 이동
-                      </span>
-                    </button>
-                  </div>
-                </div>
+              <aside className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto">
 
-                {upcomingExams.length > 0 && (
-                  <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-                    <p className="mb-3 text-[11px] font-black text-slate-400">다가오는 시험</p>
-                    <div className="flex flex-col gap-2">
-                      {upcomingExams.map((exam) => {
-                        const days = getDaysUntil(exam.exam_date);
-                        const dday = formatDday(days);
-                        const urgent = days <= 3;
-                        return (
-                          <div key={exam.id} className={`flex items-center gap-3 rounded-xl border p-3 ${urgent ? 'border-red-100 bg-red-50' : 'border-amber-100 bg-amber-50'}`}>
-                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${urgent ? 'bg-red-100' : 'bg-amber-100'}`}>
-                              <MaterialIcon icon="quiz" size={16} color={urgent ? '#dc2626' : '#d97706'} />
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-black text-slate-950">{exam.title}</p>
-                              <p className="text-[11px] font-bold text-slate-500">{exam.exam_date}</p>
-                            </div>
-                            <span className={`text-xs font-black ${urgent ? 'text-red-600' : 'text-amber-600'}`}>{dday}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-                  <p className="mb-2 text-[11px] font-black text-slate-400">AI 빠른 작업</p>
-                  <div className="flex flex-col gap-1.5">
+                {/* AI 핵심 작업 */}
+                <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
+                  <p className="mb-3 text-[11px] font-black text-slate-400">AI 작업</p>
+                  <div className="flex flex-col gap-2">
                     {situationAiActions.map((action) => (
                       <button
                         key={action.key}
                         type="button"
                         onClick={action.onClick}
                         disabled={aiAction !== null}
-                        className="flex items-center gap-2 rounded-lg border border-blue-100 bg-white p-2.5 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex items-center gap-3 rounded-xl border border-blue-100 bg-[#fbfdff] p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50"
                       >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50">
-                          <MaterialIcon icon={action.icon} size={15} color="#2563eb" />
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50">
+                          <MaterialIcon icon={action.icon} size={18} color="#2563eb" />
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate text-xs font-black text-slate-950">
+                          <span className="block truncate text-sm font-black text-slate-950">
                             {aiAction === action.key ? 'AI 처리 중...' : action.label}
                           </span>
-                          <span className="block truncate text-[10px] font-bold text-slate-400">
+                          <span className="block truncate text-[11px] font-bold text-slate-400">
                             {action.desc}
                           </span>
                         </span>
@@ -1427,28 +1448,6 @@ useEffect(() => {
                     ))}
                   </div>
                 </div>
-
-                {needsTimetableUpload && (
-                  <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-                    <div className="flex items-start gap-2">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white">
-                        <MaterialIcon icon="upload_file" size={16} color="#2563eb" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-black text-slate-950">시간표 이미지로 빠르게 시작</p>
-                        <p className="mt-0.5 text-[11px] font-bold text-slate-500">인식 결과 검토 후 반영</p>
-                        <button
-                          type="button"
-                          onClick={() => setIsEtaReimportOpen(true)}
-                          className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100"
-                        >
-                          <MaterialIcon icon="image" size={16} color="#2563eb" />
-                          시간표 업로드
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </aside>
 
             </section>
@@ -1547,6 +1546,75 @@ useEffect(() => {
               </div>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsFreeTimeDialogOpen(false);
+              runAiCommand(
+                'free-plan',
+                '오늘 시간표의 빈 시간을 분석해서 지금 할 수 있는 일과 배치하면 좋은 일정을 추천해줘',
+                '오늘 빈 시간 활용안을 정리했습니다',
+              );
+            }}
+            disabled={aiAction !== null}
+            className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
+          >
+            <MaterialIcon icon="smart_toy" size={16} color="#fff" />
+            {aiAction === 'free-plan' ? 'AI 처리 중...' : '빈 시간 활용 AI 추천'}
+          </button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!examForStudyBlocks} onOpenChange={(open) => { if (!open) setExamForStudyBlocks(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>공부 일정 자동 배치</DialogTitle>
+          </DialogHeader>
+          {examForStudyBlocks && (
+            <div className="py-2 space-y-4">
+              <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3">
+                <p className="text-sm font-black text-slate-950">{examForStudyBlocks.title}</p>
+                <p className="mt-0.5 text-xs font-bold text-amber-700">
+                  {examForStudyBlocks.exam_date} · D-{getDaysUntil(examForStudyBlocks.exam_date)}
+                </p>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-black text-slate-700">하루 공부 시간</p>
+                <div className="flex gap-2">
+                  {[1, 2, 3].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setStudyHoursPerDay(h)}
+                      className={`flex-1 rounded-lg border py-2.5 text-sm font-black transition ${
+                        studyHoursPerDay === h
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300'
+                      }`}
+                    >
+                      {h}시간
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const e = examForStudyBlocks;
+                  setExamForStudyBlocks(null);
+                  runAiCommand(
+                    'study-blocks',
+                    `${e.title} 시험(${e.exam_date})까지 남은 기간을 기준으로, 하루 ${studyHoursPerDay}시간씩 공부 블록을 빈 시간에 자동으로 추가해줘. 기존 일정과 충돌하지 않는 시간대에 배치하고, 시험일에 가까울수록 더 집중되게 해줘.`,
+                    '공부 블록을 시간표에 추가했습니다',
+                  );
+                }}
+                disabled={aiAction !== null}
+                className="w-full rounded-lg bg-blue-600 py-3 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                공부 일정 배치하기
+              </button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

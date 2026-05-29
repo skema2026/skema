@@ -205,16 +205,7 @@ export function DashboardHeader({
           <MaterialIcon icon="photo_camera" size={16} color="#fff" />
           <span className="hide-mobile">셋로그</span>
         </button>
-        <button
-          type="button"
-          onClick={onReschedule}
-          disabled={isRegenerating}
-          title="AI 재배치"
-          className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <MaterialIcon icon="auto_awesome" size={16} color="#2563eb" />
-          <span className="hide-mobile">{isRegenerating ? '처리 중...' : '오늘 할 일로'}</span>
-        </button>
+
         <button
           type="button"
           onClick={onUploadTimetable}
