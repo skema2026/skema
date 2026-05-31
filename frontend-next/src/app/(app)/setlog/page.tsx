@@ -10,6 +10,7 @@ import {
   useMyStudyLogs,
   useStreak,
   useStudyFeed,
+  useTodayStats,
   useToggleReaction,
 } from '@/hooks/useStudyLogs';
 
@@ -265,6 +266,7 @@ export default function SetlogPage() {
   const { data: feedData, isLoading: feedLoading } = useStudyFeed();
   const { data: myData, isLoading: myLoading } = useMyStudyLogs();
   const { data: streak } = useStreak();
+  const { data: todayStats } = useTodayStats();
   const deleteLog = useDeleteStudyLog();
 
   const handleDelete = async (id: number) => {
@@ -287,7 +289,7 @@ export default function SetlogPage() {
         <div className="mx-auto flex max-w-lg items-center justify-between">
           <div>
             <p className="text-[11px] font-black text-blue-600">SKEMA</p>
-            <h1 className="text-lg font-black text-slate-950">셋로그</h1>
+            <h1 className="text-lg font-black text-slate-950">기록</h1>
           </div>
           {streak && (
             <div className="flex items-center gap-3">
@@ -333,6 +335,15 @@ export default function SetlogPage() {
           ))}
         </div>
       </div>
+
+      {/* 오늘 현황 배너 */}
+      {todayStats && todayStats.today_users > 0 && tab === 'feed' && (
+        <div className="border-b border-blue-50 bg-blue-600 px-4 py-2.5">
+          <p className="mx-auto max-w-lg text-center text-sm font-black text-white">
+            오늘 {todayStats.today_users}명이 함께 기록하고 있어요
+          </p>
+        </div>
+      )}
 
       {/* 피드 */}
       <main className="mx-auto max-w-lg px-4 py-4">

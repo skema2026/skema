@@ -116,6 +116,26 @@ async def create_study_log(
     return _build_log_out(log, current_user.id)
 
 
+@router.get("/today-stats")
+def get_today_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """오늘 기록한 사람 수, 오늘 올라온 인증 수 반환."""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    today_start = datetime.now(ZoneInfo("Asia/Seoul")).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start_utc = today_start.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+
+    today_logs = (
+        db.query(StudyLog)
+        .filter(StudyLog.created_at >= today_start_utc, StudyLog.is_public == True)  # noqa: E712
+        .all()
+    )
+    user_count = len({log.user_id for log in today_logs})
+    return {"today_users": user_count, "today_logs": len(today_logs)}
+
+
 @router.get("/streak")
 def get_streak(
     db: Session = Depends(get_db),

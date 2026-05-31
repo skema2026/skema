@@ -199,11 +199,11 @@ export function DashboardHeader({
         <button
           type="button"
           onClick={onOpenSetlog}
-          title="셋로그 MVP"
+          title="기록 MVP"
           className="flex items-center gap-2 rounded-lg bg-slate-950 px-5 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800"
         >
           <MaterialIcon icon="photo_camera" size={16} color="#fff" />
-          <span className="hide-mobile">셋로그</span>
+          <span className="hide-mobile">기록</span>
         </button>
 
         <button

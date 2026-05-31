@@ -81,6 +81,18 @@ export function useDeleteStudyLog() {
   });
 }
 
+// 오늘 통계
+export function useTodayStats() {
+  return useQuery({
+    queryKey: ['study-logs', 'today-stats'],
+    queryFn: async () => {
+      const { data } = await api.get<{ today_users: number; today_logs: number }>('/study-logs/today-stats');
+      return data;
+    },
+    staleTime: 60_000,
+  });
+}
+
 // 스트릭
 export type StreakInfo = {
   current_streak: number;
