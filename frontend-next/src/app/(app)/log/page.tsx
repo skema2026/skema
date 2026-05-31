@@ -401,35 +401,47 @@ function MemberCard({
 
       {/* 사진 또는 미올림 플레이스홀더 */}
       {hasLog ? (
-        <div className="flex gap-0">
-          {/* 사진 — 정사각형 썸네일 */}
+        <>
+          {/* 사진 — 전체 너비, 16:9 비율로 콤팩트하게 */}
           {slot.photo_url && (
-            <div className="w-24 shrink-0 bg-slate-100" style={{ aspectRatio: '1/1' }}>
-              <img src={photoUrl(slot.photo_url)} alt="공부 인증" className="h-full w-full object-cover" />
+            <div className="relative w-full overflow-hidden bg-slate-100" style={{ aspectRatio: '16/9' }}>
+              <img
+                src={photoUrl(slot.photo_url)}
+                alt="공부 인증"
+                className="h-full w-full object-cover"
+              />
+              {/* 사진 위 캡션 오버레이 (사진+텍스트 둘 다 있을 때) */}
+              {slot.caption && (
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
+                  <p className="text-xs font-bold text-white line-clamp-2">{slot.caption}</p>
+                </div>
+              )}
             </div>
           )}
 
-          {/* 텍스트 + 좋아요 */}
-          <div className={`flex flex-1 flex-col justify-between px-3 py-2 ${!slot.photo_url ? 'py-2' : ''}`}>
-            {slot.caption ? (
-              <p className="text-sm font-bold leading-snug text-slate-950 line-clamp-3">{slot.caption}</p>
-            ) : (
-              <span />
-            )}
+          {/* 사진 없고 캡션만 있는 경우 */}
+          {!slot.photo_url && slot.caption && (
+            <div className="px-3 pb-1">
+              <p className="text-sm font-bold leading-relaxed text-slate-950">{slot.caption}</p>
+            </div>
+          )}
+
+          {/* 좋아요 */}
+          <div className="flex items-center justify-between px-3 py-2">
             <button
               type="button"
               onClick={() => slot.log_id && toggle.mutate({ logId: slot.log_id, emoji: '👍' })}
-              className={`mt-2 flex w-fit items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-black transition ${
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition ${
                 liked
                   ? 'border-blue-500 bg-blue-600 text-white'
                   : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:text-blue-600'
               }`}
             >
-              <MaterialIcon icon="thumb_up" size={11} color={liked ? '#fff' : 'currentColor'} />
+              <MaterialIcon icon="thumb_up" size={12} color={liked ? '#fff' : 'currentColor'} />
               <span>{likeCount > 0 ? likeCount : '좋아요'}</span>
             </button>
           </div>
-        </div>
+        </>
       ) : (
         <div className="flex h-10 items-center justify-center">
           <p className="text-xs font-bold text-slate-300">아직 기록을 올리지 않았어요</p>
