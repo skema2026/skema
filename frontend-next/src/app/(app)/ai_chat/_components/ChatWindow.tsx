@@ -19,9 +19,13 @@ const QUICK_CHIPS = [
 ];
 
 function parseLine(line: string): React.ReactNode {
-  // **텍스트** → 파란색으로 강조
-  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  // <<<텍스트>>> → 파란색으로 강조
+  const parts = line.split(/(<<<[^>]+>>>)/g);
   return parts.map((part, i) => {
+    if (part.startsWith('<<<') && part.endsWith('>>>')) {
+      return <span key={i} style={{ color: '#2563eb', fontWeight: 700 }}>{part.slice(3, -3)}</span>;
+    }
+    // 혹시 남아있는 ** 도 처리
     if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
       return <span key={i} style={{ color: '#2563eb', fontWeight: 700 }}>{part.slice(2, -2)}</span>;
     }
