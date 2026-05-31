@@ -22,8 +22,6 @@ import {
   useDeleteStudyLog,
   useMyStudyLogs,
   useStreak,
-  useStudyFeed,
-  useToggleReaction,
 } from '@/hooks/useStudyLogs';
 
 // ── 공통 ─────────────────────────────────────────────────────────────────────
@@ -547,110 +545,6 @@ function GroupFeed({
         );
       })}
     </div>
-  );
-}
-
-// ── 글로벌 피드 (그룹 없는 사람용) ───────────────────────────────────────────
-
-function GlobalFeed({ currentUserId }: { currentUserId?: number }) {
-  const { data: feedData, isLoading } = useStudyFeed();
-  const { data: myData } = useMyStudyLogs();
-  const toggle = useToggleReaction();
-  const deleteLog = useDeleteStudyLog();
-  const [tab, setTab] = useState<'feed' | 'me'>('feed');
-
-  const logs    = tab === 'feed' ? feedData?.items : myData?.items;
-  const loading = tab === 'feed' ? isLoading : false;
-
-  const handleDelete = async (id: number) => {
-    if (!confirm('이 기록을 삭제할까요?')) return;
-    try { await deleteLog.mutateAsync(id); toast.success('삭제됐습니다.'); }
-    catch { toast.error('삭제에 실패했습니다.'); }
-  };
-
-  return (
-    <>
-      <div className="sticky top-[57px] z-10 -mx-4 border-b border-blue-100 bg-white/95 px-4 backdrop-blur-sm">
-        <div className="flex">
-          {([['feed', '모두의 기록'], ['me', '내 기록']] as const).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`flex-1 py-3 text-sm font-black transition ${
-                tab === key ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-3 space-y-3">
-        {loading ? (
-          <div className="flex h-40 items-center justify-center text-sm text-slate-400">불러오는 중...</div>
-        ) : !logs?.length ? (
-          <div className="mt-6 rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-sm">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
-              <MaterialIcon icon="edit_note" size={24} color="#93c5fd" />
-            </div>
-            <p className="text-sm font-black text-slate-700">아직 기록이 없어요</p>
-          </div>
-        ) : (
-          logs.map(log => {
-            const liked     = log.my_reactions.includes('👍');
-            const likeCount = log.reactions.find(r => r.emoji === '👍')?.count ?? 0;
-            const color = avatarColor(log.user_id);
-            return (
-              <article key={log.id} className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
-                <div className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-black text-white" style={{ background: color }}>
-                      {log.username.slice(0, 1).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-slate-950">{log.username}</p>
-                      {log.schedule_title
-                        ? <StatusPill tone="blue">{log.schedule_title} 완료</StatusPill>
-                        : <span className="text-[11px] text-slate-400">{new Date(log.created_at).toLocaleDateString('ko-KR')}</span>
-                      }
-                    </div>
-                  </div>
-                  {tab === 'me' && log.user_id === currentUserId && (
-                    <button type="button" onClick={() => handleDelete(log.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-300 transition hover:bg-red-50 hover:text-red-400">
-                      <MaterialIcon icon="delete" size={16} color="currentColor" />
-                    </button>
-                  )}
-                </div>
-                {log.photo_url && (
-                  <div className="w-full bg-slate-100" style={{ aspectRatio: '4/3' }}>
-                    <img src={`${process.env.NEXT_PUBLIC_API_URL ?? '/proxy'}${log.photo_url}`} alt="공부 인증" className="h-full w-full object-cover" />
-                  </div>
-                )}
-                {log.caption && (
-                  <div className={`px-4 ${log.photo_url ? 'pt-3' : 'pt-0'}`}>
-                    <p className={`font-bold text-slate-950 ${log.photo_url ? 'text-sm' : 'text-base leading-relaxed'}`}>{log.caption}</p>
-                  </div>
-                )}
-                <div className="px-4 py-3">
-                  <button type="button"
-                    onClick={() => toggle.mutate({ logId: log.id, emoji: '👍' })}
-                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition ${
-                      liked ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300'
-                    }`}
-                  >
-                    <MaterialIcon icon="thumb_up" size={12} color={liked ? '#fff' : 'currentColor'} />
-                    <span>{likeCount > 0 ? likeCount : '좋아요'}</span>
-                  </button>
-                </div>
-              </article>
-            );
-          })
-        )}
-      </div>
-    </>
   );
 }
 
