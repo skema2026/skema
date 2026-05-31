@@ -16,7 +16,7 @@ import { recurringDayToIndex } from '@/lib/recurringDay';
 import { scheduleVisibleIn } from '@/lib/scheduleViewScope';
 import { getDisplayColor } from '@/lib/scheduleColor';
 import { useNotificationPrefs } from '@/hooks/usePushNotifications';
-import { useCreateStudyLog } from '@/hooks/useStudyLogs';
+import { useCreateStudyLog, useStreak } from '@/hooks/useStudyLogs';
 import { minutesToTime, timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { ExamSchedule, Schedule, UserProfile } from '@/types';
@@ -385,6 +385,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const toggleComplete = useToggleComplete();
   const { data: profile } = useProfile(initialProfile ?? undefined);
   const { prefs: notifPrefs } = useNotificationPrefs();
+  const { data: streak } = useStreak();
 
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
@@ -1071,14 +1072,21 @@ ${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
                           </button>
                           </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => showWeekViewForDate(dayDate)}
-                            className="text-left transition hover:opacity-70"
-                            title="주간 보기로 전환"
-                          >
-                            <h2 className="text-lg font-black text-slate-950 whitespace-nowrap">{formatLongDate(dayDate)}</h2>
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => showWeekViewForDate(dayDate)}
+                              className="text-left transition hover:opacity-70"
+                              title="주간 보기로 전환"
+                            >
+                              <h2 className="text-lg font-black text-slate-950 whitespace-nowrap">{formatLongDate(dayDate)}</h2>
+                            </button>
+                            {streak && streak.current_streak > 0 && (
+                              <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-black ${streak.today_checked ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                <span>{streak.current_streak}일 연속</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {/* 2행: 완료율 + 진행바 */}

@@ -10,3 +10,4 @@ from app.share.models import ShareToken             # noqa: F401
 from app.ai_chat.models import AIChatLog            # noqa: F401
 from app.notification.models import Notification, PushSubscription  # noqa: F401
 from app.studylog.models import StudyLog, StudyLogReaction          # noqa: F401
+from app.studylog.streak import StreakCheckIn                       # noqa: F401

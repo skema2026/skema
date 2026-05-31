@@ -4,6 +4,7 @@
 POST   /study-logs                  — 인증 사진 + 캡션 업로드
 GET    /study-logs/feed             — 전체 공개 피드 (최신순, 페이지네이션)
 GET    /study-logs/me               — 내 로그 목록
+GET    /study-logs/streak           — 내 스트릭 (현재/최장)
 DELETE /study-logs/{id}            — 내 로그 삭제
 POST   /study-logs/{id}/reactions  — 이모지 반응 추가/토글
 """
@@ -11,6 +12,7 @@ POST   /study-logs/{id}/reactions  — 이모지 반응 추가/토글
 import os
 import uuid
 from collections import Counter
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -22,6 +24,7 @@ from app.schedule.models import Schedule
 
 from .models import StudyLog, StudyLogReaction
 from .schemas import FeedResponse, ReactionToggleRequest, StudyLogOut
+from .streak import compute_streak
 
 router = APIRouter(prefix="/study-logs", tags=["study-logs"])
 
@@ -111,6 +114,15 @@ async def create_study_log(
     log.user  # trigger load
 
     return _build_log_out(log, current_user.id)
+
+
+@router.get("/streak")
+def get_streak(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """현재 스트릭 / 최장 스트릭 반환."""
+    return compute_streak(db, current_user.id)
 
 
 @router.get("/feed", response_model=FeedResponse)

@@ -7,6 +7,7 @@ from app.auth.models import User
 from app.core.security import get_current_user, get_db
 from app.schedule import repository, service
 from app.schedule.models import Schedule
+from app.studylog.streak import record_check_in
 from app.schedule.schemas import (
     EventCreate, EventResponse, EventUpdate,
     ExamScheduleCreate, ExamScheduleResponse, ExamScheduleUpdate,
@@ -51,7 +52,12 @@ def update_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.update_schedule(db, schedule_id, current_user.id, data)
+    result = service.update_schedule(db, schedule_id, current_user.id, data)
+    # 완료 처리 시 스트릭 체크인 기록
+    if data.is_completed:
+        record_check_in(db, current_user.id)
+        db.commit()
+    return result
 
 
 @router.delete("/schedules/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -8,6 +8,7 @@ import {
   useCreateStudyLog,
   useDeleteStudyLog,
   useMyStudyLogs,
+  useStreak,
   useStudyFeed,
   useToggleReaction,
 } from '@/hooks/useStudyLogs';
@@ -263,6 +264,7 @@ export default function SetlogPage() {
 
   const { data: feedData, isLoading: feedLoading } = useStudyFeed();
   const { data: myData, isLoading: myLoading } = useMyStudyLogs();
+  const { data: streak } = useStreak();
   const deleteLog = useDeleteStudyLog();
 
   const handleDelete = async (id: number) => {
@@ -287,6 +289,20 @@ export default function SetlogPage() {
             <p className="text-[11px] font-black text-blue-600">SKEMA</p>
             <h1 className="text-lg font-black text-slate-950">셋로그</h1>
           </div>
+          {streak && (
+            <div className="flex items-center gap-3">
+              <div className="text-center">
+                <p className={`text-xl font-black ${streak.today_checked ? 'text-blue-600' : 'text-slate-300'}`}>
+                  {streak.current_streak}
+                </p>
+                <p className="text-[10px] font-black text-slate-400">연속</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xl font-black text-slate-400">{streak.longest_streak}</p>
+                <p className="text-[10px] font-black text-slate-400">최장</p>
+              </div>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setShowUpload(true)}

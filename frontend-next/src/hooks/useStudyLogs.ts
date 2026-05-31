@@ -81,6 +81,24 @@ export function useDeleteStudyLog() {
   });
 }
 
+// 스트릭
+export type StreakInfo = {
+  current_streak: number;
+  longest_streak: number;
+  today_checked: boolean;
+};
+
+export function useStreak() {
+  return useQuery({
+    queryKey: ['study-logs', 'streak'],
+    queryFn: async () => {
+      const { data } = await api.get<StreakInfo>('/study-logs/streak');
+      return data;
+    },
+    staleTime: 60_000,
+  });
+}
+
 // 리액션 토글
 export function useToggleReaction() {
   const qc = useQueryClient();
