@@ -15,7 +15,7 @@ class StudyLogOut(BaseModel):
     username: str
     schedule_id: Optional[int] = None
     schedule_title: Optional[str] = None
-    photo_url: str
+    photo_url: Optional[str] = None
     caption: Optional[str] = None
     is_public: bool
     created_at: datetime

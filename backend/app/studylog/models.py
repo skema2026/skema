@@ -12,7 +12,7 @@ class StudyLog(Base):
     id         = Column(Integer, primary_key=True, index=True)
     user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     schedule_id = Column(Integer, ForeignKey("schedules.id", ondelete="SET NULL"), nullable=True, index=True)
-    photo_path = Column(String(512), nullable=False)
+    photo_path = Column(String(512), nullable=True)  # 사진 선택사항
     caption    = Column(String(200), nullable=True)
     is_public  = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

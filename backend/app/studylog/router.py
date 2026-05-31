@@ -71,26 +71,29 @@ def _build_log_out(log: StudyLog, current_user_id: int) -> StudyLogOut:
 
 @router.post("", status_code=201, response_model=StudyLogOut)
 async def create_study_log(
-    photo: UploadFile = File(...),
+    photo: Optional[UploadFile] = File(None),  # 사진 선택사항
     caption: Optional[str] = Form(None),
     is_public: bool = Form(True),
     schedule_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if photo.content_type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=415, detail="jpeg/png/webp 이미지만 업로드 가능합니다.")
+    if not photo and not caption:
+        raise HTTPException(status_code=400, detail="사진 또는 텍스트 중 하나는 필요합니다.")
 
-    content = await photo.read()
-    if len(content) > MAX_BYTES:
-        raise HTTPException(status_code=413, detail="파일 크기는 10MB 이하여야 합니다.")
-
-    _ensure_upload_dir()
-    ext = photo.filename.rsplit(".", 1)[-1] if photo.filename and "." in photo.filename else "jpg"
-    filename = f"{uuid.uuid4().hex}.{ext}"
-    photo_path = os.path.join(UPLOAD_DIR, filename)
-    with open(photo_path, "wb") as f:
-        f.write(content)
+    photo_path = None
+    if photo and photo.filename:
+        if photo.content_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=415, detail="jpeg/png/webp 이미지만 업로드 가능합니다.")
+        content = await photo.read()
+        if len(content) > MAX_BYTES:
+            raise HTTPException(status_code=413, detail="파일 크기는 10MB 이하여야 합니다.")
+        _ensure_upload_dir()
+        ext = photo.filename.rsplit(".", 1)[-1] if "." in photo.filename else "jpg"
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        photo_path = os.path.join(UPLOAD_DIR, filename)
+        with open(photo_path, "wb") as f:
+            f.write(content)
 
     # schedule_id 검증
     if schedule_id:
@@ -107,9 +110,6 @@ async def create_study_log(
     )
     db.add(log)
     db.commit()
-    db.refresh(log)
-
-    # user 관계 로드
     db.refresh(log)
     log.user  # trigger load
 

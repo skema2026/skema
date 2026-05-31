@@ -71,19 +71,23 @@ function LogCard({
         </div>
       </div>
 
-      {/* 사진 */}
-      <div className="relative w-full bg-slate-100" style={{ aspectRatio: '4/3' }}>
-        <img
-          src={photoUrl(log.photo_url)}
-          alt="공부 인증"
-          className="h-full w-full object-cover"
-        />
-      </div>
+      {/* 사진 (없으면 생략) */}
+      {log.photo_url && (
+        <div className="relative w-full bg-slate-100" style={{ aspectRatio: '4/3' }}>
+          <img
+            src={photoUrl(log.photo_url)}
+            alt="공부 인증"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      )}
 
       {/* 캡션 + 리액션 */}
       <div className="px-4 py-3">
         {log.caption && (
-          <p className="mb-2 text-sm font-bold text-slate-950">{log.caption}</p>
+          <p className={`mb-2 font-bold text-slate-950 ${log.photo_url ? 'text-sm' : 'text-base'}`}>
+            {log.caption}
+          </p>
         )}
 
         {/* 리액션 현황 */}
@@ -162,15 +166,18 @@ function UploadModal({
   };
 
   const handleSubmit = async () => {
-    if (!file) { toast.error('사진을 선택해주세요.'); return; }
+    if (!file && !caption.trim()) {
+      toast.error('사진 또는 한 마디를 입력해주세요.');
+      return;
+    }
     const form = new FormData();
-    form.append('photo', file);
-    form.append('caption', caption);
+    if (file) form.append('photo', file);
+    if (caption.trim()) form.append('caption', caption);
     form.append('is_public', String(isPublic));
     if (scheduleId) form.append('schedule_id', String(scheduleId));
     try {
       await create.mutateAsync(form);
-      toast.success('공부 인증이 등록됐습니다!');
+      toast.success('기록이 등록됐습니다!');
       onClose();
     } catch {
       toast.error('업로드에 실패했습니다.');
@@ -191,19 +198,19 @@ function UploadModal({
           <p className="mb-3 text-xs font-bold text-blue-600">연결 일정: {scheduleTitle}</p>
         )}
 
-        {/* 사진 선택 */}
+        {/* 사진 선택 (선택사항) */}
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
           className="mb-3 flex w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 transition hover:bg-blue-50"
-          style={{ aspectRatio: '4/3' }}
+          style={{ minHeight: preview ? undefined : '100px', aspectRatio: preview ? '4/3' : undefined }}
         >
           {preview ? (
             <img src={preview} alt="preview" className="h-full w-full object-cover" />
           ) : (
-            <div className="flex flex-col items-center gap-2 text-blue-400">
-              <MaterialIcon icon="add_photo_alternate" size={32} color="currentColor" />
-              <p className="text-sm font-black">사진 선택</p>
+            <div className="flex flex-col items-center gap-1.5 py-4 text-blue-400">
+              <MaterialIcon icon="add_photo_alternate" size={24} color="currentColor" />
+              <p className="text-xs font-black">사진 추가 (선택)</p>
             </div>
           )}
         </button>
