@@ -654,19 +654,30 @@ function GlobalFeed({ currentUserId }: { currentUserId?: number }) {
 
 // ── 메인 페이지 ───────────────────────────────────────────────────────────────
 
+type MainTab = 'group' | 'me';
+
 export default function LogPage() {
   const router = useRouter();
   const { data: groups = [], isLoading: groupsLoading } = useMyGroups();
   const { data: streak } = useStreak();
+  const { data: myData, isLoading: myLoading } = useMyStudyLogs();
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
-  const [showUpload, setShowUpload]   = useState(false);
+  const [mainTab, setMainTab]               = useState<MainTab>('group');
+  const [showUpload, setShowUpload]         = useState(false);
   const [showGroupSetup, setShowGroupSetup] = useState(false);
+  const deleteLog = useDeleteStudyLog();
 
   const activeGroup = selectedGroupId
     ? groups.find(g => g.id === selectedGroupId) ?? groups[0]
     : groups[0];
 
   const hasGroups = groups.length > 0;
+
+  const handleDeleteMyLog = async (id: number) => {
+    if (!confirm('이 기록을 삭제할까요?')) return;
+    try { await deleteLog.mutateAsync(id); toast.success('삭제됐습니다.'); }
+    catch { toast.error('삭제에 실패했습니다.'); }
+  };
 
   return (
     <div className="min-h-dvh bg-[#eaf1ff]">
@@ -705,38 +716,106 @@ export default function LogPage() {
             </div>
           </div>
 
-          {/* 그룹 탭 */}
-          {hasGroups && (
-            <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-0.5">
-              {groups.map(g => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setSelectedGroupId(g.id)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black transition ${
-                    (activeGroup?.id === g.id)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {g.name}
-                </button>
-              ))}
+          {/* 그룹 탭 + 내 기록 탭 */}
+          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-0.5">
+            {/* 내 기록 탭 */}
+            <button
+              type="button"
+              onClick={() => setMainTab('me')}
+              className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black transition ${
+                mainTab === 'me'
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <MaterialIcon icon="person" size={12} color={mainTab === 'me' ? '#fff' : 'currentColor'} />
+              내 기록
+            </button>
+
+            {/* 그룹 탭들 */}
+            {groups.map(g => (
               <button
+                key={g.id}
                 type="button"
-                onClick={() => setShowGroupSetup(true)}
-                className="shrink-0 flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-500 transition hover:bg-slate-200"
+                onClick={() => { setSelectedGroupId(g.id); setMainTab('group'); }}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black transition ${
+                  mainTab === 'group' && activeGroup?.id === g.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
               >
-                <MaterialIcon icon="add" size={12} color="currentColor" />
-                그룹 추가
+                {g.name}
               </button>
-            </div>
-          )}
+            ))}
+            <button
+              type="button"
+              onClick={() => setShowGroupSetup(true)}
+              className="shrink-0 flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-500 transition hover:bg-slate-200"
+            >
+              <MaterialIcon icon="add" size={12} color="currentColor" />
+              그룹 추가
+            </button>
+          </div>
         </header>
 
         <main className="px-4 py-4">
           {groupsLoading ? (
             <div className="flex h-40 items-center justify-center text-sm text-slate-400">불러오는 중...</div>
+          ) : mainTab === 'me' ? (
+            /* ── 내 기록 탭 ── */
+            <div>
+              {myLoading ? (
+                <div className="flex h-40 items-center justify-center text-sm text-slate-400">불러오는 중...</div>
+              ) : !myData?.items.length ? (
+                <div className="mt-8 rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-sm">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
+                    <MaterialIcon icon="edit_note" size={24} color="#93c5fd" />
+                  </div>
+                  <p className="text-sm font-black text-slate-700">아직 내 기록이 없어요</p>
+                  <button type="button" onClick={() => setShowUpload(true)}
+                    className="mt-4 rounded-xl bg-blue-600 px-5 py-2 text-sm font-black text-white">
+                    기록 남기기
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myData.items.map(log => {
+                    const color = avatarColor(log.user_id);
+                    return (
+                      <article key={log.id} className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <div>
+                            {log.schedule_title
+                              ? <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">{log.schedule_title} 완료</span>
+                              : <span className="text-[11px] text-slate-400">{new Date(log.created_at).toLocaleDateString('ko-KR')}</span>
+                            }
+                          </div>
+                          <button type="button" onClick={() => handleDeleteMyLog(log.id)}
+                            className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-300 transition hover:bg-red-50 hover:text-red-400">
+                            <MaterialIcon icon="delete" size={16} color="currentColor" />
+                          </button>
+                        </div>
+                        {log.photo_url && (
+                          <div className="relative w-full overflow-hidden bg-slate-100" style={{ aspectRatio: '16/9' }}>
+                            <img src={`${process.env.NEXT_PUBLIC_API_URL ?? '/proxy'}${log.photo_url}`} alt="기록" className="h-full w-full object-cover" />
+                            {log.caption && (
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
+                                <p className="text-xs font-bold text-white line-clamp-2">{log.caption}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {!log.photo_url && log.caption && (
+                          <div className="px-4 pb-3">
+                            <p className="text-sm font-bold leading-relaxed text-slate-950">{log.caption}</p>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           ) : hasGroups && activeGroup ? (
             <GroupFeed group={activeGroup} />
           ) : (
@@ -746,11 +825,8 @@ export default function LogPage() {
                 <p className="text-[11px] font-black text-slate-400">스터디 그룹</p>
                 <p className="mt-1 text-sm font-black text-slate-950">함께 공부하는 그룹을 만들어보세요</p>
                 <p className="mt-0.5 text-xs font-bold text-slate-400">그룹 안에서 서로의 기록을 확인할 수 있어요</p>
-                <button
-                  type="button"
-                  onClick={() => setShowGroupSetup(true)}
-                  className="mt-3 flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white"
-                >
+                <button type="button" onClick={() => setShowGroupSetup(true)}
+                  className="mt-3 flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white">
                   <MaterialIcon icon="group_add" size={14} color="#fff" />
                   그룹 만들기 / 참여
                 </button>

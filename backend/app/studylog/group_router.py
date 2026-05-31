@@ -189,6 +189,12 @@ def leave_group(
     ).first()
     if not m:
         raise HTTPException(status_code=404, detail="해당 그룹의 멤버가 아닙니다.")
+    # 내가 이 그룹에 올린 기록들을 개인 기록으로 전환 (group_id → NULL)
+    # 재참여 시 이전 기록이 다시 뜨는 것을 방지
+    db.query(StudyLog).filter(
+        StudyLog.group_id == group_id,
+        StudyLog.user_id == current_user.id,
+    ).update({"group_id": None})
     db.delete(m)
     db.commit()
 

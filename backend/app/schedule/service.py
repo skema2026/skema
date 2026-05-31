@@ -145,7 +145,13 @@ def update_schedule(db: Session, schedule_id: int, user_id: int, data: ScheduleU
     new_day = updates.get("recurring_day", schedule.recurring_day)
     new_day_str = new_day.value if isinstance(new_day, DayOfWeek) else new_day
 
-    if any(k in updates for k in ("start_time", "end_time", "recurring_day")):
+    # 시간/요일이 실제로 변경됐을 때만 충돌 검사
+    time_changed = (
+        new_start != schedule.start_time
+        or new_end != schedule.end_time
+        or new_day_str != (schedule.recurring_day.value if schedule.recurring_day else None)
+    )
+    if time_changed and new_day_str:
         _check_no_conflict(db, user_id, new_start, new_end, new_day_str, exclude_id=schedule.id)
 
     return repository.update_schedule(db, schedule, updates)
