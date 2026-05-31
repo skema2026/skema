@@ -89,6 +89,17 @@ def delete_notification(
 
 # ── /notifications/prefs ─────────────────────────────────────
 
+DEFAULT_NOTIF_PREFS = {
+    "reminder_start": True,
+    "reminder_incomplete": True,
+    "reminder_minutes": 30,
+    "exam_alert": True,
+    "motivation": True,
+    "weekly_report": True,
+    "comparison": False,
+}
+
+
 @router.get("/notifications/prefs")
 def get_notif_prefs(
     db: Session = Depends(get_db),
@@ -98,11 +109,12 @@ def get_notif_prefs(
     from app.auth.models import UserProfile
     profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
     if not profile or not profile.notification_prefs:
-        return {"motivation": True, "weekly_report": True, "reminder": True, "comparison": True, "exam_alert": True}
+        return DEFAULT_NOTIF_PREFS
     try:
-        return json.loads(profile.notification_prefs)
-    except Exception:
-        return {"motivation": True, "weekly_report": True, "reminder": True, "comparison": True, "exam_alert": True}
+        # 누락 키는 기본값으로 채워 반환
+        return {**DEFAULT_NOTIF_PREFS, **json.loads(profile.notification_prefs)}
+    except (json.JSONDecodeError, TypeError):
+        return DEFAULT_NOTIF_PREFS
 
 
 @router.put("/notifications/prefs")

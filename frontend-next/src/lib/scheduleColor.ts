@@ -91,42 +91,34 @@ function hashToPalette(key: string, palette: readonly string[]): string {
   return palette[djb2Hash(key) % palette.length];
 }
 
-// ── 색상 key 생성 ─────────────────────────────────────────────────────────────
+// ── 유형별 고정색 ─────────────────────────────────────────────────────────────
 
-export function getScheduleColorKey(schedule: Schedule): string {
-  const { schedule_type, schedule_source, linked_exam_id, title, original_generated_title } = schedule;
-
-  // AI가 시험을 위해 생성한 학습 세션: 같은 시험 = 같은 색
-  if (schedule_type === 'study' && schedule_source === 'ai_generated' && linked_exam_id) {
-    return `exam:${linked_exam_id}`;
-  }
-
-  // 이모지 등 앞부분 기호 제거 후 제목 기반 key
-  const base = (original_generated_title || title).replace(/^[^\w가-힣a-zA-Z]+/, '').trim();
-  return base || title;
-}
+export const SCHEDULE_TYPE_COLORS: Record<string, string> = {
+  class:      '#3b82f6',
+  study:      '#059669',
+  assignment: '#f59e0b',
+  activity:   '#ec4899',
+  personal:   '#ec4899',
+  event:      '#f97316',
+};
 
 // ── 렌더링용 색상 계산 ─────────────────────────────────────────────────────────
 
 /**
- * 일정의 표시 색상을 반환한다.
- * - AI 시험 학습 블록: exam key → DIVERSE_PALETTE (같은 시험 = 같은 색)
- * - 사용자가 직접 설정한 색상: 그대로 존중
- * - 나머지: 제목 hash → DIVERSE_PALETTE (유형 무관, 제목이 같으면 색이 같음)
+ * ETA(OCR) 시간표 → 유형별 고정색 (수업은 모두 파랑으로 통일)
+ * AI 시험 학습 블록 → exam key 기반 색
+ * 사용자가 직접 추가한 일정 → 사용자가 선택한 색
  */
-export function getScheduleColor(schedule: Schedule): string {
+export function getDisplayColor(schedule: Schedule): string {
   const { schedule_source, linked_exam_id, schedule_type, color } = schedule;
 
-  // AI 시험 학습 블록 → exam key 기반
+  if (schedule_source === 'eta_import') {
+    return SCHEDULE_TYPE_COLORS[schedule_type] ?? '#3b82f6';
+  }
   if (schedule_type === 'study' && schedule_source === 'ai_generated' && linked_exam_id) {
     return hashToPalette(`exam:${linked_exam_id}`, DIVERSE_PALETTE);
   }
-
-  // 사용자가 직접 설정한 색상 (기본값 #6366F1 제외)
-  if (color && color !== '#6366F1') return color;
-
-  // 제목 기반 해시
-  return hashToPalette(getScheduleColorKey(schedule), DIVERSE_PALETTE);
+  return color || '#6366f1';
 }
 
 /**
@@ -138,30 +130,3 @@ export function getAutoColor(title: string): string {
   return hashToPalette(trimmed, DIVERSE_PALETTE);
 }
 
-/**
- * 표시 중인 일정 목록에서 고유 colorKey마다 충돌 없이 색상을 배정한다.
- * - 정렬된 key 순서로 인덱스를 매겨 같은 제목이면 항상 같은 색, 다른 제목은 다른 색.
- * - DIVERSE_PALETTE(36개) 초과 시 hsl 골든앵글로 추가 생성.
- */
-export function buildTitleColorMap(schedules: Schedule[]): Map<string, string> {
-  const keys = new Set<string>();
-  for (const s of schedules) keys.add(getScheduleColorKey(s));
-
-  const sorted = Array.from(keys).sort();
-  const palette = DIVERSE_PALETTE as readonly string[];
-  const map = new Map<string, string>();
-
-  sorted.forEach((key, idx) => {
-    if (idx < palette.length) {
-      map.set(key, palette[idx]);
-    } else {
-      // 골든각도(137.5°) 기반 추가 색상
-      const hue = Math.round((idx * 137.508) % 360);
-      const sat = 65 + (idx % 3) * 7;
-      const lig = 42 + (idx % 2) * 8;
-      map.set(key, `hsl(${hue},${sat}%,${lig}%)`);
-    }
-  });
-
-  return map;
-}

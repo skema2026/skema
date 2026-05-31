@@ -14,6 +14,8 @@ import { useUIStore } from '@/store/uiStore';
 import { api } from '@/lib/api';
 import { recurringDayToIndex } from '@/lib/recurringDay';
 import { scheduleVisibleIn } from '@/lib/scheduleViewScope';
+import { getDisplayColor } from '@/lib/scheduleColor';
+import { useNotificationPrefs } from '@/hooks/usePushNotifications';
 import { minutesToTime, timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { ExamSchedule, Schedule, UserProfile } from '@/types';
@@ -45,15 +47,6 @@ const VIEW_LABELS: { key: TimetableView; label: string }[] = [
   { key: 'month', label: '월간' },
 ];
 
-const SCHEDULE_TYPE_COLORS: Record<string, string> = {
-  class:      '#3b82f6', // 파랑 - 수업
-  study:      '#059669', // 초록 - 공부
-  assignment: '#f59e0b', // 노랑 - 과제
-  activity:   '#8b5cf6', // 보라 - 활동
-  personal:   '#ec4899', // 분홍 - 개인
-  event:      '#f97316', // 주황 - 이벤트
-};
-const getTypeColor = (type: string | undefined) => SCHEDULE_TYPE_COLORS[type ?? ''] ?? '#6366f1';
 
 const toLocalDateString = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -75,81 +68,7 @@ const formatLongDate = (date: Date) => LONG_DATE_FORMATTER.format(date);
 
 const DEFAULT_WAKE_TIME = '07:00';
 const DAY_END_MINUTES = 24 * 60;
-const AGENDA_PERIODS = [
-  { key: 'morning', label: '오전', icon: 'wb_sunny' },
-  { key: 'afternoon', label: '오후', icon: 'light_mode' },
-  { key: 'evening', label: '저녁', icon: 'nights_stay' },
-] as const;
 
-type StatusCardTone = 'blue' | 'slate' | 'green' | 'amber';
-
-const STATUS_CARD_TONES: Record<StatusCardTone, {
-  border: string;
-  iconColor: string;
-}> = {
-  blue: {
-    border: 'border-l-blue-500',
-    iconColor: '#2563eb',
-  },
-  slate: {
-    border: 'border-l-slate-300',
-    iconColor: '#64748b',
-  },
-  green: {
-    border: 'border-l-emerald-500',
-    iconColor: '#059669',
-  },
-  amber: {
-    border: 'border-l-amber-500',
-    iconColor: '#d97706',
-  },
-};
-
-function StatusSummaryCard({
-  label,
-  value,
-  detail,
-  icon,
-  tone = 'slate',
-  onClick,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  icon: string;
-  tone?: StatusCardTone;
-  onClick?: () => void;
-}) {
-  const toneClass = STATUS_CARD_TONES[tone];
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`min-w-0 cursor-pointer border-l-4 py-1 pl-3 pr-2 text-left transition hover:bg-slate-50 rounded-r-lg ${toneClass.border}`}
-      >
-        <div className="flex items-center gap-1.5">
-          <MaterialIcon icon={icon} size={13} color={toneClass.iconColor} />
-          <p className="truncate text-[11px] font-black text-slate-500">{label}</p>
-        </div>
-        <p className="mt-1 truncate text-base font-black text-slate-950">{value}</p>
-        <p className="truncate text-[11px] font-bold text-slate-400">{detail}</p>
-      </button>
-    );
-  }
-
-  return (
-    <section className={`min-w-0 border-l-4 py-1 pl-3 pr-2 text-left ${toneClass.border}`}>
-      <div className="flex items-center gap-1.5">
-        <MaterialIcon icon={icon} size={13} color={toneClass.iconColor} />
-        <p className="truncate text-[11px] font-black text-slate-500">{label}</p>
-      </div>
-      <p className="mt-1 truncate text-base font-black text-slate-950">{value}</p>
-      <p className="truncate text-[11px] font-bold text-slate-400">{detail}</p>
-    </section>
-  );
-}
 
 const getWakeStartMinutes = (wakeTime?: string) => {
   const minutes = timeToMinutes(wakeTime || DEFAULT_WAKE_TIME);
@@ -212,13 +131,6 @@ const getOverlappingSchedules = (schedules: Schedule[]) => {
   });
 };
 
-const getAgendaPeriod = (schedule: Schedule) => {
-  const start = timeToMinutes(schedule.start_time);
-  if (start < 12 * 60) return 'morning';
-  if (start < 18 * 60) return 'afternoon';
-  return 'evening';
-};
-
 const formatDuration = (start: number, end: number) => {
   const minutes = Math.max(0, end - start);
   const hours = Math.floor(minutes / 60);
@@ -248,17 +160,40 @@ function MobileWeekAgenda({
   days,
   todayStr,
   onScheduleClick,
-  onDayClick,
+  onScrollToDate,
+  onShowDayView,
+  scrollToDateStr,
+  onScrollConsumed,
 }: {
   days: WeekAgendaDay[];
   todayStr: string;
   onScheduleClick: (schedule: Schedule) => void;
-  onDayClick: (date: Date) => void;
+  onScrollToDate: (date: Date) => void;
+  onShowDayView: (date: Date) => void;
+  scrollToDateStr: string | null;
+  onScrollConsumed: () => void;
 }) {
   const activeDays = days.filter((day) => day.schedules.length > 0 || day.exams.length > 0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToDateInternal = useCallback((dateStr: string) => {
+    const el = containerRef.current?.querySelector<HTMLElement>(`[data-agenda-date="${dateStr}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!scrollToDateStr) return;
+    const t = setTimeout(() => {
+      scrollToDateInternal(scrollToDateStr);
+      onScrollConsumed();
+    }, 100);
+    return () => clearTimeout(t);
+  }, [scrollToDateStr, scrollToDateInternal, onScrollConsumed]);
 
   return (
-    <div className="space-y-3 bg-[#f8fbff] p-3">
+    <div ref={containerRef} className="space-y-3 bg-[#f8fbff] p-3">
       <div className="grid grid-cols-7 gap-1.5">
         {days.map((day) => {
           const isToday = day.dateStr === todayStr;
@@ -267,7 +202,7 @@ function MobileWeekAgenda({
             <button
               key={day.dateStr}
               type="button"
-              onClick={() => onDayClick(day.date)}
+              onClick={() => onScrollToDate(day.date)}
               className={`min-w-0 rounded-xl border px-1 py-2 text-center transition ${
                 isToday
                   ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
@@ -300,7 +235,8 @@ function MobileWeekAgenda({
             return (
               <section
                 key={`agenda-${day.dateStr}`}
-                className={`rounded-2xl border bg-white p-3 shadow-sm ${isToday ? 'border-blue-300' : 'border-blue-100'}`}
+                data-agenda-date={day.dateStr}
+                className={`scroll-mt-3 rounded-2xl border bg-white p-3 shadow-sm ${isToday ? 'border-blue-300' : 'border-blue-100'}`}
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="min-w-0">
@@ -311,9 +247,13 @@ function MobileWeekAgenda({
                       {day.date.getMonth() + 1}월 {day.date.getDate()}일
                     </h3>
                   </div>
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">
-                    {day.schedules.length + day.exams.length}개
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onShowDayView(day.date)}
+                    className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-black text-white transition hover:bg-blue-700"
+                  >
+                    자세히
+                  </button>
                 </div>
 
                 <div className="space-y-1.5">
@@ -332,12 +272,16 @@ function MobileWeekAgenda({
                       key={`mobile-week-${day.dateStr}-${schedule.id}`}
                       type="button"
                       onClick={() => onScheduleClick(schedule)}
-                      className={`w-full rounded-xl border px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50 ${
+                      className={`w-full rounded-xl border py-2 pl-0 pr-3 text-left transition hover:border-blue-300 hover:bg-blue-50 ${
                         schedule.is_completed ? 'border-slate-100 bg-slate-50 opacity-70' : 'border-blue-100 bg-[#fbfdff]'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-[72px] shrink-0 text-xs font-black text-blue-700">
+                        <div
+                          className="w-[4px] self-stretch rounded-full shrink-0"
+                          style={{ background: schedule.is_completed ? '#cbd5e1' : getDisplayColor(schedule) }}
+                        />
+                        <div className="w-[64px] shrink-0 text-xs font-black text-blue-700">
                           {schedule.start_time}
                           <span className="block text-[11px] font-bold text-slate-400">{schedule.end_time}</span>
                         </div>
@@ -415,7 +359,7 @@ function MobileMonthAgenda({
                         <span
                           key={`mobile-month-dot-${day.dateStr}-${schedule.id}`}
                           className="h-1.5 w-1.5 rounded-full"
-                          style={{ background: isToday ? '#bfdbfe' : schedule.color || '#2563eb' }}
+                          style={{ background: isToday ? '#bfdbfe' : getDisplayColor(schedule) }}
                         />
                       ))}
                     </div>
@@ -439,6 +383,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const { data: exams = [] } = useExams();
   const toggleComplete = useToggleComplete();
   const { data: profile } = useProfile(initialProfile ?? undefined);
+  const { prefs: notifPrefs } = useNotificationPrefs();
 
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
@@ -452,6 +397,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [dayOffset, setDayOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [weekScrollDate, setWeekScrollDate] = useState<string | null>(null);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const [examForStudyBlocks, setExamForStudyBlocks] = useState<{ id: number; title: string; exam_date: string } | null>(null);
   const [studyHoursPerDay, setStudyHoursPerDay] = useState(2);
@@ -468,12 +414,11 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     }
   }, [profile, router]);
 
-  // Notification system
+  // Notification system (서버 prefs 기반 인앱 배너)
   const checkNotifications = useCallback(() => {
     if (typeof window === 'undefined') return;
-    const notifEnabled = localStorage.getItem('skema_notif_enabled') !== 'false';
-    if (!notifEnabled || !schedules.length) return;
-    const notifMinutes = parseInt(localStorage.getItem('skema_notif_minutes') || '30', 10);
+    if (!notifPrefs.reminder_start || !schedules.length) return;
+    const notifMinutes = notifPrefs.reminder_minutes ?? 30;
     const now = new Date();
     const todayDow = now.getDay() === 0 ? 6 : now.getDay() - 1;
     const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -491,7 +436,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
       setNotification(upcoming);
       setTimeout(() => setNotification(null), 8000);
     }
-  }, [schedules]);
+  }, [schedules, notifPrefs.reminder_start, notifPrefs.reminder_minutes]);
 
   useEffect(() => {
     checkNotifications();
@@ -599,10 +544,6 @@ useEffect(() => {
       ? daySchedules.find((s) => !s.is_completed && timeToMinutes(s.start_time) >= nowMin)
       : daySchedules.find((s) => !s.is_completed)
   ) ?? daySchedules[0] ?? null;
-  const agendaByPeriod = AGENDA_PERIODS.map((period) => ({
-    ...period,
-    schedules: daySchedules.filter((schedule) => getAgendaPeriod(schedule) === period.key),
-  }));
 
   // 오늘 수행률
   const todayTotal = todaySchedules.length;
@@ -610,18 +551,10 @@ useEffect(() => {
   const todayPct   = todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : null;
 
   const remainingToday = todaySchedules.filter((s) => !s.is_completed);
-  const nextSchedule = remainingToday.find((s) => timeToMinutes(s.start_time) >= nowMin) ?? null;
   const todayFreeWindows = findFreeWindows(todaySchedules, wakeStartMinutes);
   const todayAvailableMinutes = todayFreeWindows.reduce(
     (sum, window) => sum + Math.max(0, window.end - window.start),
     0,
-  );
-  const longestFreeWindow = todayFreeWindows.reduce<{ start: number; end: number } | null>(
-    (longest, window) => {
-      if (!longest) return window;
-      return window.end - window.start > longest.end - longest.start ? window : longest;
-    },
-    null,
   );
   const overdueSchedules = todaySchedules.filter((schedule) => (
     !schedule.is_completed && timeToMinutes(schedule.end_time) < nowMin
@@ -695,11 +628,86 @@ useEffect(() => {
       label: '이번 주 요약',
       desc: '완료율·미룬 일정·집중 시간대 분석',
       icon: 'bar_chart',
-      onClick: () => runAiCommand(
-        'weekly-summary',
-        '이번 주 시간표 전체를 분석해서 완료율, 자주 미뤄진 일정 패턴, 집중이 잘 된 시간대를 파악하고 간결하게 피드백해줘',
-        '이번 주 요약을 정리했습니다',
-      ),
+      onClick: () => {
+        // 보고 있는 주 기준
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        const weekStartStr = toLocalDateString(weekStart);
+        const weekEndStr = toLocalDateString(weekEnd);
+        const todayWeekStartStr = toLocalDateString(getWeekStart(new Date(now.getFullYear(), now.getMonth(), now.getDate())));
+        const isCurrentWeek = weekStartStr === todayWeekStartStr;
+
+        // 요일별 일정 집계
+        let totalSchedules = 0;
+        let totalDone = 0;
+        const periodCount = { 오전: 0, 오후: 0, 저녁: 0 };
+        const typeCount: Record<string, { total: number; done: number }> = {};
+        const dayLines: string[] = [];
+        const missedSamples: string[] = [];
+
+        weekAgendaDays.forEach((day) => {
+          const wkLabel = ['월','화','수','목','금','토','일'][getLocalDow(day.date)];
+          const dayDone = day.schedules.filter(s => s.is_completed).length;
+          totalSchedules += day.schedules.length;
+          totalDone += dayDone;
+
+          day.schedules.forEach(s => {
+            const sm = timeToMinutes(s.start_time);
+            if (sm < 12 * 60) periodCount.오전++;
+            else if (sm < 18 * 60) periodCount.오후++;
+            else periodCount.저녁++;
+
+            const t = s.schedule_type ?? '일정';
+            if (!typeCount[t]) typeCount[t] = { total: 0, done: 0 };
+            typeCount[t].total++;
+            if (s.is_completed) typeCount[t].done++;
+
+            // 지나간 날인데 미완료인 일정 샘플
+            if (!s.is_completed && day.dateStr < todayStr && missedSamples.length < 5) {
+              missedSamples.push(`${day.dateStr}(${wkLabel}) ${s.title}`);
+            }
+          });
+          dayLines.push(`- ${day.dateStr}(${wkLabel}): ${day.schedules.length}개 (완료 ${dayDone}개)${day.exams.length > 0 ? `, 시험 ${day.exams.length}개` : ''}`);
+        });
+
+        const pct = totalSchedules > 0 ? Math.round((totalDone / totalSchedules) * 100) : 0;
+        const typeLines = Object.entries(typeCount)
+          .map(([t, v]) => `- ${t}: ${v.done}/${v.total}개 (${v.total > 0 ? Math.round(v.done / v.total * 100) : 0}%)`)
+          .join('\n') || '- 없음';
+        const periodLine = `오전 ${periodCount.오전}개 / 오후 ${periodCount.오후}개 / 저녁 ${periodCount.저녁}개`;
+        const upcomingExamLines = upcomingExams.slice(0, 3)
+          .map(e => `- ${e.title} (${e.exam_date}, D-${getDaysUntil(e.exam_date)})`).join('\n') || '- 없음';
+        const missedLines = missedSamples.length > 0 ? missedSamples.map(s => `- ${s}`).join('\n') : '- 없음';
+
+        const prompt = `주간 요약 분석 요청
+주간 기간: ${weekStartStr} ~ ${weekEndStr} (월~일${isCurrentWeek ? ', 현재 진행 중인 주' : ''})
+
+전체 완료율: ${totalDone}/${totalSchedules}개 (${pct}%)
+
+요일별 일정 수:
+${dayLines.join('\n')}
+
+시간대별 일정 분포: ${periodLine}
+
+유형별 완료 현황:
+${typeLines}
+
+지나간 날의 미완료 일정 (최대 5개):
+${missedLines}
+
+다가오는 시험:
+${upcomingExamLines}
+
+위 데이터를 정확히 참고해서 한국어로 자연스럽게 답해줘. 정확히 아래 4가지로:
+① 이번 주 요약 한 줄 — 전체적인 완료율과 분위기
+② 미룬 패턴 — 어떤 종류/요일/시간대가 자주 미뤄지는지 (위 데이터만 참고)
+③ 집중이 잘 된 시간대 — 시간대별 분포와 유형별 완료율을 보고 추측
+④ 남은 주에 대한 조언 — 다가오는 시험·미완료를 고려해서 무엇을 할지
+
+각 항목은 1-2문장으로 구체적으로. 모르는 정보는 추측하지 말고 위 데이터만 참고해.`;
+
+        runAiCommand('weekly-summary', prompt, '이번 주 요약을 정리했습니다');
+      },
     },
   ];
 
@@ -799,6 +807,15 @@ useEffect(() => {
     setTimetableView('day');
   };
 
+  const showWeekViewForDate = (date: Date) => {
+    const todayWeekStart = getWeekStart(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+    const targetWeekStart = getWeekStart(date);
+    const diffWeeks = Math.round((targetWeekStart.getTime() - todayWeekStart.getTime()) / (7 * 86400000));
+    setWeekOffset(diffWeeks);
+    setWeekScrollDate(toLocalDateString(date));
+    setTimetableView('week');
+  };
+
   const resetCalendar = () => {
     setDayOffset(0);
     setWeekOffset(0);
@@ -860,10 +877,10 @@ useEffect(() => {
           isRegenerating={isRegenerating}
         />
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f8f9ff] p-4 sm:p-5">
-          <div className="mx-auto flex max-w-[1500px] flex-col gap-4">
-            <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-              <div className="flex min-w-0 flex-col rounded-2xl border border-blue-100 bg-sky-50 p-6 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
+        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f8f9ff] p-3">
+          <div className="flex w-full flex-col gap-3">
+            <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="flex min-w-0 flex-col rounded-2xl border border-blue-100 bg-sky-50 p-4 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-black text-blue-600">{todayLabel}</p>
@@ -922,60 +939,74 @@ useEffect(() => {
                           days={weekAgendaDays}
                           todayStr={todayStr}
                           onScheduleClick={openClassForm}
-                          onDayClick={showDayViewForDate}
+                          onScrollToDate={(date) => setWeekScrollDate(toLocalDateString(date))}
+                          onShowDayView={showDayViewForDate}
+                          scrollToDateStr={weekScrollDate}
+                          onScrollConsumed={() => setWeekScrollDate(null)}
                         />
                       </div>
                       <div
                         ref={timetableRef}
                         className="hidden max-h-[calc(100vh-220px)] overflow-y-auto sm:block"
                       >
-                        <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} startTime="00:00" />
+                        <Timetable schedules={weekSchedules} exams={exams} weekStart={weekStart} startTime="00:00" onDayClick={showDayViewForDate} />
                       </div>
                     </>
                   )}
 
                   {timetableView === 'day' && (
                     <div className="h-full overflow-y-auto bg-[#f8fbff] p-4">
-                      <div className="mb-4 rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
+                      <div className="mb-3 rounded-lg border border-blue-100 bg-white p-3 shadow-sm">
                         {/* 1행: 날짜 + 버튼 */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-black text-blue-600">하루 진행표</p>
-                            <h2 className="mt-0.5 text-xl font-black text-slate-950">{formatLongDate(dayDate)}</h2>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="whitespace-nowrap text-xs font-black text-blue-600">하루 진행표</p>
+                            <div className="flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => {
                               const isToday = toLocalDateString(dayDate) === todayStr;
                               const doneCnt = daySchedules.filter(s => s.is_completed).length;
                               const pct = daySchedules.length > 0 ? Math.round((doneCnt / daySchedules.length) * 100) : 0;
+                              const fmt = (s: Schedule) =>
+                                `- [${s.is_completed ? '완료' : '미완료'}] ${s.start_time}-${s.end_time} ${s.title} (${s.schedule_type ?? '일정'}${s.location ? `, ${s.location}` : ''})`;
                               const scheduleLines = daySchedules.length > 0
-                                ? daySchedules.map(s => `- [${s.is_completed ? '완료' : '미완료'}] ${s.title} ${s.start_time}-${s.end_time} (${s.schedule_type ?? '일정'})`).join('\n')
+                                ? daySchedules.map(fmt).join('\n')
                                 : '- 일정 없음';
-                              const examLine = upcomingExam ? `다가오는 시험: ${upcomingExam.title} D-${getDaysUntil(upcomingExam.exam_date)}` : '';
-                              const sleepLine = `기상/취침: ${wakeStartTime} / ${profile?.sleep_start ?? '23:00'}`;
+                              const dayExamLines = dayExams.length > 0
+                                ? dayExams.map(e => `- ${e.title}${e.exam_time ? ` (${e.exam_time})` : ''}${e.location ? ` @${e.location}` : ''}`).join('\n')
+                                : '';
+                              const upcomingExamLines = upcomingExams
+                                .filter(e => e.exam_date !== toLocalDateString(dayDate))
+                                .slice(0, 3)
+                                .map(e => `- ${e.title} (${e.exam_date}, D-${getDaysUntil(e.exam_date)})`).join('\n');
+                              const freeTimeLine = dayFreeWindows.length > 0
+                                ? dayFreeWindows.map(w => `${minutesToTime(w.start)}-${minutesToTime(w.end)}`).join(', ')
+                                : '없음';
+                              const conflictLine = dayConflictSchedules.length > 0
+                                ? dayConflictSchedules.map(({ schedule }) => schedule.title).join(', ')
+                                : '없음';
 
-                              const prompt = isToday
-                                ? `현재 시각: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}
-날짜: ${toLocalDateString(dayDate)}
+                              const header = isToday
+                                ? `현재 시각: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}\n날짜: ${toLocalDateString(dayDate)} (오늘)`
+                                : `날짜: ${toLocalDateString(dayDate)}`;
+
+                              const prompt = `${header}
 완료율: ${doneCnt}/${daySchedules.length}개 (${pct}%)
-${sleepLine}
-${examLine}
+기상/취침: ${wakeStartTime} / ${profile?.sleep_start ?? '23:00'}
+빈 시간대: ${freeTimeLine}
+겹치는 일정: ${conflictLine}
+${dayExamLines ? `\n당일 시험:\n${dayExamLines}` : ''}${upcomingExamLines ? `\n\n다가오는 시험:\n${upcomingExamLines}` : ''}
 
-오늘 일정:
+일정 목록:
 ${scheduleLines}
 
-위 정보를 바탕으로 ① 지금 당장 할 것 ② 남은 빈 시간 활용 ③ 주의할 점을 각각 1-2문장씩 실용적으로 알려줘.`
-                                : `날짜: ${toLocalDateString(dayDate)}
-완료율: ${doneCnt}/${daySchedules.length}개 (${pct}%)
-${sleepLine}
-${examLine}
+위 데이터를 정확히 참고해서 한국어로 자연스럽게 정리해줘. 정확히 아래 3가지 항목으로 답해줘:
+① ${isToday ? '지금 당장 할 것' : '이 날 가장 중요한 것'} — 미완료 일정 중 우선순위, 시험 D-day 임박 여부 반영
+② 빈 시간 활용 — 위의 "빈 시간대"를 그대로 인용해서 무엇을 하면 좋을지
+③ 주의할 점 — 겹치는 일정, 무리한 일정, 빠뜨리기 쉬운 것 등
 
-해당 날 일정:
-${scheduleLines}
-
-위 일정을 기준으로 ① 이 날 우선순위 ② 빈 시간 활용 ③ 주의할 점을 각각 1-2문장씩 알려줘.`;
+각 항목은 1-2문장으로 짧고 구체적으로 작성해줘. 모르는 정보를 추측하지 말고 위 데이터만 참고해.`;
 
                               runAiCommand('today-plan', prompt, '하루 시간표를 정리했습니다');
                             }}
@@ -993,15 +1024,40 @@ ${scheduleLines}
                               const nextDayStr = toLocalDateString(nextDay);
                               const nextSchedules = getSchedulesForDate(nextDay, 'day');
                               const nextExams = exams.filter(e => e.exam_date === nextDayStr);
-                              const scheduleLines = nextSchedules.length > 0
-                                ? nextSchedules.map(s => `- ${s.title} ${s.start_time}-${s.end_time}`).join('\n')
+                              const nextScheduleLines = nextSchedules.length > 0
+                                ? nextSchedules.map(s => `- ${s.start_time}-${s.end_time} ${s.title} (${s.schedule_type ?? '일정'}${s.location ? `, ${s.location}` : ''})`).join('\n')
                                 : '- 일정 없음';
-                              const examLine = nextExams.length > 0 ? `내일 시험: ${nextExams.map(e => e.title).join(', ')}` : '';
-                              runAiCommand(
-                                'tomorrow-plan',
-                                `내일(${nextDayStr}) 준비해야 할 것을 정리해줘.\n${examLine}\n내일 일정:\n${scheduleLines}\n\n오늘 미완료 일정: ${remainingToday.length}개\n\n내일을 위해 오늘 미리 해둘 것, 챙길 것, 주의할 점을 2-3가지로 짧게 알려줘.`,
-                                '내일 준비 사항을 정리했습니다',
-                              );
+                              const tomorrowExamLines = nextExams.length > 0
+                                ? nextExams.map(e => `- ${e.title}${e.exam_time ? ` (${e.exam_time})` : ''}${e.location ? ` @${e.location}` : ''}`).join('\n')
+                                : '';
+                              const remainingLines = remainingToday.length > 0
+                                ? remainingToday.map(s => `- ${s.start_time}-${s.end_time} ${s.title}`).join('\n')
+                                : '- 없음';
+                              const upcomingExamLines = upcomingExams
+                                .filter(e => e.exam_date !== nextDayStr)
+                                .slice(0, 3)
+                                .map(e => `- ${e.title} (${e.exam_date}, D-${getDaysUntil(e.exam_date)})`).join('\n');
+                              const refDate = toLocalDateString(dayDate);
+                              const isRefToday = refDate === todayStr;
+
+                              const prompt = `${isRefToday ? `현재 시각: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}\n` : ''}기준 날짜: ${refDate}${isRefToday ? ' (오늘)' : ''}
+다음 날(내일): ${nextDayStr}
+${tomorrowExamLines ? `\n내일 시험:\n${tomorrowExamLines}\n` : ''}
+내일 일정:
+${nextScheduleLines}
+
+${isRefToday ? '오늘 남은 미완료 일정' : '기준 날 미완료 일정'}:
+${remainingLines}
+${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
+
+위 데이터를 정확히 참고해서 "내일을 위해 ${isRefToday ? '오늘' : '기준 날'} 미리 해둘 것"을 정리해줘. 정확히 아래 3가지 항목으로 답해줘:
+① 미리 챙겨야 할 것 — 내일 일정/시험에 필요한 준비물, 자료, 마감
+② 오늘 마무리할 것 — ${isRefToday ? '오늘' : '기준 날'} 남은 미완료 일정 중 내일에 영향 줄 수 있는 것
+③ 주의할 점 — 일찍 일어나야 하는지, 시험이 임박했는지, 무리한 일정인지 등
+
+각 항목은 1-2문장으로 구체적으로. 모르는 정보를 추측하지 말고 위 데이터만 참고해.`;
+
+                              runAiCommand('tomorrow-plan', prompt, '내일 준비 사항을 정리했습니다');
                             }}
                             disabled={aiAction !== null}
                             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-1.5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
@@ -1010,6 +1066,15 @@ ${scheduleLines}
                             {aiAction === 'tomorrow-plan' ? '준비 중...' : '내일 준비'}
                           </button>
                           </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => showWeekViewForDate(dayDate)}
+                            className="text-left transition hover:opacity-70"
+                            title="주간 보기로 전환"
+                          >
+                            <h2 className="text-lg font-black text-slate-950 whitespace-nowrap">{formatLongDate(dayDate)}</h2>
+                          </button>
                         </div>
 
                         {/* 2행: 완료율 + 진행바 */}
@@ -1048,7 +1113,7 @@ ${scheduleLines}
                                   if (end <= start) return null;
                                   const left = ((start - dayStart) / total) * 100;
                                   const width = ((end - start) / total) * 100;
-                                  const periodColor = getTypeColor(s.schedule_type);
+                                  const periodColor = getDisplayColor(s);
                                   return (
                                     <div key={s.id} className="absolute h-full opacity-80"
                                       style={{ left: `${left}%`, width: `${Math.max(width, 0.5)}%`, background: s.is_completed ? '#86efac' : periodColor }} />
@@ -1099,17 +1164,17 @@ ${scheduleLines}
                           );
                         })()}
 
-                        <div className="mt-3 grid gap-2 grid-cols-3">
+                        <div className="mt-3 grid gap-1.5 grid-cols-3">
                           <button
                             type="button"
                             onClick={() => selectedDayPrimarySchedule ? openClassForm(selectedDayPrimarySchedule) : openClassForm()}
-                            className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                            className="rounded-lg border border-blue-100 bg-blue-50/70 px-2 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
                           >
-                            <p className="text-[11px] font-black text-blue-600">{isSelectedDayToday ? '다음 일정' : '첫 일정'}</p>
-                            <p className="mt-0.5 truncate text-sm font-black text-slate-950">
+                            <p className="text-[10px] font-black text-blue-600 leading-tight">{isSelectedDayToday ? '다음 일정' : '첫 일정'}</p>
+                            <p className="mt-1 truncate text-xs font-black text-slate-950">
                               {selectedDayPrimarySchedule ? selectedDayPrimarySchedule.title : '없음'}
                             </p>
-                            <p className="truncate text-[11px] font-bold text-slate-400">
+                            <p className="truncate text-[10px] font-bold text-slate-400 leading-tight">
                               {selectedDayPrimarySchedule
                                 ? `${selectedDayPrimarySchedule.start_time}–${selectedDayPrimarySchedule.end_time}`
                                 : '일정 없음'}
@@ -1119,13 +1184,15 @@ ${scheduleLines}
                           <button
                             type="button"
                             onClick={remainingToday.length > 0 ? () => setIsRemainingDialogOpen(true) : undefined}
-                            className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                            className="rounded-lg border border-blue-100 bg-blue-50/70 px-2 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
                           >
-                            <p className="text-[11px] font-black text-blue-600">오늘 해야할 일</p>
-                            <p className="mt-0.5 text-sm font-black text-slate-950">
+                            <p className="text-[10px] font-black text-blue-600 leading-tight">
+                              해야할 일{!isSelectedDayToday && <span className="text-slate-400"> (오늘)</span>}
+                            </p>
+                            <p className="mt-1 text-xs font-black text-slate-950">
                               {remainingToday.length > 0 ? `${remainingToday.length}개` : '모두 완료'}
                             </p>
-                            <p className="truncate text-[11px] font-bold text-slate-400">
+                            <p className="truncate text-[10px] font-bold text-slate-400 leading-tight">
                               {remainingToday.length > 0 ? remainingToday[0].title : '미완료 없음'}
                             </p>
                           </button>
@@ -1133,13 +1200,15 @@ ${scheduleLines}
                           <button
                             type="button"
                             onClick={issueCount > 0 ? () => setIsIssueDialogOpen(true) : undefined}
-                            className={`rounded-lg border px-3 py-2.5 text-left transition ${issueCount > 0 ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50' : 'border-blue-100 bg-blue-50/70 hover:bg-blue-50'}`}
+                            className={`rounded-lg border px-2 py-2 text-left transition ${issueCount > 0 ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50' : 'border-blue-100 bg-blue-50/70 hover:bg-blue-50'}`}
                           >
-                            <p className={`text-[11px] font-black ${issueCount > 0 ? 'text-amber-600' : 'text-blue-600'}`}>확인 필요</p>
-                            <p className="mt-0.5 text-sm font-black text-slate-950">
+                            <p className={`text-[10px] font-black leading-tight ${issueCount > 0 ? 'text-amber-600' : 'text-blue-600'}`}>
+                              확인 필요{!isSelectedDayToday && <span className="text-slate-400"> (오늘)</span>}
+                            </p>
+                            <p className="mt-1 text-xs font-black text-slate-950">
                               {issueCount > 0 ? `${issueCount}개` : '정상'}
                             </p>
-                            <p className="truncate text-[11px] font-bold text-slate-400">
+                            <p className="truncate text-[10px] font-bold text-slate-400 leading-tight">
                               {issueItems[0]?.label ?? '이상 없음'}
                             </p>
                           </button>
@@ -1214,7 +1283,7 @@ ${scheduleLines}
                                   const start = timeToMinutes(schedule.start_time);
                                   const end = timeToMinutes(schedule.end_time);
                                   const done = schedule.is_completed;
-                                  const periodColor = getTypeColor(schedule.schedule_type);
+                                  const periodColor = getDisplayColor(schedule);
                                   return (
                                     <div
                                       key={schedule.id}
@@ -1311,11 +1380,34 @@ ${scheduleLines}
                                     )}
                                     <button
                                       type="button"
-                                      onClick={() => runAiCommand(
-                                        'day-report',
-                                        '오늘 하루 일정을 분석해서 완료율, 시간 활용 패턴, 개선할 점을 2~3문장으로 간결하게 평가해줘',
-                                        'AI 평가가 완료됐습니다',
-                                      )}
+                                      onClick={() => {
+                                        const refDate = toLocalDateString(dayDate);
+                                        const isRefToday = refDate === todayStr;
+                                        const doneLines = daySchedules.filter(s => s.is_completed)
+                                          .map(s => `- ${s.start_time}-${s.end_time} ${s.title} (${s.schedule_type ?? '일정'})`).join('\n') || '- 없음';
+                                        const missedLines = daySchedules.filter(s => !s.is_completed)
+                                          .map(s => `- ${s.start_time}-${s.end_time} ${s.title} (${s.schedule_type ?? '일정'})`).join('\n') || '- 없음';
+
+                                        const reportPrompt = `${isRefToday ? `현재 시각: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}\n` : ''}평가 대상 날짜: ${refDate}${isRefToday ? ' (오늘)' : ''}
+전체 완료율: ${done}/${total}개 (${pct}%)
+일정 점유 시간: ${formatMinutesDuration(totalMin)}
+빈 시간: ${formatMinutesDuration(freeMin)}
+일정 몰린 시간대: ${busyPeriod}
+
+완료된 일정:
+${doneLines}
+
+미완료 일정:
+${missedLines}
+
+위 데이터를 정확히 참고해서 한국어로 2~3문장으로 자연스럽게 평가해줘.
+- 완료율과 분위기 한 줄
+- 시간 활용에서 잘한 점 또는 아쉬운 점 한 줄
+- 개선 제안 한 줄
+모르는 정보는 추측하지 말고 위 데이터만 참고해.`;
+
+                                        runAiCommand('day-report', reportPrompt, 'AI 평가가 완료됐습니다');
+                                      }}
                                       disabled={aiAction !== null}
                                       className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
                                     >
@@ -1359,8 +1451,6 @@ ${scheduleLines}
                           {monthDays.map((date) => {
                             const dateStr = toLocalDateString(date);
                             const items = getSchedulesForDate(date, 'month');
-                            const classItems = items.filter((s) => s.schedule_type === 'class');
-                            const nonClassItems = items.filter((s) => s.schedule_type !== 'class');
                             const dayExams = exams.filter((exam) => exam.exam_date === dateStr);
                             const isToday = dateStr === todayStr;
                             const isCurrentMonth = date.getMonth() === monthDate.getMonth();
@@ -1387,30 +1477,20 @@ ${scheduleLines}
                                     </span>
                                   )}
                                 </div>
-                                <div className="space-y-0.5">
-                                  {classItems.slice(0, 2).map((schedule) => (
-                                    <span
-                                      key={`${dateStr}-${schedule.id}`}
-                                      className="block truncate rounded bg-blue-600/10 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
-                                    >
-                                      {schedule.title}
-                                    </span>
-                                  ))}
-                                </div>
-                                {nonClassItems.length > 0 && (
-                                  <div className="mt-1 flex flex-wrap gap-0.5">
-                                    {nonClassItems.slice(0, 5).map((schedule) => (
+                                {items.length > 0 && (
+                                  <div className="flex flex-wrap gap-0.5">
+                                    {items.slice(0, 6).map((schedule) => (
                                       <span
                                         key={`dot-${dateStr}-${schedule.id}`}
                                         className="h-2 w-2 rounded-full"
-                                        style={{ background: schedule.color || '#6366f1' }}
+                                        style={{ background: getDisplayColor(schedule) }}
                                       />
                                     ))}
                                   </div>
                                 )}
-                                {(classItems.length > 2 || nonClassItems.length > 5) && (
+                                {items.length > 6 && (
                                   <span className="mt-0.5 block text-[10px] font-black text-slate-400">
-                                    +{Math.max(0, classItems.length - 2) + Math.max(0, nonClassItems.length - 5)}개
+                                    +{items.length - 6}개
                                   </span>
                                 )}
                               </button>
@@ -1423,7 +1503,7 @@ ${scheduleLines}
                 </div>
               </div>
 
-              <aside className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto">
+              <aside className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto">
 
                 {/* AI 핵심 작업 */}
                 <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">

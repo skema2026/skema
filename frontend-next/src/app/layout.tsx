@@ -43,6 +43,7 @@ export default function RootLayout({
       lang="ko"
       data-scroll-behavior="smooth"
       className={`${manrope.variable} ${inter.variable} h-full antialiased light`}
+      suppressHydrationWarning
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: `
@@ -54,7 +55,7 @@ export default function RootLayout({
           })();
         `}} />
       </head>
-      <body className="min-h-full flex flex-col bg-[#f6f8fc] text-[#0f172a]" style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}>
+      <body className="min-h-full flex flex-col bg-[#f6f8fc] text-[#0f172a]" style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }} suppressHydrationWarning>
         <Providers>
           {children}
           <Toaster richColors position="top-center" />

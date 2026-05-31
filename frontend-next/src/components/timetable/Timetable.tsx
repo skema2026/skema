@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import type { Schedule, ExamSchedule } from '@/types';
 import { useUIStore } from '@/store/uiStore';
 import { useUpdateSchedule } from '@/hooks/useSchedules';
-import { getScheduleColor, buildTitleColorMap, getScheduleColorKey } from '@/lib/scheduleColor';
+import { getDisplayColor } from '@/lib/scheduleColor';
 import { timeToMinutes, minutesToTime, dateStringToDow } from '@/lib/timetableParser';
 import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 
@@ -102,13 +102,12 @@ interface BlockProps {
   schedule:     Schedule;
   isConflict:   boolean;
   readOnly:     boolean;
-  isFaded:      boolean;   // true while this block is being dragged
-  colorMap:     Map<string, string>;
+  isFaded:      boolean;
   startMinutes: number;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>, s: Schedule, blockTopClientY: number) => void;
 }
 
-function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, startMinutes, onPointerDown }: BlockProps) {
+function EventBlock({ schedule: s, isConflict, readOnly, isFaded, startMinutes, onPointerDown }: BlockProps) {
   const startMins   = timeToMinutes(s.start_time);
   const endMins     = timeToMinutes(s.end_time);
   if (startMins < 0 || endMins <= startMinutes) return null;
@@ -120,7 +119,7 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, star
   const height      = Math.max(MIN_BLOCK_H, rawH);
   const durationMin = endMins - visibleStart;
   const isCompact   = durationMin < 45;
-  const color       = colorMap.get(getScheduleColorKey(s)) ?? getScheduleColor(s);
+  const color = getDisplayColor(s);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (readOnly) return;
@@ -190,16 +189,15 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, colorMap, star
 }
 
 /** Ghost block — shown at the snapped drop target while dragging */
-function GhostBlock({ schedule: s, slot, durationSlots, colorMap, startMinutes }: {
+function GhostBlock({ schedule: s, slot, durationSlots, startMinutes }: {
   schedule: Schedule;
   slot: number;
   durationSlots: number;
-  colorMap: Map<string, string>;
   startMinutes: number;
 }) {
   const top    = slot * SLOT_H;
   const height = Math.max(MIN_BLOCK_H, durationSlots * SLOT_H - 1);
-  const color  = colorMap.get(getScheduleColorKey(s)) ?? getScheduleColor(s);
+  const color = getDisplayColor(s);
   const durationMin = durationSlots * 30;
   const isCompact   = durationMin < 45;
 
@@ -274,9 +272,10 @@ interface TimetableProps {
   weekStart?: Date;
   startTime?: string;
   onExamClick?: (exam: ExamSchedule) => void;
+  onDayClick?: (date: Date) => void;
 }
 
-export function Timetable({ schedules, exams = [], readOnly = false, weekStart: weekStartProp, startTime, onExamClick }: TimetableProps) {
+export function Timetable({ schedules, exams = [], readOnly = false, weekStart: weekStartProp, startTime, onExamClick, onDayClick }: TimetableProps) {
   const weekStart = weekStartProp ?? getWeekStart();
   const startMinutes = useMemo(() => normalizeGridStart(startTime), [startTime]);
   const totalSlots = useMemo(() => Math.ceil((END_MINUTES - startMinutes) / 30), [startMinutes]);
@@ -315,25 +314,7 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
     });
   }, [schedules]);
 
-  // ── 1b. Title-based color map (no hash collisions) ──────────────────────────
-  const titleColorMap = useMemo(() => buildTitleColorMap(unique), [unique]);
-
-  // ── 2. Conflict detection ───────────────────────────────────────────────────
-  const conflictIds = useMemo<Set<number>>(() => {
-    const ids = new Set<number>();
-    for (let i = 0; i < unique.length; i++) {
-      for (let j = i + 1; j < unique.length; j++) {
-        const a = unique[i], b = unique[j];
-        if (effectiveDow(a) !== effectiveDow(b)) continue;
-        const aS = timeToMinutes(a.start_time), aE = timeToMinutes(a.end_time);
-        const bS = timeToMinutes(b.start_time), bE = timeToMinutes(b.end_time);
-        if (aS < bE && bS < aE) { ids.add(a.id); ids.add(b.id); }
-      }
-    }
-    return ids;
-  }, [unique]);
-
-  // ── 3. Group by dow — date-based schedules filtered to current week ─────────
+  // ── 2. Group by dow — date-based schedules filtered to current week ─────────
   const byDow = useMemo<Record<number, Schedule[]>>(() => {
     const g: Record<number, Schedule[]> = { 0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] };
 
@@ -359,6 +340,23 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
     }
     return g;
   }, [unique, weekStart]);
+
+  // ── 3. Conflict detection — 현재 주에 실제 표시되는 일정만 비교 ──────────────
+  const conflictIds = useMemo<Set<number>>(() => {
+    const ids = new Set<number>();
+    for (let dow = 0; dow <= 6; dow++) {
+      const items = byDow[dow] ?? [];
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          const a = items[i], b = items[j];
+          const aS = timeToMinutes(a.start_time), aE = timeToMinutes(a.end_time);
+          const bS = timeToMinutes(b.start_time), bE = timeToMinutes(b.end_time);
+          if (aS < bE && bS < aE) { ids.add(a.id); ids.add(b.id); }
+        }
+      }
+    }
+    return ids;
+  }, [byDow]);
 
   // ── 4. Group exams by dow — filtered to current week ───────────────────────
   const examByDow = useMemo<Record<number, ExamSchedule[]>>(() => {
@@ -587,13 +585,16 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
           const sub   = hasExam ? '#92400e' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#2563eb' : '#aaa';
 
           return (
-            <div key={`hdr-${dow}`} style={{
-              flex:      1,
-              textAlign: 'center',
-              padding:   '5px 2px',
-              background: bg,
-              borderBottom: isPreExam && !hasExam ? '2px solid #fca5a5' : undefined,
-            }}>
+            <div key={`hdr-${dow}`}
+              onClick={() => onDayClick?.(colDate)}
+              style={{
+                flex:      1,
+                textAlign: 'center',
+                padding:   '5px 2px',
+                background: bg,
+                borderBottom: isPreExam && !hasExam ? '2px solid #fca5a5' : undefined,
+                cursor: onDayClick ? 'pointer' : undefined,
+              }}>
               <div style={{ fontSize: 11, fontWeight: 800, color, lineHeight: 1.2 }}>
                 {ALL_DAYS[dow]}
               </div>
@@ -706,7 +707,6 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                 isConflict={conflictIds.has(s.id)}
                 readOnly={readOnly}
                 isFaded={dragSnap?.scheduleId === s.id}
-                colorMap={titleColorMap}
                 startMinutes={startMinutes}
                 onPointerDown={handleBlockPointerDown}
               />
@@ -718,7 +718,6 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                 schedule={dragStateRef.current.schedule}
                 slot={dragSnap.slot}
                 durationSlots={dragStateRef.current.durationSlots}
-                colorMap={titleColorMap}
                 startMinutes={startMinutes}
               />
             )}

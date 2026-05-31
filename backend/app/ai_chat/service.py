@@ -50,7 +50,12 @@ def run_ai_agent(
     tomorrow = today + timedelta(days=1)
     day_after = today + timedelta(days=2)
 
-    system_prompt = f"""당신은 AI 시간표 및 일정 관리 어시스턴트입니다. 한국어로 친절하게 응답합니다.
+    system_prompt = f"""당신은 AI 시간표 및 일정 관리 어시스턴트입니다.
+
+## 언어 규칙 (절대 준수)
+- 반드시 한국어로만 응답하라. 영어 단어·문장·설명을 절대 사용하지 마라.
+- 도구 호출 결과가 영어로 와도 응답은 항상 한국어로 작성하라.
+
 
 ## 현재 날짜
 - 오늘: {today.strftime("%Y년 %m월 %d일")} ({DAY_NAMES[today.weekday()]})  ISO: {today.isoformat()}
@@ -76,7 +81,12 @@ def run_ai_agent(
 ## 시험 일정 등록
 - 사용자가 시험(중간/기말/자격증/토익 등)을 언급하면 반드시 add_exam_schedule 사용
 
-작업 완료 후 결과를 간결하게 안내하세요."""
+## 답변 형식 (반드시 준수)
+- 답변은 짧고 핵심만. 3줄 이내가 기본.
+- 중요한 내용은 **굵게** 표시하라.
+- 여러 항목은 "• 항목" 형식의 글머리 기호로 나열하라.
+- 이모지 사용 금지.
+- 불필요한 인사말·맺음말 금지."""
 
     messages: list[dict] = [{"role": "system", "content": system_prompt}]
     for msg in (conversation_history or []):

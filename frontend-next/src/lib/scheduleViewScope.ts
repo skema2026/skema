@@ -27,7 +27,3 @@ export function targetsToScope(targets: ScheduleViewTarget[]): ScheduleViewScope
 export function scheduleVisibleIn(schedule: Pick<Schedule, 'view_scope'>, target: ScheduleViewTarget): boolean {
   return scopeToTargets(schedule.view_scope).includes(target);
 }
-
-export function defaultScopeForMode(isRecurring: boolean): ScheduleViewScope {
-  return isRecurring ? 'day_week' : 'day_month';
-}

@@ -21,17 +21,6 @@ const getCurrentPushPermission = (): PushPermission => {
   return Notification.permission as PushPermission;
 };
 
-const getStoredReminderEnabled = () => (
-  typeof window === 'undefined'
-    ? true
-    : localStorage.getItem('skema_notif_enabled') !== 'false'
-);
-
-const getStoredReminderMinutes = () => {
-  if (typeof window === 'undefined') return 30;
-  const minutes = parseInt(localStorage.getItem('skema_notif_minutes') || '30', 10);
-  return Number.isFinite(minutes) ? minutes : 30;
-};
 
 export function usePushNotifications() {
   const [permission, setPermission] = useState<PushPermission>(getCurrentPushPermission);
@@ -110,19 +99,23 @@ export function usePushNotifications() {
 }
 
 export type NotificationPrefs = {
+  reminder_start: boolean;
+  reminder_incomplete: boolean;
+  reminder_minutes: number;
+  exam_alert: boolean;
   motivation: boolean;
   weekly_report: boolean;
-  reminder: boolean;
   comparison: boolean;
-  exam_alert: boolean;
 };
 
 const DEFAULT_PREFS: NotificationPrefs = {
+  reminder_start: true,
+  reminder_incomplete: true,
+  reminder_minutes: 30,
+  exam_alert: true,
   motivation: true,
   weekly_report: true,
-  reminder: true,
-  comparison: true,
-  exam_alert: true,
+  comparison: false,
 };
 
 export function useNotificationPrefs() {
@@ -136,28 +129,14 @@ export function useNotificationPrefs() {
       .finally(() => setLoading(false));
   }, []);
 
-  const updatePref = useCallback(async (key: keyof NotificationPrefs, value: boolean) => {
-    const next = { ...prefs, [key]: value };
-    setPrefs(next);
-    await api.put('/notifications/prefs', next);
-  }, [prefs]);
+  // functional update로 항상 최신 prefs 기반 → 연속 토글 시 덮어쓰기 방지
+  const updatePref = useCallback(<K extends keyof NotificationPrefs>(key: K, value: NotificationPrefs[K]) => {
+    setPrefs((prev) => {
+      const next = { ...prev, [key]: value };
+      api.put('/notifications/prefs', next).catch(() => {});
+      return next;
+    });
+  }, []);
 
   return { prefs, loading, updatePref };
-}
-
-export function useReminderSettings() {
-  const [enabled, setEnabled] = useState(getStoredReminderEnabled);
-  const [minutes, setMinutes] = useState(getStoredReminderMinutes);
-
-  const setNotifEnabled = useCallback((val: boolean) => {
-    setEnabled(val);
-    localStorage.setItem('skema_notif_enabled', val ? 'true' : 'false');
-  }, []);
-
-  const setNotifMinutes = useCallback((val: number) => {
-    setMinutes(val);
-    localStorage.setItem('skema_notif_minutes', String(val));
-  }, []);
-
-  return { enabled, minutes, setNotifEnabled, setNotifMinutes };
 }

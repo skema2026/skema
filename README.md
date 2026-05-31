@@ -1,206 +1,140 @@
-# SKEMA — AI 기반 개인 시간표·학습 관리
+# SKEMA — AI 기반 학생 시간표·학습 관리 플랫폼
 
-> Scheme에서 따온 이름, SKEMA. 학생의 시간표와 학습 일정을 스마트하게 관리하고, AI가 일정 파싱·채팅·준비도 분석까지 도와줍니다.
+> **"내 시간표를 AI가 이해하고, 함께 관리한다"**  
+> 단국대학교 2026-1 캡스톤디자인 프로젝트
 
 ---
 
-## 주요 기능
+## 프로젝트 소개
 
-- **시간표 OCR**: 시간표 이미지를 업로드하면 AI가 자동으로 일정을 파싱·등록
-- **일정 CRUD**: 과목명, 요일/시간, 장소, 메모, 우선순위, 유형(수업/자율학습/과제/활동/개인)
-- **시험 일정 관리**: 중간·기말·퀴즈 등 시험 일정 별도 관리
-- **이벤트 관리**: 수업·시험 외 별도 이벤트 일정 등록
-- **AI 채팅**: 일정 기반 맥락을 이해하는 AI 어시스턴트 (GPT-4.1)
-- **준비도 진단**: 시험 연결 일정 수행률 분석 + AI 피드백
-- **대시보드**: 오늘 일정 요약, 다음 일정, 빈 시간대 시각화
-- **알림 센터**: 앱 내 알림 목록, 읽음 처리, 알림 설정(유형별 ON/OFF)
-- **웹 푸시 알림**: Service Worker 기반 OS 푸시 알림 (Android 즉시 / iOS PWA 필요)
-  - 일정 시작 30분 전 리마인더
-  - 매일 09:00 동기부여 메시지
-  - 매주 월요일 주간 수행률 리포트
-  - 매주 수요일 평균 대비 비교 알림
-- **카카오 알림**: 카카오톡으로 일정 요약 메시지 발송
-- **일정 공유**: 읽기 전용 공유 토큰으로 시간표 URL 공유
-- **OAuth 로그인**: Kakao · Naver OAuth + 이메일/비밀번호 JWT 인증
+SKEMA는 대학생의 시간표 관리 문제를 AI로 해결하는 웹 애플리케이션입니다.
+
+기존 시간표 앱은 단순 일정 기록에 그쳤습니다. SKEMA는 시간표 이미지를 올리면 AI가 자동으로 일정을 파싱하고, 등록된 일정을 바탕으로 AI와 대화하며 학습 계획을 세우고, 시험 준비도까지 분석해 줍니다. 웹 푸시 알림으로 놓치는 일정 없이 하루를 관리할 수 있습니다.
+
+---
+
+## 핵심 기능
+
+### AI 기반 자동화
+- **시간표 OCR** — 강의계획서·시간표 이미지를 업로드하면 GPT-4.1이 과목명·요일·시간·장소를 자동 추출해 일정으로 등록
+- **AI 채팅 어시스턴트** — 등록된 일정을 맥락으로 이해하는 AI. "내일 오후 비는 시간 알려줘", "수학 일정 추가해줘" 등 자연어 명령으로 일정 관리
+- **시험 준비도 진단** — 시험 연결 일정의 수행률을 분석하고 AI가 피드백 제공
+- **하루 정리 / 내일 준비** — 버튼 하나로 오늘 일정 요약 및 내일 준비 사항을 AI가 정리
+
+### 일정 관리
+- **다중 뷰** — 하루·주간·월간 시간표를 탭 전환으로 확인. 드래그&드롭으로 일정 시간 변경 가능
+- **일정 유형 분류** — 수업·자율학습·과제·시험·개인 유형별 색상 구분
+- **시험 D-day 관리** — 시험 일정 별도 등록. D-7·D-3·D-1·당일 자동 알림
+- **빈 시간 시각화** — 기상 시간 기준 하루의 빈 시간대를 계산해 표시
+- **일정 공유** — 읽기 전용 공유 링크로 시간표를 외부에 공유
+
+### 알림 시스템
+- **개인화 리마인더** — 일정 시작 5·10·15·30·60분 전 선택 알림 (서버 설정 동기화)
+- **미완료 알림** — 일정 종료 후에도 완료 처리 안 된 경우 자동 알림
+- **주간 리포트** — 매주 월요일 08:00 지난주 수행률·이번주 일정 수 요약 발송
+- **동기부여 메시지** — 매일 09:00 학습 동기 메시지
+- **웹 푸시** — Service Worker 기반 OS 알림 (Android Chrome 즉시 / iOS Safari PWA 지원)
+
+### 사용자 경험
+- **PWA 지원** — 모바일 홈 화면에 설치해 앱처럼 사용 가능
+- **OAuth 로그인** — Kakao·Naver·Google OAuth + 이메일/비밀번호 JWT 인증
+- **반응형 UI** — 모바일·태블릿·데스크탑 전 환경 최적화
+- **Optimistic Update** — 일정 추가·수정·삭제 시 서버 응답 전에 화면이 즉시 반영
 
 ---
 
 ## 기술 스택
 
-| 영역 | 기술 |
-|------|------|
-| 프런트엔드 | Next.js 15, React 19, TypeScript, Tailwind CSS v4, shadcn/ui |
-| 상태관리 | Zustand v5, TanStack React Query v5 |
-| 백엔드 | FastAPI (Python 3.11+), SQLAlchemy ORM, Alembic |
-| 데이터베이스 | MySQL 8.0 |
-| 인증 | JWT (python-jose, bcrypt) + Kakao OAuth 2.0 |
-| AI | OpenAI GPT-4.1 (채팅·OCR·준비도 분석) |
-| 알림 | APScheduler (푸시 스케줄러) + Web Push API (VAPID) + Kakao 메시지 API |
-| 운영 | Docker, Docker Compose |
+| 영역 | 기술 | 선택 이유 |
+|------|------|----------|
+| 프런트엔드 | Next.js 15, React 19, TypeScript | App Router + SSR으로 초기 로딩 최적화 |
+| 스타일 | Tailwind CSS v4, shadcn/ui | 빠른 UI 구성 + 일관된 디자인 시스템 |
+| 상태관리 | Zustand v5, TanStack React Query v5 | 서버 상태와 클라이언트 상태 분리 |
+| 백엔드 | FastAPI (Python 3.11+) | 비동기 처리 + 자동 Swagger 문서화 |
+| ORM / DB | SQLAlchemy, Alembic, MySQL 8.0 | 마이그레이션 이력 관리 |
+| AI | OpenAI GPT-4.1 (Tool Calling) | 일정 파싱·채팅·준비도 분석 |
+| 알림 | APScheduler + Web Push (VAPID) | 서버 사이드 스케줄 + 브라우저 푸시 |
+| 인프라 | Docker, Docker Compose | 환경 일관성 보장 |
+
+---
+
+## 시스템 아키텍처
+
+```
+[클라이언트 (Next.js)]
+    │  /proxy rewrite (dev)
+    │  REST API
+    ▼
+[FastAPI 백엔드]  ──────  [MySQL 8.0]
+    │
+    ├── OpenAI GPT-4.1 (Tool Calling)
+    ├── APScheduler (알림 스케줄러)
+    │     ├── 매 30분: 일정 리마인더
+    │     ├── 매일 08:00: 시험 D-day 알림
+    │     ├── 매일 09:00: 동기부여 메시지
+    │     └── 매주 월요일: 주간 리포트
+    └── Web Push (VAPID / pywebpush)
+            ▼
+    [Service Worker → OS 푸시 알림]
+```
 
 ---
 
 ## 빠른 시작
 
-### Docker Compose (권장)
+### 사전 준비
 
-**사전 준비**
-
-- Docker Desktop 설치 및 실행 확인
-- `.env` 파일 설정 (아래 [.env 필수 키](#env-필수-키) 참고)
+- Docker Desktop 설치 및 실행
+- `.env` 파일 설정
 
 ```bash
 cp .env.example .env
-# .env 파일에 필요한 키 입력
+# .env 파일에 아래 필수 키 입력
 ```
 
----
-
-#### 프로덕션 모드 (`docker-compose.yml`)
-
-MySQL + 백엔드 + 프런트엔드를 모두 컨테이너로 실행합니다.
+### 실행
 
 ```bash
-# 빌드 후 백그라운드 실행
+# 전체 서비스 실행 (DB + 백엔드 + 프런트)
 docker compose up -d --build
 
-# 특정 서비스만 재빌드
-docker compose up -d --build backend
-
-# 실행 중인 컨테이너 확인
-docker compose ps
-
-# 전체 로그 스트리밍
+# 로그 확인
 docker compose logs -f
-
-# 특정 서비스 로그만 보기
-docker compose logs -f backend
-
-# 중지 (컨테이너만 제거, 볼륨 유지)
-docker compose down
-
-# 중지 + 볼륨까지 삭제 (DB 초기화 시)
-docker compose down -v
 ```
 
-접속 주소:
-
-| 서비스 | URL |
-|--------|-----|
+| 서비스 | 주소 |
+|--------|------|
 | 프런트엔드 | http://localhost:3000 |
 | 백엔드 API | http://localhost:8000 |
-| Swagger 문서 | http://localhost:8000/docs |
+| API 문서 (Swagger) | http://localhost:8000/docs |
 
----
-
-#### 개발 모드 (`docker-compose.dev.yml`)
-
-코드 변경 시 자동 재시작(hot-reload)이 활성화됩니다.
+### 개발 모드 (Hot-reload)
 
 ```bash
-# DB + 백엔드만 컨테이너로 실행 (프런트는 로컬 dev 서버 사용)
+# DB + 백엔드만 컨테이너로
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db backend
 
-# 프런트 dev 서버 별도 실행
+# 프런트 로컬 dev 서버
 cd frontend-next && npm run dev
-
-# 백엔드 재시작
-docker compose -f docker-compose.yml -f docker-compose.dev.yml restart backend
 ```
 
 ---
 
-#### 컨테이너 내부 명령 실행
-
-```bash
-# 백엔드 컨테이너 셸 접속
-docker compose exec backend bash
-
-# DB 마이그레이션 수동 실행
-docker compose exec backend alembic upgrade head
-```
-
----
-
-### 로컬 개발 (Docker 없이)
-
-**백엔드**
-
-```bash
-cd backend
-cp .env.example .env
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload
-```
-
-**프런트엔드**
-
-```bash
-cd frontend-next
-cp .env.local.example .env.local   # 없으면 직접 생성 (아래 참고)
-npm install
-npm run dev
-```
-
-`frontend-next/.env.local`:
-```
-NEXT_PUBLIC_API_URL=/proxy
-INTERNAL_API_URL=http://localhost:8000
-```
-
----
-
-### 모바일 테스트 (ngrok)
-
-모바일(Android/iPhone)에서 로컬 개발 서버를 테스트할 때 사용합니다.
-
-1. ngrok 설치 및 계정 연동
-   ```bash
-   winget install ngrok.ngrok
-   ngrok config add-authtoken <토큰>
-   ```
-
-2. ngrok 실행 (프런트 dev 서버가 켜진 상태에서)
-   ```bash
-   ngrok http 3000
-   ```
-   → 표시된 `https://xxxx.ngrok-free.app` URL 메모
-
-3. `frontend-next/next.config.ts`의 `allowedDevOrigins` 업데이트
-   ```ts
-   allowedDevOrigins: ['xxxx.ngrok-free.app'],
-   ```
-
-4. 루트 `.env` 업데이트
-   ```
-   CORS_ORIGINS=http://localhost:3000,https://xxxx.ngrok-free.app
-   FRONTEND_URL=https://xxxx.ngrok-free.app
-   ```
-
-5. 백엔드 재시작 후 모바일에서 ngrok URL 접속
-
-> **iOS 푸시 알림**: Safari에서 공유 버튼 → "홈 화면에 추가" 후 해당 아이콘으로 실행해야 동작 (iOS 16.4+ 필요)  
-> **Android 푸시 알림**: Chrome 브라우저 탭에서 바로 동작  
-> **ngrok 무료 플랜**: 재실행 시 URL이 바뀌므로 3~5단계 반복 필요
-
----
-
-## .env 필수 키
+## 환경 변수
 
 ```env
-# MySQL
-MYSQL_ROOT_PASSWORD=...
+# DB
+MYSQL_ROOT_PASSWORD=your_password
 MYSQL_DATABASE=skema_db
-MYSQL_USER=...
-MYSQL_PASSWORD=...
+MYSQL_USER=skema
+MYSQL_PASSWORD=your_password
 
 # JWT
-SECRET_KEY=...
+SECRET_KEY=your_secret_key
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
 # AI
-OPENAI_API_KEY=...
+OPENAI_API_KEY=sk-...
 
 # Web Push (VAPID)
 VAPID_PUBLIC_KEY=...
@@ -212,8 +146,6 @@ KAKAO_CLIENT_ID=...
 KAKAO_CLIENT_SECRET=...
 NAVER_CLIENT_ID=...
 NAVER_CLIENT_SECRET=...
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
 
 # URL
 FRONTEND_URL=http://localhost:3000
@@ -223,54 +155,42 @@ BACKEND_URL=http://localhost:8000
 
 ---
 
-## 폴더 구조
+## 프로젝트 구조
 
 ```
 capstone-design-2026-1/
 ├── docker-compose.yml
 ├── docker-compose.dev.yml
 ├── .env.example
-├── backend/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── alembic.ini
-│   ├── alembic/versions/       # DB 마이그레이션 이력
+│
+├── backend/                        # FastAPI 백엔드
 │   └── app/
-│       ├── main.py             # FastAPI 진입점 + 라우터 등록
-│       ├── ai_chat/            # AI 채팅·준비도 진단 API
-│       ├── auth/               # JWT + OAuth 인증, 프로필
-│       ├── eta/                # 시간표 이미지 OCR 파서
-│       ├── kakao/              # 카카오 OAuth·메시지 API
-│       ├── notification/       # APScheduler 푸시 스케줄러 + 알림 CRUD
-│       ├── schedule/           # 일정·시험·이벤트 CRUD
-│       ├── share/              # 공유 토큰
-│       ├── admin/              # 관리자 API
-│       ├── core/               # 설정, JWT, LLM 유틸
-│       └── db/                 # DB 세션·베이스
-└── frontend-next/
-    ├── Dockerfile
-    ├── public/
-    │   └── sw.js               # Service Worker (웹 푸시)
+│       ├── main.py                 # 진입점 + 라우터 등록
+│       ├── ai_chat/                # AI 채팅 · Tool Calling · 준비도 분석
+│       ├── auth/                   # JWT + OAuth (Kakao · Naver · Google)
+│       ├── eta/                    # 시간표 이미지 OCR 파서
+│       ├── notification/           # APScheduler + 웹 푸시 + 알림 CRUD
+│       ├── schedule/               # 일정 · 시험 · 이벤트 CRUD
+│       ├── share/                  # 공유 토큰
+│       └── core/                   # 설정 · JWT · LLM 유틸
+│
+└── frontend-next/                  # Next.js 15 프런트엔드
     └── src/
         ├── app/
-        │   ├── (auth)/         # 로그인·회원가입
-        │   ├── (app)/
-        │   │   ├── dashboard/  # 대시보드 (오늘 일정·AI 채팅)
-        │   │   ├── onboarding/ # 최초 시간표 등록
-        │   │   ├── notifications/ # 알림 센터
-        │   │   ├── profile/    # 프로필 설정
-        │   │   ├── report/     # 주간 리포트
-        │   │   └── ai_chat/    # AI 채팅
-        │   └── share/[token]/  # 공유 시간표 (읽기 전용)
+        │   ├── (auth)/             # 로그인 · 회원가입
+        │   └── (app)/
+        │       ├── dashboard/      # 메인 대시보드 (하루·주간·월간 시간표)
+        │       ├── onboarding/     # 최초 시간표 등록 (AI 채팅 기반)
+        │       ├── notifications/  # 알림 센터 · 알림 설정
+        │       ├── profile/        # 프로필 설정
+        │       ├── report/         # 주간 리포트
+        │       └── ai_chat/        # AI 채팅 전용 화면
         ├── components/
-        │   ├── timetable/      # 시간표 뷰
-        │   ├── class-form/     # 과목 추가·수정 폼
-        │   ├── ai-chat/        # AI 채팅 컴포넌트
-        │   └── ui/             # shadcn/ui 공통 컴포넌트
-        ├── hooks/              # useSchedules, useExams, useProfile, usePushNotifications 등
-        ├── store/              # authStore (Zustand)
-        ├── lib/                # Axios 클라이언트, 서버 fetch
-        └── types/              # 공통 TypeScript 타입
+        │   ├── timetable/          # 주간 시간표 (드래그&드롭)
+        │   └── class-form/         # 일정 추가·수정 폼
+        ├── hooks/                  # 데이터 패칭 훅 (React Query)
+        ├── lib/                    # API 클라이언트 · 색상 · 유틸
+        └── store/                  # 인증 상태 (Zustand)
 ```
 
 ---
@@ -281,23 +201,14 @@ capstone-design-2026-1/
 |--------|------|------|
 | POST | `/auth/signup` | 회원가입 |
 | POST | `/auth/login` | JWT 로그인 |
-| GET | `/auth/{provider}/authorize` | OAuth 로그인 (kakao, naver) |
-| GET/PUT | `/users/me` | 내 정보 조회/수정 |
-| GET/PUT | `/profiles` | 프로필 조회/수정 |
+| GET | `/auth/{provider}/authorize` | OAuth 로그인 |
 | GET/POST | `/schedules` | 일정 목록/추가 |
 | PUT/DELETE | `/schedules/{id}` | 일정 수정/삭제 |
 | GET/POST | `/exam-schedules` | 시험 일정 조회/추가 |
-| GET/POST | `/events` | 이벤트 조회/추가 |
-| POST | `/eta/parse-image` | 시간표 이미지 OCR |
-| POST | `/eta/save-schedules` | OCR 결과 일정 저장 |
-| POST | `/ai/chat` | AI 채팅 |
+| POST | `/eta/parse-image` | 시간표 OCR 파싱 |
+| POST | `/ai/chat` | AI 채팅 (Tool Calling) |
 | POST | `/ai/readiness-summary` | 시험 준비도 AI 진단 |
-| GET | `/notifications` | 알림 목록 |
 | GET/PUT | `/notifications/prefs` | 알림 설정 조회/수정 |
-| GET | `/push/public-key` | VAPID 공개키 |
-| POST | `/push/subscriptions` | 푸시 구독 등록 |
-| DELETE | `/push/subscriptions` | 푸시 구독 해제 |
-| POST | `/push/test` | 테스트 푸시 발송 |
+| POST | `/push/subscriptions` | 웹 푸시 구독 등록 |
 | POST | `/share-tokens` | 공유 토큰 생성 |
 | GET | `/share/{token}` | 공유 시간표 조회 |
-| POST | `/kakao/notify/schedule-summary` | 카카오톡 일정 알림 |
