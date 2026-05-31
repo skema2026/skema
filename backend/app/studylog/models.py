@@ -50,6 +50,7 @@ class StudyLog(Base):
     schedule_id = Column(Integer, ForeignKey("schedules.id", ondelete="SET NULL"), nullable=True, index=True)
     photo_path  = Column(String(512), nullable=True)
     caption     = Column(String(200), nullable=True)
+    is_public   = Column(Boolean, nullable=False, default=True)
     created_at  = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     user    = relationship("User", backref="study_logs")

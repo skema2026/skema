@@ -17,6 +17,7 @@ class StudyLogOut(BaseModel):
     schedule_title: Optional[str] = None
     photo_url: Optional[str] = None
     caption: Optional[str] = None
+    is_public: bool = True
     created_at: datetime
     reactions: list[ReactionOut] = []
     my_reactions: list[str] = []

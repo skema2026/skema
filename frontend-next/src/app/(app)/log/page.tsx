@@ -237,16 +237,18 @@ function UploadModal({
   const [file, setFile]         = useState<File | null>(null);
   const [caption, setCaption]   = useState('');
   const [groupId, setGroupId]   = useState<number | null>(defaultGroupId ?? (groups[0]?.id ?? null));
+  const [isPublic, setIsPublic] = useState(true);
 
   const handleFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)); };
 
   const handleSubmit = async () => {
     if (!file && !caption.trim()) { toast.error('사진 또는 한 마디를 입력해주세요.'); return; }
     const form = new FormData();
-    if (file)          form.append('photo', file);
+    if (file)           form.append('photo', file);
     if (caption.trim()) form.append('caption', caption);
     if (groupId)        form.append('group_id', String(groupId));
     if (scheduleId)     form.append('schedule_id', String(scheduleId));
+    form.append('is_public', String(isPublic));
     try {
       await create.mutateAsync(form);
       toast.success('기록이 등록됐습니다!');
@@ -321,8 +323,39 @@ function UploadModal({
           value={caption}
           onChange={e => setCaption(e.target.value.slice(0, 200))}
           rows={3}
-          className="mb-4 w-full resize-none rounded-2xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          className="mb-3 w-full resize-none rounded-2xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
         />
+
+        {/* 공개 / 비공개 */}
+        {!groupId && (
+          <div className="mb-4 flex items-center justify-between rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 py-3">
+            <div>
+              <p className="text-sm font-black text-slate-950">
+                {isPublic ? '전체 공개' : '나만 보기'}
+              </p>
+              <p className="text-[11px] font-bold text-slate-400">
+                {isPublic ? '모든 사용자의 피드에 표시됩니다' : '내 기록 탭에서만 볼 수 있어요'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPublic(v => !v)}
+              style={{
+                width: 44, height: 26, borderRadius: 99,
+                background: isPublic ? '#2563eb' : '#e2e8f0',
+                border: 'none', cursor: 'pointer', padding: 0,
+                position: 'relative', transition: 'background .2s',
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 2, left: isPublic ? 20 : 2,
+                width: 22, height: 22, borderRadius: '50%',
+                background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+                transition: 'left .2s',
+              }} />
+            </button>
+          </div>
+        )}
 
         <button
           type="button"
@@ -784,11 +817,17 @@ export default function LogPage() {
                     return (
                       <article key={log.id} className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
                         <div className="flex items-center justify-between px-4 py-3">
-                          <div>
+                          <div className="flex items-center gap-2">
                             {log.schedule_title
                               ? <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">{log.schedule_title} 완료</span>
                               : <span className="text-[11px] text-slate-400">{new Date(log.created_at).toLocaleDateString('ko-KR')}</span>
                             }
+                            {!log.is_public && (
+                              <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-500">
+                                <MaterialIcon icon="lock" size={10} color="#64748b" />
+                                나만 보기
+                              </span>
+                            )}
                           </div>
                           <button type="button" onClick={() => handleDeleteMyLog(log.id)}
                             className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-300 transition hover:bg-red-50 hover:text-red-400">

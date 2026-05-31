@@ -61,6 +61,7 @@ def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = Non
         schedule_title=schedule_title_val,
         photo_url=_photo_url(log.photo_path) if log.photo_path else None,
         caption=log.caption,
+        is_public=log.is_public,
         created_at=log.created_at,
         reactions=reactions_out,
         my_reactions=my_reactions,
@@ -73,6 +74,7 @@ async def create_study_log(
     caption: Optional[str] = Form(None),
     group_id: Optional[int] = Form(None),
     schedule_id: Optional[int] = Form(None),
+    is_public: bool = Form(True),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -107,12 +109,14 @@ async def create_study_log(
         if not sched:
             schedule_id = None
 
+    # 그룹에 올리는 기록은 그룹 내 공개가 기본, 별도 is_public로 글로벌 피드 노출 제어
     log = StudyLog(
         user_id=current_user.id,
         group_id=group_id,
         schedule_id=schedule_id,
         photo_path=photo_path,
         caption=caption[:200] if caption else None,
+        is_public=is_public,
     )
     db.add(log)
     db.commit()
@@ -176,11 +180,11 @@ def get_feed(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """그룹에 속하지 않은 글로벌 공개 피드."""
+    """그룹에 속하지 않은 글로벌 공개 피드 (is_public=True만)."""
     limit = min(limit, 50)
     q = (
         db.query(StudyLog)
-        .filter(StudyLog.group_id == None)  # noqa: E711
+        .filter(StudyLog.group_id == None, StudyLog.is_public == True)  # noqa: E711,E712
         .options(joinedload(StudyLog.user), joinedload(StudyLog.reactions))
         .order_by(StudyLog.created_at.desc())
     )
