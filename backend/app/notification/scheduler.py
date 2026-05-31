@@ -332,6 +332,44 @@ def job_comparison():
         db.close()
 
 
+def job_flush_like_queue():
+    """5분마다: 좋아요 큐를 (target_user, content) 단위로 묶어 배치 푸시."""
+    from app.notification.models import LikeNotificationQueue
+    from app.notification.service import send_push_to_user
+
+    db = _get_db()
+    try:
+        rows = db.query(LikeNotificationQueue).order_by(LikeNotificationQueue.queued_at).all()
+        if not rows:
+            return
+
+        # (target_user_id, content_type, content_id) → [liker_name, ...]
+        groups: dict[tuple, list[str]] = {}
+        for row in rows:
+            key = (row.target_user_id, row.content_type, row.content_id)
+            groups.setdefault(key, []).append(row.liker_name)
+
+        for (target_user_id, content_type, content_id), names in groups.items():
+            if not _is_notif_enabled(db, target_user_id, "log_like"):
+                continue
+            unique_names = list(dict.fromkeys(names))   # 순서 유지 dedup
+            if len(unique_names) == 1:
+                body = f"{unique_names[0]}님이 {'기록' if content_type == 'log' else '게시글'}에 좋아요를 눌렀어요"
+            else:
+                body = f"{', '.join(unique_names[:3])}{'님 외 여러 명' if len(unique_names) > 3 else '님'}이 좋아요를 눌렀어요"
+            url = "/log" if content_type == "log" else "/feed"
+            send_push_to_user(db, target_user_id, title="좋아요", body=body, url=url, ntype="log_like")
+
+        for row in rows:
+            db.delete(row)
+        db.commit()
+        logger.info("job_flush_like_queue: sent %d batches", len(groups))
+    except Exception as e:
+        logger.error("job_flush_like_queue failed: %s", e, exc_info=True)
+    finally:
+        db.close()
+
+
 _scheduler = None
 
 
@@ -347,6 +385,7 @@ def start_scheduler():
         _scheduler.add_job(job_exam_alert,       CronTrigger(hour=8, minute=0))
         _scheduler.add_job(job_daily_motivation, CronTrigger(hour=9, minute=0))
         _scheduler.add_job(job_reminders,        CronTrigger(minute="*/30"), misfire_grace_time=60)
+        _scheduler.add_job(job_flush_like_queue, CronTrigger(minute="*/5"),  misfire_grace_time=60)
 
         _scheduler.start()
         logger.info("Notification scheduler started")

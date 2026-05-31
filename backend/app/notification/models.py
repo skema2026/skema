@@ -21,6 +21,18 @@ class Notification(Base):
     related_schedule_id = Column(BigInteger, ForeignKey("schedules.id", ondelete="SET NULL"), nullable=True)
 
 
+class LikeNotificationQueue(Base):
+    """좋아요 묶음 알림 큐 — 5분마다 스케줄러가 배치 발송."""
+    __tablename__ = "like_notification_queue"
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    target_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    liker_name     = Column(String(100), nullable=False)
+    content_type   = Column(String(10), nullable=False)   # 'post' | 'log'
+    content_id     = Column(Integer, nullable=False)
+    queued_at      = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class PushSubscription(Base):
     __tablename__ = "push_subscriptions"
 

@@ -158,17 +158,17 @@ def toggle_like(
         db.add(PostLike(post_id=post_id, user_id=current_user.id))
     db.commit()
 
-    # 새 좋아요면 작성자에게 알림 (본인 제외)
+    # 새 좋아요면 큐에 적재 (5분 주기 배치 발송)
     if is_new and post.author_id != current_user.id:
-        from app.notification.service import send_push_to_user
         from app.notification.scheduler import _is_notif_enabled
+        from app.notification.models import LikeNotificationQueue
         if _is_notif_enabled(db, post.author_id, "log_like"):
-            send_push_to_user(
-                db, post.author_id,
-                title="좋아요",
-                body=f"{current_user.username}님이 게시글에 좋아요를 눌렀어요",
-                url="/feed",
-                ntype="log_like",
-            )
+            db.add(LikeNotificationQueue(
+                target_user_id=post.author_id,
+                liker_name=current_user.username,
+                content_type='post',
+                content_id=post_id,
+            ))
+            db.commit()
 
     return _post_out(_load_post(db, post_id), current_user.id)

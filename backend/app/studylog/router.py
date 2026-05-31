@@ -264,18 +264,18 @@ def toggle_reaction(
         db.add(StudyLogReaction(log_id=log_id, user_id=current_user.id, emoji=body.emoji))
     db.commit()
 
-    # 좋아요(👍) 새로 달렸을 때 기록 주인에게 알림 (본인 제외)
+    # 👍 새로 달렸을 때 큐에 적재 (5분 주기 배치 발송)
     if is_new and body.emoji == '👍' and log.user_id != current_user.id:
-        from app.notification.service import send_push_to_user
         from app.notification.scheduler import _is_notif_enabled
+        from app.notification.models import LikeNotificationQueue
         if _is_notif_enabled(db, log.user_id, "log_like"):
-            send_push_to_user(
-                db, log.user_id,
-                title="좋아요",
-                body=f"{current_user.username}님이 내 기록에 좋아요를 눌렀어요",
-                url="/log",
-                ntype="log_like",
-            )
+            db.add(LikeNotificationQueue(
+                target_user_id=log.user_id,
+                liker_name=current_user.username,
+                content_type='log',
+                content_id=log_id,
+            ))
+            db.commit()
 
     reactions = db.query(StudyLogReaction).filter(StudyLogReaction.log_id == log_id).all()
     counts = Counter(r.emoji for r in reactions)
