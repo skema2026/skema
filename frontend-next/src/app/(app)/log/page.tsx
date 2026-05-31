@@ -16,7 +16,28 @@ import {
 
 type Tab = 'feed' | 'me';
 
-// ── 좋아요/싫어요 버튼 ─────────────────────────────────────────────────────────
+function StatusPill({
+  children,
+  tone = 'blue',
+}: {
+  children: React.ReactNode;
+  tone?: 'blue' | 'green' | 'amber' | 'slate' | 'fire';
+}) {
+  const cls = {
+    blue:  'bg-blue-50 text-blue-700',
+    green: 'bg-emerald-50 text-emerald-700',
+    amber: 'bg-amber-50 text-amber-700',
+    slate: 'bg-slate-100 text-slate-600',
+    fire:  'bg-blue-600 text-white',
+  }[tone];
+  return (
+    <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${cls}`}>
+      {children}
+    </span>
+  );
+}
+
+// ── 좋아요/싫어요 ────────────────────────────────────────────────────────────
 
 function LikeButtons({
   logId,
@@ -28,8 +49,7 @@ function LikeButtons({
   myReactions: string[];
 }) {
   const toggle = useToggleReaction();
-
-  const likeCount  = reactions.find(r => r.emoji === '👍')?.count ?? 0;
+  const likeCount    = reactions.find(r => r.emoji === '👍')?.count ?? 0;
   const dislikeCount = reactions.find(r => r.emoji === '👎')?.count ?? 0;
   const liked    = myReactions.includes('👍');
   const disliked = myReactions.includes('👎');
@@ -39,32 +59,32 @@ function LikeButtons({
       <button
         type="button"
         onClick={() => toggle.mutate({ logId, emoji: '👍' })}
-        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-black transition ${
+        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition ${
           liked
             ? 'border-blue-500 bg-blue-600 text-white'
             : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:text-blue-600'
         }`}
       >
-        <MaterialIcon icon="thumb_up" size={14} color={liked ? '#fff' : 'currentColor'} />
+        <MaterialIcon icon="thumb_up" size={13} color={liked ? '#fff' : 'currentColor'} />
         <span>{likeCount > 0 ? likeCount : '좋아요'}</span>
       </button>
       <button
         type="button"
         onClick={() => toggle.mutate({ logId, emoji: '👎' })}
-        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-black transition ${
+        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition ${
           disliked
             ? 'border-slate-500 bg-slate-700 text-white'
             : 'border-slate-200 bg-white text-slate-400 hover:border-slate-400'
         }`}
       >
-        <MaterialIcon icon="thumb_down" size={14} color={disliked ? '#fff' : 'currentColor'} />
+        <MaterialIcon icon="thumb_down" size={13} color={disliked ? '#fff' : 'currentColor'} />
         <span>{dislikeCount > 0 ? dislikeCount : '싫어요'}</span>
       </button>
     </div>
   );
 }
 
-// ── 게시글 카드 ────────────────────────────────────────────────────────────────
+// ── 게시글 카드 ───────────────────────────────────────────────────────────────
 
 function LogCard({
   log,
@@ -85,32 +105,41 @@ function LogCard({
     return `${Math.floor(h / 24)}일 전`;
   })();
 
+  const avatarColors = ['#2563eb', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+  const color = avatarColors[log.user_id % avatarColors.length];
+
   return (
     <article className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
       {/* 헤더 */}
       <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-sm font-black text-white shadow-sm">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-black text-white"
+            style={{ background: color }}
+          >
             {log.username.slice(0, 1).toUpperCase()}
           </div>
           <div>
             <p className="text-sm font-black text-slate-950">{log.username}</p>
-            {log.schedule_title ? (
-              <p className="text-[11px] font-bold text-blue-600">{log.schedule_title} 완료</p>
-            ) : (
-              <p className="text-[11px] font-bold text-slate-400">{relTime}</p>
-            )}
+            <div className="mt-0.5 flex items-center gap-1.5">
+              {log.schedule_title ? (
+                <StatusPill tone="blue">{log.schedule_title} 완료</StatusPill>
+              ) : (
+                <span className="text-[11px] font-bold text-slate-400">{relTime}</span>
+              )}
+              {log.schedule_title && (
+                <span className="text-[11px] text-slate-400">{relTime}</span>
+              )}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {log.schedule_title && (
-            <span className="text-[11px] text-slate-400">{relTime}</span>
-          )}
+        <div className="flex items-center gap-1.5">
+          {!log.is_public && <StatusPill tone="slate">비공개</StatusPill>}
           {isMe && onDelete && (
             <button
               type="button"
               onClick={() => onDelete(log.id)}
-              className="rounded-lg p-1 text-slate-300 transition hover:text-red-400"
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-300 transition hover:bg-red-50 hover:text-red-400"
             >
               <MaterialIcon icon="delete" size={16} color="currentColor" />
             </button>
@@ -146,7 +175,7 @@ function LogCard({
   );
 }
 
-// ── 업로드 모달 ────────────────────────────────────────────────────────────────
+// ── 업로드 모달 ───────────────────────────────────────────────────────────────
 
 function UploadModal({
   onClose,
@@ -191,25 +220,29 @@ function UploadModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 backdrop-blur-sm sm:items-center">
       <div className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-base font-black text-slate-950">기록 남기기</p>
+        {/* 모달 헤더 */}
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
+            <MaterialIcon icon="edit" size={16} color="#fff" />
+          </div>
+          <p className="flex-1 text-base font-black text-slate-950">기록 남기기</p>
           <button type="button" onClick={onClose} className="text-slate-400">
             <MaterialIcon icon="close" size={20} color="currentColor" />
           </button>
         </div>
 
         {scheduleTitle && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2">
+          <div className="mb-3 flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2.5">
             <MaterialIcon icon="check_circle" size={14} color="#2563eb" />
             <p className="text-xs font-black text-blue-700">{scheduleTitle} 완료</p>
           </div>
         )}
 
-        {/* 사진 선택 (선택사항) */}
+        {/* 사진 (선택) */}
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="mb-3 flex w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 transition hover:bg-blue-50"
+          className="mb-3 flex w-full items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 transition hover:bg-blue-50"
           style={{ minHeight: preview ? undefined : '80px', aspectRatio: preview ? '4/3' : undefined }}
         >
           {preview ? (
@@ -235,12 +268,15 @@ function UploadModal({
           value={caption}
           onChange={(e) => setCaption(e.target.value.slice(0, 200))}
           rows={3}
-          className="mb-3 w-full resize-none rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          className="mb-3 w-full resize-none rounded-2xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
         />
 
         {/* 공개 여부 */}
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5">
-          <p className="text-sm font-black text-slate-950">전체 공개</p>
+        <div className="mb-4 flex items-center justify-between rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 py-3">
+          <div>
+            <p className="text-sm font-black text-slate-950">전체 공개</p>
+            <p className="text-[11px] font-bold text-slate-400">모든 SKEMA 사용자에게 보입니다</p>
+          </div>
           <button
             type="button"
             onClick={() => setIsPublic(v => !v)}
@@ -264,7 +300,7 @@ function UploadModal({
           type="button"
           onClick={handleSubmit}
           disabled={create.isPending}
-          className="w-full rounded-xl bg-blue-600 py-3 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-40"
+          className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-40"
         >
           {create.isPending ? '등록 중...' : '기록 남기기'}
         </button>
@@ -273,9 +309,9 @@ function UploadModal({
   );
 }
 
-// ── 메인 페이지 ────────────────────────────────────────────────────────────────
+// ── 메인 페이지 ───────────────────────────────────────────────────────────────
 
-export default function SetlogPage() {
+export default function LogPage() {
   const [tab, setTab] = useState<Tab>('feed');
   const [showUpload, setShowUpload] = useState(false);
 
@@ -299,97 +335,108 @@ export default function SetlogPage() {
   const loading = tab === 'feed' ? feedLoading : myLoading;
 
   return (
-    <div className="min-h-dvh bg-[#f8faff]">
+    <div className="min-h-dvh bg-[#eaf1ff]">
+      <div className="mx-auto max-w-lg min-h-dvh bg-[#f7f9ff]">
 
-      {/* 헤더 */}
-      <header className="sticky top-0 z-20 border-b border-blue-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-lg items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-[11px] font-black text-blue-600">SKEMA</p>
-              <h1 className="text-lg font-black text-slate-950">기록</h1>
-            </div>
-            {/* 스트릭 */}
-            {streak && streak.current_streak > 0 && (
-              <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
-                streak.today_checked ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
-              }`}>
-                <MaterialIcon icon="local_fire_department" size={13} color={streak.today_checked ? '#fff' : '#94a3b8'} />
-                {streak.current_streak}일 연속
+        {/* 헤더 */}
+        <header className="sticky top-0 z-20 border-b border-blue-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600">
+                <MaterialIcon icon="edit_note" size={18} color="#fff" />
               </div>
-            )}
+              <div>
+                <p className="text-[11px] font-black text-blue-600">SKEMA</p>
+                <h1 className="text-base font-black leading-none text-slate-950">기록</h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {streak && streak.current_streak > 0 && (
+                <StatusPill tone={streak.today_checked ? 'fire' : 'slate'}>
+                  🔥 {streak.current_streak}일 연속
+                </StatusPill>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowUpload(true)}
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+              >
+                <MaterialIcon icon="add" size={15} color="#fff" />
+                기록하기
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
-          >
-            <MaterialIcon icon="edit" size={15} color="#fff" />
-            기록하기
-          </button>
-        </div>
-      </header>
+        </header>
 
-      {/* 탭 */}
-      <div className="sticky top-[57px] z-10 border-b border-blue-100 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-lg">
-          {([['feed', '모두의 기록'], ['me', '내 기록']] as const).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`flex-1 py-3 text-sm font-black transition ${
-                tab === key
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 오늘 현황 */}
-      {todayStats && todayStats.today_users > 0 && tab === 'feed' && (
-        <div className="bg-blue-600 px-4 py-2.5">
-          <p className="mx-auto max-w-lg text-center text-xs font-black text-white/90">
-            오늘 {todayStats.today_users}명이 함께 기록하고 있어요
-          </p>
-        </div>
-      )}
-
-      {/* 피드 */}
-      <main className="mx-auto max-w-lg px-4 py-4">
-        {loading ? (
-          <div className="flex h-40 items-center justify-center text-sm text-slate-400">불러오는 중...</div>
-        ) : !logs?.length ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <MaterialIcon icon="edit_note" size={40} color="#cbd5e1" />
-            <p className="text-sm font-black text-slate-500">
-              {tab === 'feed' ? '아직 기록이 없어요' : '아직 내 기록이 없어요'}
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowUpload(true)}
-              className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-black text-white"
-            >
-              첫 기록 남기기
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {logs.map((log) => (
-              <LogCard
-                key={log.id}
-                log={log}
-                isMe={tab === 'me'}
-                onDelete={handleDelete}
-              />
+        {/* 탭 */}
+        <div className="sticky top-[57px] z-10 border-b border-blue-100 bg-white/95 backdrop-blur-sm">
+          <div className="flex">
+            {([['feed', '모두의 기록'], ['me', '내 기록']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTab(key)}
+                className={`flex-1 py-3 text-sm font-black transition ${
+                  tab === key
+                    ? 'border-b-2 border-blue-600 text-blue-600'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {label}
+              </button>
             ))}
           </div>
+        </div>
+
+        {/* 오늘 현황 */}
+        {todayStats && todayStats.today_users > 0 && tab === 'feed' && (
+          <div className="border-b border-blue-50 bg-blue-600 px-4 py-2.5">
+            <p className="text-center text-xs font-black text-white/90">
+              오늘 {todayStats.today_users}명이 함께 기록하고 있어요
+            </p>
+          </div>
         )}
-      </main>
+
+        {/* 피드 */}
+        <main className="px-4 py-4">
+          {loading ? (
+            <div className="flex h-40 items-center justify-center text-sm text-slate-400">
+              불러오는 중...
+            </div>
+          ) : !logs?.length ? (
+            <div className="mt-8 rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-sm">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
+                <MaterialIcon icon="edit_note" size={24} color="#93c5fd" />
+              </div>
+              <p className="text-sm font-black text-slate-700">
+                {tab === 'feed' ? '아직 기록이 없어요' : '아직 내 기록이 없어요'}
+              </p>
+              <p className="mt-1 text-xs font-bold text-slate-400">
+                {tab === 'feed' ? '첫 번째로 기록을 남겨보세요' : '공부한 내용을 기록으로 남겨보세요'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowUpload(true)}
+                className="mt-4 rounded-xl bg-blue-600 px-5 py-2 text-sm font-black text-white"
+              >
+                기록 남기기
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {logs.map((log) => (
+                <LogCard
+                  key={log.id}
+                  log={log}
+                  isMe={tab === 'me'}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          )}
+        </main>
+
+      </div>
 
       {showUpload && <UploadModal onClose={() => setShowUpload(false)} />}
     </div>
