@@ -42,17 +42,17 @@ def _photo_url(photo_path: str, request_base: str = "") -> str:
     return f"/uploads/studylogs/{filename}"
 
 
-def _build_log_out(log: StudyLog, current_user_id: int) -> StudyLogOut:
-    reaction_counts = Counter((r.emoji) for r in log.reactions)
+def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = None) -> StudyLogOut:
+    reaction_counts = Counter(r.emoji for r in log.reactions)
     my_reactions = [r.emoji for r in log.reactions if r.user_id == current_user_id]
     reactions_out = [{"emoji": e, "count": c} for e, c in reaction_counts.items()]
 
     username = log.user.username if log.user else "unknown"
-    schedule_title = None
-    if log.schedule_id:
-        schedule = log.user  # already loaded via relationship or fallback
-    # get schedule title safely
+
     schedule_title_val = None
+    if log.schedule_id and db:
+        sched = db.query(Schedule).filter(Schedule.id == log.schedule_id).first()
+        schedule_title_val = sched.title if sched else None
 
     return StudyLogOut(
         id=log.id,
@@ -60,7 +60,7 @@ def _build_log_out(log: StudyLog, current_user_id: int) -> StudyLogOut:
         username=username,
         schedule_id=log.schedule_id,
         schedule_title=schedule_title_val,
-        photo_url=_photo_url(log.photo_path),
+        photo_url=_photo_url(log.photo_path) if log.photo_path else None,
         caption=log.caption,
         is_public=log.is_public,
         created_at=log.created_at,
@@ -113,7 +113,7 @@ async def create_study_log(
     db.refresh(log)
     log.user  # trigger load
 
-    return _build_log_out(log, current_user.id)
+    return _build_log_out(log, current_user.id, db)
 
 
 @router.get("/today-stats")
@@ -165,7 +165,7 @@ def get_feed(
     total = q.count()
     logs = q.offset(offset).limit(limit).all()
     return FeedResponse(
-        items=[_build_log_out(log, current_user.id) for log in logs],
+        items=[_build_log_out(log, current_user.id, db) for log in logs],
         total=total,
         has_next=(offset + limit) < total,
     )
@@ -191,7 +191,7 @@ def get_my_logs(
     total = q.count()
     logs = q.offset(offset).limit(limit).all()
     return FeedResponse(
-        items=[_build_log_out(log, current_user.id) for log in logs],
+        items=[_build_log_out(log, current_user.id, db) for log in logs],
         total=total,
         has_next=(offset + limit) < total,
     )
@@ -206,8 +206,7 @@ def delete_study_log(
     log = db.query(StudyLog).filter(StudyLog.id == log_id, StudyLog.user_id == current_user.id).first()
     if not log:
         raise HTTPException(status_code=404, detail="로그를 찾을 수 없습니다.")
-    # 파일 삭제
-    if os.path.exists(log.photo_path):
+    if log.photo_path and os.path.exists(log.photo_path):
         os.remove(log.photo_path)
     db.delete(log)
     db.commit()

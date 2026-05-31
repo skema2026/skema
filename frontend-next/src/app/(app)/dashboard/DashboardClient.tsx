@@ -876,7 +876,7 @@ ${upcomingExamLines}
           onOpenAdminLogs={() => router.push('/admin/login-logs')}
           onLogout={handleLogout}
           onAddSchedule={() => openClassForm()}
-          onOpenSetlog={() => router.push('/setlog')}
+          onOpenSetlog={() => router.push('/log')}
           onReschedule={handleReschedule}
           onUploadTimetable={() => setIsEtaReimportOpen(true)}
           isRegenerating={isRegenerating}
