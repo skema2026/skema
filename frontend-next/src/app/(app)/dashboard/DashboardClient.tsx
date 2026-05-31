@@ -17,6 +17,7 @@ import { scheduleVisibleIn } from '@/lib/scheduleViewScope';
 import { getDisplayColor } from '@/lib/scheduleColor';
 import { useNotificationPrefs } from '@/hooks/usePushNotifications';
 import { useCreateStudyLog, useStreak } from '@/hooks/useStudyLogs';
+import { useMyGroups } from '@/hooks/useGroups';
 import { minutesToTime, timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { ExamSchedule, Schedule, UserProfile } from '@/types';
@@ -406,8 +407,11 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [isFreeTimeDialogOpen, setIsFreeTimeDialogOpen] = useState(false);
   const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
   const [certSchedule, setCertSchedule] = useState<{ id: number; title: string } | null>(null);
+  const [certGroupId, setCertGroupId]   = useState<number | null>(null);
+  const [certCaption, setCertCaption]   = useState('');
   const createStudyLog = useCreateStudyLog();
   const certFileRef = useRef<HTMLInputElement>(null);
+  const { data: myGroups = [] } = useMyGroups();
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
   const queryClient = useQueryClient();
   const timetableRef = useRef<HTMLDivElement | null>(null);
@@ -1746,7 +1750,7 @@ ${missedLines}
 
       <ClassForm />
 
-      {/* 인증샷 파일 선택 (완료 체크 연동) */}
+      {/* 인증샷 — 완료 체크 연동, 그룹 피드로 업로드 */}
       <input
         ref={certFileRef}
         type="file"
@@ -1757,37 +1761,94 @@ ${missedLines}
           if (!file || !certSchedule) return;
           const form = new FormData();
           form.append('photo', file);
-          form.append('is_public', 'true');
           form.append('schedule_id', String(certSchedule.id));
+          if (certCaption.trim()) form.append('caption', certCaption.trim());
+          if (certGroupId) form.append('group_id', String(certGroupId));
           try {
             await createStudyLog.mutateAsync(form);
-            toast.success('인증 완료!');
+            toast.success('기록이 그룹에 올라갔어요!');
           } catch {
             toast.error('업로드에 실패했습니다.');
           }
           setCertSchedule(null);
+          setCertCaption('');
           e.target.value = '';
         }}
       />
       {certSchedule && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 backdrop-blur-sm sm:items-center">
           <div className="w-full max-w-sm rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-2xl">
-            <p className="mb-1 text-base font-black text-slate-950">인증샷 올리기</p>
-            <p className="mb-4 text-sm font-bold text-blue-600">{certSchedule.title}</p>
+            {/* 헤더 */}
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-base font-black text-slate-950">기록 남기기</p>
+                <p className="text-xs font-bold text-blue-600">{certSchedule.title} 완료</p>
+              </div>
+              <button type="button" onClick={() => setCertSchedule(null)} className="text-slate-400">
+                <MaterialIcon icon="close" size={20} color="currentColor" />
+              </button>
+            </div>
+
+            {/* 그룹 선택 */}
+            {myGroups.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1.5 text-[11px] font-black text-slate-400">올릴 그룹</p>
+                <div className="flex flex-wrap gap-2">
+                  {myGroups.map(g => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setCertGroupId(prev => prev === g.id ? null : g.id)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
+                        certGroupId === g.id
+                          ? 'border-blue-500 bg-blue-600 text-white'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                      }`}
+                    >
+                      {g.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 캡션 */}
+            <textarea
+              placeholder="한 마디 남기기 (선택사항)"
+              value={certCaption}
+              onChange={e => setCertCaption(e.target.value.slice(0, 200))}
+              rows={2}
+              className="mb-3 w-full resize-none rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => certFileRef.current?.click()}
                 className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-black text-white"
               >
-                사진 선택
+                사진 찍어 기록하기
               </button>
               <button
                 type="button"
-                onClick={() => setCertSchedule(null)}
-                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600"
+                onClick={async () => {
+                  if (!certCaption.trim()) { toast.error('사진 또는 한 마디를 입력해주세요.'); return; }
+                  const form = new FormData();
+                  form.append('schedule_id', String(certSchedule.id));
+                  form.append('caption', certCaption.trim());
+                  if (certGroupId) form.append('group_id', String(certGroupId));
+                  try {
+                    await createStudyLog.mutateAsync(form);
+                    toast.success('기록이 올라갔어요!');
+                    setCertSchedule(null);
+                    setCertCaption('');
+                  } catch {
+                    toast.error('업로드에 실패했습니다.');
+                  }
+                }}
+                className="rounded-xl border border-slate-200 px-3 py-3 text-sm font-black text-slate-700"
               >
-                취소
+                텍스트만
               </button>
             </div>
           </div>
