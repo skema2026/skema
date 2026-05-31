@@ -327,14 +327,16 @@ function UploadModal({
         />
 
         {/* 공개 / 비공개 */}
-        {!groupId && (
-          <div className="mb-4 flex items-center justify-between rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 py-3">
+        <div className="mb-4 flex items-center justify-between rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 py-3">
             <div>
               <p className="text-sm font-black text-slate-950">
                 {isPublic ? '전체 공개' : '나만 보기'}
               </p>
               <p className="text-[11px] font-bold text-slate-400">
-                {isPublic ? '모든 사용자의 피드에 표시됩니다' : '내 기록 탭에서만 볼 수 있어요'}
+                {groupId
+                  ? (isPublic ? '그룹 + 전체 피드에 표시' : '그룹 멤버에게만 보임')
+                  : (isPublic ? '모든 사용자의 피드에 표시됩니다' : '내 기록 탭에서만 볼 수 있어요')
+                }
               </p>
             </div>
             <button
@@ -355,7 +357,6 @@ function UploadModal({
               }} />
             </button>
           </div>
-        )}
 
         <button
           type="button"
