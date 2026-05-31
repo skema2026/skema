@@ -205,15 +205,6 @@ export function DashboardHeader({
           <MaterialIcon icon="photo_camera" size={16} color="#fff" />
           <span className="hide-mobile">기록</span>
         </button>
-        <button
-          type="button"
-          onClick={() => router.push('/feed')}
-          title="커뮤니티"
-          className="flex items-center gap-2 rounded-lg bg-slate-950 px-5 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800"
-        >
-          <MaterialIcon icon="forum" size={16} color="#fff" />
-          <span className="hide-mobile">커뮤니티</span>
-        </button>
 
         <button
           type="button"
