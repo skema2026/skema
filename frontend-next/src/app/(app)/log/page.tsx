@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import {
@@ -50,7 +51,8 @@ function avatarColor(userId: number) { return AVATAR_COLORS[userId % AVATAR_COLO
 
 function GroupSetupModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
-  const [name, setName] = useState('');
+  const [name, setName]         = useState('');
+  const [description, setDescription] = useState('');
   const [code, setCode] = useState('');
   const create = useCreateGroup();
   const join   = useJoinGroup();
@@ -58,7 +60,7 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
   const handleCreate = async () => {
     if (!name.trim()) return;
     try {
-      await create.mutateAsync(name.trim());
+      await create.mutateAsync({ name: name.trim(), description: description.trim() || undefined });
       toast.success('그룹이 만들어졌어요!');
       onClose();
     } catch { toast.error('그룹 생성에 실패했습니다.'); }
@@ -128,7 +130,14 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
               value={name}
               onChange={e => setName(e.target.value.slice(0, 100))}
               placeholder="그룹 이름 (예: CS 스터디)"
-              className="mb-4 h-12 w-full rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 text-sm font-black text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              className="mb-2 h-12 w-full rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 text-sm font-black text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value.slice(0, 200))}
+              placeholder="그룹 설명 (선택사항) — 어떤 그룹인지 간단히 적어주세요"
+              rows={2}
+              className="mb-4 w-full resize-none rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 py-3 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
             />
             <button
               type="button"
@@ -421,20 +430,38 @@ function GroupFeed({
   return (
     <div>
       {/* 그룹 정보 바 */}
-      <div className="mb-3 flex items-center justify-between rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
-        <div>
-          <p className="text-[11px] font-black text-slate-400">초대코드</p>
-          <p className="text-base font-black tracking-widest text-blue-700">{group.invite_code}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <StatusPill tone="slate">{group.member_count}명</StatusPill>
-          <button
-            type="button"
-            onClick={handleLeave}
-            className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-black text-red-500 transition hover:bg-red-100"
-          >
-            나가기
-          </button>
+      <div className="mb-3 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
+        {group.description && (
+          <p className="mb-2 text-xs font-bold text-slate-500">{group.description}</p>
+        )}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-black text-slate-400">초대코드</p>
+            <div className="flex items-center gap-2">
+              <p className="text-base font-black tracking-widest text-blue-700">{group.invite_code}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(group.invite_code);
+                  toast.success('초대코드가 복사됐습니다!');
+                }}
+                className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-600 transition hover:bg-blue-100"
+              >
+                <MaterialIcon icon="content_copy" size={12} color="currentColor" />
+                복사
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <StatusPill tone="slate">{group.member_count}명</StatusPill>
+            <button
+              type="button"
+              onClick={handleLeave}
+              className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-black text-red-500 transition hover:bg-red-100"
+            >
+              나가기
+            </button>
+          </div>
         </div>
       </div>
 
@@ -576,6 +603,7 @@ function GlobalFeed({ currentUserId }: { currentUserId?: number }) {
 // ── 메인 페이지 ───────────────────────────────────────────────────────────────
 
 export default function LogPage() {
+  const router = useRouter();
   const { data: groups = [], isLoading: groupsLoading } = useMyGroups();
   const { data: streak } = useStreak();
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
@@ -595,10 +623,14 @@ export default function LogPage() {
         {/* 헤더 */}
         <header className="sticky top-0 z-20 border-b border-blue-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600">
-                <MaterialIcon icon="edit_note" size={18} color="#fff" />
-              </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 transition hover:bg-slate-200"
+              >
+                <MaterialIcon icon="arrow_back" size={18} color="#475569" />
+              </button>
               <div>
                 <p className="text-[11px] font-black text-blue-600">SKEMA</p>
                 <h1 className="text-base font-black leading-none text-slate-950">기록</h1>

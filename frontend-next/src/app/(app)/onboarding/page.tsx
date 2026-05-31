@@ -679,7 +679,7 @@ export default function OnboardingPage() {
       (e) => e.subject_name.trim() && e.start_time && e.end_time && e.start_time < e.end_time,
     );
 
-    const isReturningUser = profile?.onboarding_completed || sessionStorage.getItem('skema_onboarding_done') === '1';
+    const isReturningUser = profile?.onboarding_completed === true;
 
     const doSaveAndContinue = async () => {
       setShowEtaOverwriteConfirm(false);

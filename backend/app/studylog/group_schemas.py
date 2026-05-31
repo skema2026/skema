@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class GroupCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=300)
 
 
 class MemberOut(BaseModel):
@@ -18,6 +19,7 @@ class MemberOut(BaseModel):
 class GroupOut(BaseModel):
     id: int
     name: str
+    description: Optional[str] = None
     invite_code: str
     member_count: int
     created_at: datetime

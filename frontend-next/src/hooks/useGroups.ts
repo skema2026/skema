@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 export type GroupOut = {
   id: number;
   name: string;
+  description?: string | null;
   invite_code: string;
   member_count: number;
   created_at: string;
@@ -77,8 +78,8 @@ export function useGroupFeed(groupId: number | null, days = 7) {
 export function useCreateGroup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (name: string) => {
-      const { data } = await api.post<GroupOut>('/groups', { name });
+    mutationFn: async ({ name, description }: { name: string; description?: string }) => {
+      const { data } = await api.post<GroupOut>('/groups', { name, description });
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),

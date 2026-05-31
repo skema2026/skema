@@ -54,7 +54,7 @@ def create_group(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    group = StudyGroup(name=body.name, created_by=current_user.id)
+    group = StudyGroup(name=body.name, description=body.description, created_by=current_user.id)
     db.add(group)
     db.flush()
     db.add(StudyGroupMember(group_id=group.id, user_id=current_user.id))
@@ -63,6 +63,7 @@ def create_group(
     return GroupOut(
         id=group.id,
         name=group.name,
+        description=group.description,
         invite_code=group.invite_code,
         member_count=1,
         created_at=group.created_at,
@@ -89,6 +90,7 @@ def join_group(
     return GroupOut(
         id=group.id,
         name=group.name,
+        description=group.description,
         invite_code=group.invite_code,
         member_count=count,
         created_at=group.created_at,
@@ -137,8 +139,9 @@ def get_group(
         for m in memberships
     ]
     return GroupDetail(
-        id=group.id, name=group.name, invite_code=group.invite_code,
-        member_count=len(members), created_at=group.created_at, members=members,
+        id=group.id, name=group.name, description=group.description,
+        invite_code=group.invite_code, member_count=len(members),
+        created_at=group.created_at, members=members,
     )
 
 

@@ -14,8 +14,9 @@ def _invite_code() -> str:
 class StudyGroup(Base):
     __tablename__ = "study_groups"
 
-    id         = Column(Integer, primary_key=True, index=True)
-    name       = Column(String(100), nullable=False)
+    id          = Column(Integer, primary_key=True, index=True)
+    name        = Column(String(100), nullable=False)
+    description = Column(String(300), nullable=True)
     invite_code = Column(String(16), nullable=False, unique=True, default=_invite_code)
     created_by  = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at  = Column(DateTime, nullable=False, default=datetime.utcnow)
