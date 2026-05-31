@@ -1081,11 +1081,6 @@ ${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
                             >
                               <h2 className="text-lg font-black text-slate-950 whitespace-nowrap">{formatLongDate(dayDate)}</h2>
                             </button>
-                            {streak && streak.current_streak > 0 && (
-                              <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-black ${streak.today_checked ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                                <span>{streak.current_streak}일 연속</span>
-                              </div>
-                            )}
                           </div>
                         </div>
 
