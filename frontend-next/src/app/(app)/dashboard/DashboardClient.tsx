@@ -1823,14 +1823,12 @@ ${missedLines}
               className="mb-3 w-full resize-none rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
             />
 
-            {/* 공개 / 비공개 */}
-            <div className="mb-3 flex items-center justify-between rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5">
+            {/* 공개 / 비공개 — 그룹 선택 시 숨김 */}
+            {!certGroupId && <div className="mb-3 flex items-center justify-between rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5">
               <div>
                 <p className="text-sm font-black text-slate-950">{certIsPublic ? '전체 공개' : '나만 보기'}</p>
                 <p className="text-[11px] font-bold text-slate-400">
-                  {certGroupId
-                    ? (certIsPublic ? '그룹 + 전체 피드에 표시' : '그룹 멤버에게만 보임')
-                    : (certIsPublic ? '전체 피드에 표시됩니다' : '내 기록 탭에서만 보여요')}
+                  {certIsPublic ? '전체 피드에 표시됩니다' : '내 기록 탭에서만 보여요'}
                 </p>
               </div>
               <button
@@ -1850,7 +1848,7 @@ ${missedLines}
                   transition: 'left .2s',
                 }} />
               </button>
-            </div>
+            </div>}
 
             <div className="flex gap-2">
               <button
