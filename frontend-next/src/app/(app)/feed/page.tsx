@@ -38,6 +38,7 @@ function PostCard({
   post: PostOut;
   currentUserId?: number;
 }) {
+  const router = useRouter();
   const toggle = useToggleLike();
   const del    = useDeletePost();
   const color  = avatarColor(post.author_id);
@@ -52,7 +53,11 @@ function PostCard({
     <article className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
       {/* 헤더 */}
       <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => router.push(`/profile/${post.author_id}`)}
+          className="flex items-center gap-3 text-left"
+        >
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-black text-white"
             style={{ background: color }}
@@ -63,7 +68,7 @@ function PostCard({
             <p className="text-sm font-black text-slate-950">{post.username}</p>
             <p className="text-[11px] font-bold text-slate-400">{relativeTime(post.created_at)}</p>
           </div>
-        </div>
+        </button>
         {currentUserId === post.author_id && (
           <button
             type="button"

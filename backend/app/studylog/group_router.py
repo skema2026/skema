@@ -4,6 +4,7 @@
 POST   /groups               — 그룹 생성
 POST   /groups/join          — 초대코드로 참여
 GET    /groups/me            — 내 그룹 목록
+GET    /groups/search        — 이름으로 그룹 검색
 GET    /groups/{id}          — 그룹 상세 + 멤버
 DELETE /groups/{id}/leave    — 그룹 탈퇴
 GET    /groups/{id}/feed     — BeReal 스타일 피드 (날짜별 멤버×기록)
@@ -115,6 +116,37 @@ def my_groups(
         result.append(GroupOut(
             id=g.id, name=g.name, invite_code=g.invite_code,
             member_count=count, created_at=g.created_at,
+        ))
+    return result
+
+
+@router.get("/search", response_model=list[GroupOut])
+def search_groups(
+    q: str = "",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """이름으로 그룹 검색 (최대 20개). 초대코드 직접 입력도 지원."""
+    q = q.strip()
+    if not q:
+        return []
+    # 이름 부분 일치 OR 초대코드 완전 일치
+    groups = (
+        db.query(StudyGroup)
+        .filter(
+            (StudyGroup.name.ilike(f"%{q}%")) |
+            (StudyGroup.invite_code == q.upper())
+        )
+        .order_by(StudyGroup.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    result = []
+    for g in groups:
+        count = db.query(StudyGroupMember).filter(StudyGroupMember.group_id == g.id).count()
+        result.append(GroupOut(
+            id=g.id, name=g.name, description=g.description,
+            invite_code=g.invite_code, member_count=count, created_at=g.created_at,
         ))
     return result
 

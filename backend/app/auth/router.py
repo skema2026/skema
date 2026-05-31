@@ -155,6 +155,76 @@ def update_profile(
     return service.update_profile(db, current_user.id, data.model_dump(exclude_unset=True))
 
 
+# ── 타 사용자 공개 프로필 ──────────────────────────────────────────────────────
+
+@router.get("/users/{user_id}/profile")
+def get_user_public_profile(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """타 사용자의 공개 프로필 반환.
+
+    - 기본 정보 (username, 가입일)
+    - 커뮤니티 게시글 목록 (최신 10개)
+    - 글로벌 공개 기록 목록 (최신 10개, 그룹 기록 제외)
+    - 현재/최장 스트릭
+    """
+    from app.community.models import Post
+    from app.studylog.models import StudyLog
+    from app.studylog.streak import compute_streak
+
+    target = db.query(User).filter(User.id == user_id, User.is_active == True).first()  # noqa: E712
+    if not target:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+    from sqlalchemy.orm import joinedload as _jl
+    posts = (
+        db.query(Post)
+        .filter(Post.author_id == user_id)
+        .options(_jl(Post.likes))
+        .order_by(Post.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    logs = (
+        db.query(StudyLog)
+        .filter(StudyLog.user_id == user_id, StudyLog.group_id == None)  # noqa: E711
+        .order_by(StudyLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    streak = compute_streak(db, user_id)
+
+    return {
+        "user_id": target.id,
+        "username": target.username,
+        "joined_at": target.created_at.isoformat() if hasattr(target, "created_at") and target.created_at else None,
+        "streak": streak,
+        "posts": [
+            {
+                "id": p.id,
+                "content": p.content,
+                "image_url": f"/uploads/posts/{__import__('os').path.basename(p.image_url)}" if p.image_url else None,
+                "likes_count": len(p.likes),
+                "created_at": p.created_at.isoformat(),
+            }
+            for p in posts
+        ],
+        "logs": [
+            {
+                "id": l.id,
+                "caption": l.caption,
+                "photo_url": f"/uploads/studylogs/{__import__('os').path.basename(l.photo_path)}" if l.photo_path else None,
+                "created_at": l.created_at.isoformat(),
+            }
+            for l in logs
+        ],
+    }
+
+
 # ── OAuth (소셜 로그인) ───────────────────────────────────────────────────────
 
 @router.get("/auth/{provider}/authorize")

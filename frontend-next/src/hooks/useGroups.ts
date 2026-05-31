@@ -97,6 +97,18 @@ export function useJoinGroup() {
   });
 }
 
+export function useSearchGroups(q: string) {
+  return useQuery({
+    queryKey: ['groups', 'search', q],
+    queryFn: async () => {
+      const { data } = await api.get<GroupOut[]>('/groups/search', { params: { q } });
+      return data;
+    },
+    enabled: q.trim().length > 0,
+    staleTime: 10_000,
+  });
+}
+
 export function useLeaveGroup() {
   const qc = useQueryClient();
   return useMutation({

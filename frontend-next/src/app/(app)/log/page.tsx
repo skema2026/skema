@@ -14,6 +14,7 @@ import {
   useJoinGroup,
   useLeaveGroup,
   useMyGroups,
+  useSearchGroups,
   useToggleGroupReaction,
 } from '@/hooks/useGroups';
 import {
@@ -51,11 +52,14 @@ function avatarColor(userId: number) { return AVATAR_COLORS[userId % AVATAR_COLO
 
 function GroupSetupModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
-  const [name, setName]         = useState('');
+  const [name, setName]               = useState('');
   const [description, setDescription] = useState('');
-  const [code, setCode] = useState('');
+  const [code, setCode]               = useState('');
+  const [searchQ, setSearchQ]         = useState('');
+  const [joinTab, setJoinTab]         = useState<'search' | 'code'>('search');
   const create = useCreateGroup();
   const join   = useJoinGroup();
+  const { data: searchResults = [], isFetching: searching } = useSearchGroups(searchQ);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
@@ -66,10 +70,9 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
     } catch { toast.error('그룹 생성에 실패했습니다.'); }
   };
 
-  const handleJoin = async () => {
-    if (!code.trim()) return;
+  const handleJoin = async (inviteCode: string) => {
     try {
-      await join.mutateAsync(code.trim().toUpperCase());
+      await join.mutateAsync(inviteCode.trim().toUpperCase());
       toast.success('그룹에 참여했어요!');
       onClose();
     } catch (e: any) {
@@ -85,7 +88,7 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
             <MaterialIcon icon="group" size={16} color="#fff" />
           </div>
           <p className="flex-1 text-base font-black text-slate-950">
-            {mode === 'menu' ? '그룹 참여' : mode === 'create' ? '새 그룹 만들기' : '코드로 참여'}
+            {mode === 'menu' ? '그룹' : mode === 'create' ? '새 그룹 만들기' : '그룹 참여'}
           </p>
           <button type="button" onClick={onClose} className="text-slate-400">
             <MaterialIcon icon="close" size={20} color="currentColor" />
@@ -113,11 +116,11 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
               className="flex w-full items-center gap-4 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition hover:bg-blue-50"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800">
-                <MaterialIcon icon="link" size={20} color="#fff" />
+                <MaterialIcon icon="search" size={20} color="#fff" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-black text-slate-950">코드로 참여</p>
-                <p className="text-xs font-bold text-slate-400">친구에게 받은 초대코드를 입력하세요</p>
+                <p className="text-sm font-black text-slate-950">그룹 찾기</p>
+                <p className="text-xs font-bold text-slate-400">이름 검색 또는 초대코드로 참여</p>
               </div>
             </button>
           </div>
@@ -152,21 +155,60 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
 
         {mode === 'join' && (
           <>
-            <input
-              autoFocus
-              value={code}
-              onChange={e => setCode(e.target.value.toUpperCase())}
-              placeholder="초대코드 입력"
-              className="mb-4 h-12 w-full rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 text-center text-lg font-black tracking-widest text-slate-950 placeholder:text-slate-400 placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-blue-200"
-            />
-            <button
-              type="button"
-              onClick={handleJoin}
-              disabled={!code.trim() || join.isPending}
-              className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white disabled:opacity-40"
-            >
-              {join.isPending ? '참여 중...' : '참여하기'}
-            </button>
+            {/* 탭 */}
+            <div className="mb-3 flex rounded-xl bg-slate-100 p-1">
+              {(['search', 'code'] as const).map(t => (
+                <button key={t} type="button" onClick={() => setJoinTab(t)}
+                  className={`flex-1 rounded-lg py-2 text-xs font-black transition ${joinTab === t ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-400'}`}>
+                  {t === 'search' ? '이름으로 검색' : '초대코드 입력'}
+                </button>
+              ))}
+            </div>
+
+            {joinTab === 'search' ? (
+              <>
+                <input
+                  autoFocus
+                  value={searchQ}
+                  onChange={e => setSearchQ(e.target.value)}
+                  placeholder="그룹 이름 검색..."
+                  className="mb-3 h-11 w-full rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 text-sm font-black text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <div className="max-h-56 space-y-2 overflow-y-auto">
+                  {searching && <p className="py-2 text-center text-xs text-slate-400">검색 중...</p>}
+                  {!searching && searchQ.trim() && searchResults.length === 0 && (
+                    <p className="py-2 text-center text-xs text-slate-400">결과가 없어요</p>
+                  )}
+                  {searchResults.map(g => (
+                    <div key={g.id} className="flex items-center justify-between rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
+                      <div>
+                        <p className="text-sm font-black text-slate-950">{g.name}</p>
+                        {g.description && <p className="text-xs font-bold text-slate-400 line-clamp-1">{g.description}</p>}
+                        <p className="text-[11px] text-slate-400">{g.member_count}명</p>
+                      </div>
+                      <button type="button" onClick={() => handleJoin(g.invite_code)} disabled={join.isPending}
+                        className="rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-40">
+                        참여
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <input
+                  autoFocus
+                  value={code}
+                  onChange={e => setCode(e.target.value.toUpperCase())}
+                  placeholder="초대코드 입력"
+                  className="mb-4 h-12 w-full rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 text-center text-lg font-black tracking-widest text-slate-950 placeholder:text-slate-400 placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <button type="button" onClick={() => handleJoin(code)} disabled={!code.trim() || join.isPending}
+                  className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white disabled:opacity-40">
+                  {join.isPending ? '참여 중...' : '참여하기'}
+                </button>
+              </>
+            )}
           </>
         )}
       </div>
