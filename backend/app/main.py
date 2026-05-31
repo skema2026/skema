@@ -28,7 +28,6 @@ from app.eta.router import router as eta_router
 from app.notification.router import router as notification_router
 from app.studylog.router import router as studylog_router
 from app.studylog.group_router import router as group_router
-from app.community.router import router as community_router
 from app.core.config import settings
 
 
@@ -115,7 +114,7 @@ app.include_router(eta_router)          # /eta/parse-image, /eta/save-schedules
 app.include_router(notification_router) # /notifications/*  /push/*
 app.include_router(studylog_router)     # /study-logs/*
 app.include_router(group_router)        # /groups/*
-app.include_router(community_router)    # /posts/*
+
 
 # 업로드 파일 정적 서빙
 import os as _os
