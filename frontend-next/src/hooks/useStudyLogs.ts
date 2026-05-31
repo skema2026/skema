@@ -11,9 +11,8 @@ export type StudyLogItem = {
   username: string;
   schedule_id: number | null;
   schedule_title: string | null;
-  photo_url: string;
+  photo_url: string | null;
   caption: string | null;
-  is_public: boolean;
   created_at: string;
   reactions: ReactionOut[];
   my_reactions: string[];

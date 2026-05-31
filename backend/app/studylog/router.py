@@ -1,28 +1,28 @@
 """
 공부 인증 피드 API
 
-POST   /study-logs                  — 인증 사진 + 캡션 업로드
-GET    /study-logs/feed             — 전체 공개 피드 (최신순, 페이지네이션)
-GET    /study-logs/me               — 내 로그 목록
-GET    /study-logs/streak           — 내 스트릭 (현재/최장)
-DELETE /study-logs/{id}            — 내 로그 삭제
+POST   /study-logs                  — 기록 업로드 (그룹 지정 가능)
+GET    /study-logs/feed             — 그룹 없는 사람용 글로벌 피드
+GET    /study-logs/me               — 내 기록 목록
+GET    /study-logs/streak           — 내 스트릭
+GET    /study-logs/today-stats      — 오늘 현황
+DELETE /study-logs/{id}            — 내 기록 삭제
 POST   /study-logs/{id}/reactions  — 이모지 반응 추가/토글
 """
 
 import os
 import uuid
 from collections import Counter
-from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth.models import User, UserProfile
+from app.auth.models import User
 from app.core.security import get_current_user, get_db
 from app.schedule.models import Schedule
 
-from .models import StudyLog, StudyLogReaction
+from .models import StudyGroup, StudyGroupMember, StudyLog, StudyLogReaction
 from .schemas import FeedResponse, ReactionToggleRequest, StudyLogOut
 from .streak import compute_streak
 
@@ -37,9 +37,8 @@ def _ensure_upload_dir():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-def _photo_url(photo_path: str, request_base: str = "") -> str:
-    filename = os.path.basename(photo_path)
-    return f"/uploads/studylogs/{filename}"
+def _photo_url(photo_path: str) -> str:
+    return f"/uploads/studylogs/{os.path.basename(photo_path)}"
 
 
 def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = None) -> StudyLogOut:
@@ -62,7 +61,6 @@ def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = Non
         schedule_title=schedule_title_val,
         photo_url=_photo_url(log.photo_path) if log.photo_path else None,
         caption=log.caption,
-        is_public=log.is_public,
         created_at=log.created_at,
         reactions=reactions_out,
         my_reactions=my_reactions,
@@ -71,15 +69,24 @@ def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = Non
 
 @router.post("", status_code=201, response_model=StudyLogOut)
 async def create_study_log(
-    photo: Optional[UploadFile] = File(None),  # 사진 선택사항
+    photo: Optional[UploadFile] = File(None),
     caption: Optional[str] = Form(None),
-    is_public: bool = Form(True),
+    group_id: Optional[int] = Form(None),
     schedule_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not photo and not caption:
         raise HTTPException(status_code=400, detail="사진 또는 텍스트 중 하나는 필요합니다.")
+
+    # 그룹 멤버 검증
+    if group_id:
+        is_member = db.query(StudyGroupMember).filter(
+            StudyGroupMember.group_id == group_id,
+            StudyGroupMember.user_id == current_user.id,
+        ).first()
+        if not is_member:
+            raise HTTPException(status_code=403, detail="해당 그룹의 멤버가 아닙니다.")
 
     photo_path = None
     if photo and photo.filename:
@@ -95,7 +102,6 @@ async def create_study_log(
         with open(photo_path, "wb") as f:
             f.write(content)
 
-    # schedule_id 검증
     if schedule_id:
         sched = db.query(Schedule).filter(Schedule.id == schedule_id, Schedule.user_id == current_user.id).first()
         if not sched:
@@ -103,10 +109,10 @@ async def create_study_log(
 
     log = StudyLog(
         user_id=current_user.id,
+        group_id=group_id,
         schedule_id=schedule_id,
         photo_path=photo_path,
         caption=caption[:200] if caption else None,
-        is_public=is_public,
     )
     db.add(log)
     db.commit()
@@ -121,17 +127,14 @@ def get_today_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """오늘 기록한 사람 수, 오늘 올라온 인증 수 반환."""
-    from datetime import datetime, timezone
+    from datetime import datetime
     from zoneinfo import ZoneInfo
     today_start = datetime.now(ZoneInfo("Asia/Seoul")).replace(hour=0, minute=0, second=0, microsecond=0)
     today_start_utc = today_start.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
-
-    today_logs = (
-        db.query(StudyLog)
-        .filter(StudyLog.created_at >= today_start_utc, StudyLog.is_public == True)  # noqa: E712
-        .all()
-    )
+    today_logs = db.query(StudyLog).filter(
+        StudyLog.created_at >= today_start_utc,
+        StudyLog.group_id == None,  # noqa: E711 — 그룹 없는 글로벌 로그만
+    ).all()
     user_count = len({log.user_id for log in today_logs})
     return {"today_users": user_count, "today_logs": len(today_logs)}
 
@@ -141,7 +144,6 @@ def get_streak(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """현재 스트릭 / 최장 스트릭 반환."""
     return compute_streak(db, current_user.id)
 
 
@@ -152,14 +154,12 @@ def get_feed(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """그룹에 속하지 않은 글로벌 공개 피드."""
     limit = min(limit, 50)
     q = (
         db.query(StudyLog)
-        .filter(StudyLog.is_public == True)  # noqa: E712
-        .options(
-            joinedload(StudyLog.user),
-            joinedload(StudyLog.reactions),
-        )
+        .filter(StudyLog.group_id == None)  # noqa: E711
+        .options(joinedload(StudyLog.user), joinedload(StudyLog.reactions))
         .order_by(StudyLog.created_at.desc())
     )
     total = q.count()
@@ -182,10 +182,7 @@ def get_my_logs(
     q = (
         db.query(StudyLog)
         .filter(StudyLog.user_id == current_user.id)
-        .options(
-            joinedload(StudyLog.user),
-            joinedload(StudyLog.reactions),
-        )
+        .options(joinedload(StudyLog.user), joinedload(StudyLog.reactions))
         .order_by(StudyLog.created_at.desc())
     )
     total = q.count()
@@ -222,8 +219,15 @@ def toggle_reaction(
     log = db.query(StudyLog).filter(StudyLog.id == log_id).first()
     if not log:
         raise HTTPException(status_code=404, detail="로그를 찾을 수 없습니다.")
-    if not log.is_public and log.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="비공개 로그입니다.")
+
+    # 그룹 기록이면 멤버만 반응 가능
+    if log.group_id:
+        is_member = db.query(StudyGroupMember).filter(
+            StudyGroupMember.group_id == log.group_id,
+            StudyGroupMember.user_id == current_user.id,
+        ).first()
+        if not is_member:
+            raise HTTPException(status_code=403, detail="그룹 멤버만 반응할 수 있습니다.")
 
     existing = db.query(StudyLogReaction).filter(
         StudyLogReaction.log_id == log_id,
