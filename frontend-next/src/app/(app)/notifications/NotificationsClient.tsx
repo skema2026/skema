@@ -171,10 +171,12 @@ export default function NotificationsClient() {
 
               {/* 나머지 알림 종류 */}
               {([
-                { key: 'exam_alert',    label: '시험 D-day 알림', desc: 'D-7 · D-3 · D-1 · 당일' },
-                { key: 'motivation',    label: '학습 동기 부여',   desc: '매일 09:00' },
-                { key: 'weekly_report', label: '주간 리포트',      desc: '매주 월요일 08:00' },
-                { key: 'comparison',    label: '학습 비교',        desc: '매주 월요일 08:00 · 사용자 많아지면 켜세요' },
+                { key: 'exam_alert',         label: '시험 D-day 알림',   desc: 'D-7 · D-3 · D-1 · 당일' },
+                { key: 'motivation',         label: '학습 동기 부여',     desc: '매일 09:00' },
+                { key: 'weekly_report',      label: '주간 리포트',        desc: '매주 월요일 08:00' },
+                { key: 'group_member_post',  label: '그룹 새 기록 알림',  desc: '그룹원이 기록을 올리면 알림' },
+                { key: 'log_like',           label: '좋아요 알림',        desc: '내 기록에 좋아요가 달리면 알림' },
+                { key: 'comparison',         label: '학습 비교',          desc: '매주 월요일 08:00 · 사용자 많아지면 켜세요' },
               ] as const).map(({ key, label, desc }) => (
                 <div key={key} className="flex items-center justify-between gap-4 py-3 last:pb-0">
                   <div className="min-w-0">

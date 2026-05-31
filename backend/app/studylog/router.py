@@ -119,7 +119,29 @@ async def create_study_log(
     db.refresh(log)
     log.user  # trigger load
 
+    # 그룹 기록 알림: 같은 그룹 멤버에게 푸시
+    if group_id:
+        _notify_group_members(db, group_id, current_user.id, current_user.username)
+
     return _build_log_out(log, current_user.id, db)
+
+
+def _notify_group_members(db: Session, group_id: int, poster_id: int, poster_name: str) -> None:
+    from app.notification.service import send_push_to_user
+    from app.notification.scheduler import _is_notif_enabled
+    members = db.query(StudyGroupMember).filter(
+        StudyGroupMember.group_id == group_id,
+        StudyGroupMember.user_id != poster_id,
+    ).all()
+    for m in members:
+        if _is_notif_enabled(db, m.user_id, "group_member_post"):
+            send_push_to_user(
+                db, m.user_id,
+                title="새 기록",
+                body=f"{poster_name}님이 기록을 올렸어요",
+                url="/log",
+                ntype="group_member_post",
+            )
 
 
 @router.get("/today-stats")
@@ -235,11 +257,25 @@ def toggle_reaction(
         StudyLogReaction.emoji == body.emoji,
     ).first()
 
+    is_new = existing is None
     if existing:
         db.delete(existing)
     else:
         db.add(StudyLogReaction(log_id=log_id, user_id=current_user.id, emoji=body.emoji))
     db.commit()
+
+    # 좋아요(👍) 새로 달렸을 때 기록 주인에게 알림 (본인 제외)
+    if is_new and body.emoji == '👍' and log.user_id != current_user.id:
+        from app.notification.service import send_push_to_user
+        from app.notification.scheduler import _is_notif_enabled
+        if _is_notif_enabled(db, log.user_id, "log_like"):
+            send_push_to_user(
+                db, log.user_id,
+                title="좋아요",
+                body=f"{current_user.username}님이 내 기록에 좋아요를 눌렀어요",
+                url="/log",
+                ntype="log_like",
+            )
 
     reactions = db.query(StudyLogReaction).filter(StudyLogReaction.log_id == log_id).all()
     counts = Counter(r.emoji for r in reactions)
