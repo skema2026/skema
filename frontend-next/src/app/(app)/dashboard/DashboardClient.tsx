@@ -16,6 +16,7 @@ import { recurringDayToIndex } from '@/lib/recurringDay';
 import { scheduleVisibleIn } from '@/lib/scheduleViewScope';
 import { getDisplayColor } from '@/lib/scheduleColor';
 import { useNotificationPrefs } from '@/hooks/usePushNotifications';
+import { useCreateStudyLog } from '@/hooks/useStudyLogs';
 import { minutesToTime, timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { ExamSchedule, Schedule, UserProfile } from '@/types';
@@ -403,6 +404,9 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [studyHoursPerDay, setStudyHoursPerDay] = useState(2);
   const [isFreeTimeDialogOpen, setIsFreeTimeDialogOpen] = useState(false);
   const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
+  const [certSchedule, setCertSchedule] = useState<{ id: number; title: string } | null>(null);
+  const createStudyLog = useCreateStudyLog();
+  const certFileRef = useRef<HTMLInputElement>(null);
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
   const queryClient = useQueryClient();
   const timetableRef = useRef<HTMLDivElement | null>(null);
@@ -1290,17 +1294,29 @@ ${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
                                       className={`flex items-start gap-3 rounded-lg border p-3 transition ${done ? 'border-slate-100 bg-slate-50' : 'border-blue-50 bg-[#fbfdff] shadow-sm'}`}
                                       style={{ borderLeft: `4px solid ${done ? '#cbd5e1' : periodColor}` }}
                                     >
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleComplete.mutate({ id: schedule.id, is_completed: !done })}
-                                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${done ? 'border-emerald-400 bg-emerald-400' : 'border-slate-300 hover:border-blue-400'}`}
-                                      >
+                                      <div className="flex shrink-0 flex-col items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleComplete.mutate({ id: schedule.id, is_completed: !done })}
+                                          className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition ${done ? 'border-emerald-400 bg-emerald-400' : 'border-slate-300 hover:border-blue-400'}`}
+                                        >
+                                          {done && (
+                                            <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                                              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                          )}
+                                        </button>
                                         {done && (
-                                          <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
-                                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                          </svg>
+                                          <button
+                                            type="button"
+                                            title="인증샷 올리기"
+                                            onClick={() => setCertSchedule({ id: schedule.id, title: schedule.title })}
+                                            className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-50 text-blue-500 transition hover:bg-blue-100"
+                                          >
+                                            <MaterialIcon icon="photo_camera" size={12} color="currentColor" />
+                                          </button>
                                         )}
-                                      </button>
+                                      </div>
                                       <button
                                         type="button"
                                         onClick={() => openClassForm(schedule)}
@@ -1726,6 +1742,54 @@ ${missedLines}
       </Dialog>
 
       <ClassForm />
+
+      {/* 인증샷 파일 선택 (완료 체크 연동) */}
+      <input
+        ref={certFileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file || !certSchedule) return;
+          const form = new FormData();
+          form.append('photo', file);
+          form.append('is_public', 'true');
+          form.append('schedule_id', String(certSchedule.id));
+          try {
+            await createStudyLog.mutateAsync(form);
+            toast.success('인증 완료!');
+          } catch {
+            toast.error('업로드에 실패했습니다.');
+          }
+          setCertSchedule(null);
+          e.target.value = '';
+        }}
+      />
+      {certSchedule && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 backdrop-blur-sm sm:items-center">
+          <div className="w-full max-w-sm rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+            <p className="mb-1 text-base font-black text-slate-950">인증샷 올리기</p>
+            <p className="mb-4 text-sm font-bold text-blue-600">{certSchedule.title}</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => certFileRef.current?.click()}
+                className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-black text-white"
+              >
+                사진 선택
+              </button>
+              <button
+                type="button"
+                onClick={() => setCertSchedule(null)}
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <EtaReimportModal
         open={isEtaReimportOpen}
