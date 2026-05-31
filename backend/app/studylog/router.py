@@ -74,7 +74,6 @@ async def create_study_log(
     caption: Optional[str] = Form(None),
     group_id: Optional[int] = Form(None),
     schedule_id: Optional[int] = Form(None),
-    is_public: bool = Form(True),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -109,14 +108,13 @@ async def create_study_log(
         if not sched:
             schedule_id = None
 
-    # 그룹에 올리는 기록은 그룹 내 공개가 기본, 별도 is_public로 글로벌 피드 노출 제어
     log = StudyLog(
         user_id=current_user.id,
         group_id=group_id,
         schedule_id=schedule_id,
         photo_path=photo_path,
         caption=caption[:200] if caption else None,
-        is_public=is_public,
+        is_public=False,
     )
     db.add(log)
     db.commit()

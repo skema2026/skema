@@ -236,8 +236,7 @@ function UploadModal({
   const [preview, setPreview]   = useState<string | null>(null);
   const [file, setFile]         = useState<File | null>(null);
   const [caption, setCaption]   = useState('');
-  const [groupId, setGroupId]   = useState<number | null>(defaultGroupId ?? (groups[0]?.id ?? null));
-  const [isPublic, setIsPublic] = useState(true);
+  const [groupId, setGroupId] = useState<number | null>(defaultGroupId ?? (groups[0]?.id ?? null));
 
   const handleFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)); };
 
@@ -248,7 +247,7 @@ function UploadModal({
     if (caption.trim()) form.append('caption', caption);
     if (groupId)        form.append('group_id', String(groupId));
     if (scheduleId)     form.append('schedule_id', String(scheduleId));
-    form.append('is_public', String(isPublic));
+    form.append('is_public', 'false'); // 스터디 로그는 항상 비공개
     try {
       await create.mutateAsync(form);
       toast.success('기록이 등록됐습니다!');
@@ -326,34 +325,6 @@ function UploadModal({
           className="mb-3 w-full resize-none rounded-2xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
         />
 
-        {/* 공개 / 비공개 — 그룹 선택 시 숨김 (그룹 기록은 무조건 멤버 공개) */}
-        {!groupId && (
-          <div className="mb-4 flex items-center justify-between rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 py-3">
-            <div>
-              <p className="text-sm font-black text-slate-950">{isPublic ? '전체 공개' : '나만 보기'}</p>
-              <p className="text-[11px] font-bold text-slate-400">
-                {isPublic ? '모든 사용자의 피드에 표시됩니다' : '내 기록 탭에서만 볼 수 있어요'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsPublic(v => !v)}
-              style={{
-                width: 44, height: 26, borderRadius: 99,
-                background: isPublic ? '#2563eb' : '#e2e8f0',
-                border: 'none', cursor: 'pointer', padding: 0,
-                position: 'relative', transition: 'background .2s',
-              }}
-            >
-              <span style={{
-                position: 'absolute', top: 2, left: isPublic ? 20 : 2,
-                width: 22, height: 22, borderRadius: '50%',
-                background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,.18)',
-                transition: 'left .2s',
-              }} />
-            </button>
-          </div>
-        )}
 
         <button
           type="button"
@@ -820,12 +791,6 @@ export default function LogPage() {
                               ? <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">{log.schedule_title} 완료</span>
                               : <span className="text-[11px] text-slate-400">{new Date(log.created_at).toLocaleDateString('ko-KR')}</span>
                             }
-                            {!log.is_public && (
-                              <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-500">
-                                <MaterialIcon icon="lock" size={10} color="#64748b" />
-                                나만 보기
-                              </span>
-                            )}
                           </div>
                           <button type="button" onClick={() => handleDeleteMyLog(log.id)}
                             className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-300 transition hover:bg-red-50 hover:text-red-400">
@@ -856,20 +821,19 @@ export default function LogPage() {
           ) : hasGroups && activeGroup ? (
             <GroupFeed group={activeGroup} />
           ) : (
-            <>
-              {/* 그룹 없을 때 — 참여 유도 + 글로벌 피드 */}
-              <div className="mb-4 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-                <p className="text-[11px] font-black text-slate-400">스터디 그룹</p>
-                <p className="mt-1 text-sm font-black text-slate-950">함께 공부하는 그룹을 만들어보세요</p>
-                <p className="mt-0.5 text-xs font-bold text-slate-400">그룹 안에서 서로의 기록을 확인할 수 있어요</p>
-                <button type="button" onClick={() => setShowGroupSetup(true)}
-                  className="mt-3 flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white">
-                  <MaterialIcon icon="group_add" size={14} color="#fff" />
-                  그룹 만들기 / 참여
-                </button>
+            /* 그룹 없을 때 — 참여 유도 카드만 */
+            <div className="mt-8 rounded-2xl border border-blue-100 bg-white p-6 text-center shadow-sm">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
+                <MaterialIcon icon="group" size={24} color="#93c5fd" />
               </div>
-              <GlobalFeed />
-            </>
+              <p className="text-sm font-black text-slate-700">그룹에 참여해보세요</p>
+              <p className="mt-1 text-xs font-bold text-slate-400">그룹 안에서 서로의 기록을 확인할 수 있어요</p>
+              <button type="button" onClick={() => setShowGroupSetup(true)}
+                className="mt-4 flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white mx-auto">
+                <MaterialIcon icon="group_add" size={14} color="#fff" />
+                그룹 만들기 / 참여
+              </button>
+            </div>
           )}
         </main>
       </div>

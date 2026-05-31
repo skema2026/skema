@@ -408,8 +408,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
   const [certSchedule, setCertSchedule] = useState<{ id: number; title: string } | null>(null);
   const [certGroupId, setCertGroupId]   = useState<number | null>(null);
-  const [certCaption, setCertCaption]   = useState('');
-  const [certIsPublic, setCertIsPublic] = useState(true);
+  const [certCaption, setCertCaption] = useState('');
   const createStudyLog = useCreateStudyLog();
   const certFileRef = useRef<HTMLInputElement>(null);
   const { data: myGroups = [] } = useMyGroups();
@@ -1763,7 +1762,7 @@ ${missedLines}
           const form = new FormData();
           form.append('photo', file);
           form.append('schedule_id', String(certSchedule.id));
-          form.append('is_public', String(certIsPublic));
+          form.append('is_public', 'false');
           if (certCaption.trim()) form.append('caption', certCaption.trim());
           if (certGroupId) form.append('group_id', String(certGroupId));
           try {
@@ -1823,32 +1822,6 @@ ${missedLines}
               className="mb-3 w-full resize-none rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
             />
 
-            {/* 공개 / 비공개 — 그룹 선택 시 숨김 */}
-            {!certGroupId && <div className="mb-3 flex items-center justify-between rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5">
-              <div>
-                <p className="text-sm font-black text-slate-950">{certIsPublic ? '전체 공개' : '나만 보기'}</p>
-                <p className="text-[11px] font-bold text-slate-400">
-                  {certIsPublic ? '전체 피드에 표시됩니다' : '내 기록 탭에서만 보여요'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCertIsPublic(v => !v)}
-                style={{
-                  width: 44, height: 26, borderRadius: 99,
-                  background: certIsPublic ? '#2563eb' : '#e2e8f0',
-                  border: 'none', cursor: 'pointer', padding: 0,
-                  position: 'relative', transition: 'background .2s',
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 2, left: certIsPublic ? 20 : 2,
-                  width: 22, height: 22, borderRadius: '50%',
-                  background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,.18)',
-                  transition: 'left .2s',
-                }} />
-              </button>
-            </div>}
 
             <div className="flex gap-2">
               <button
@@ -1865,7 +1838,7 @@ ${missedLines}
                   const form = new FormData();
                   form.append('schedule_id', String(certSchedule.id));
                   form.append('caption', certCaption.trim());
-                  form.append('is_public', String(certIsPublic));
+                  form.append('is_public', 'false');
                   if (certGroupId) form.append('group_id', String(certGroupId));
                   try {
                     await createStudyLog.mutateAsync(form);
