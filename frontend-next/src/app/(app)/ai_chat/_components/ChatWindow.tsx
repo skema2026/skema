@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import ReactMarkdown from 'react-markdown';
 import { api } from '@/lib/api';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
@@ -19,22 +18,41 @@ const QUICK_CHIPS = [
   '미완료 일정 재배치해줘',
 ];
 
+function parseLine(line: string): React.ReactNode {
+  // **굵게** 파싱
+  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={i} className="font-bold text-slate-950">{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
 function renderText(text: string) {
-  return (
-    <ReactMarkdown
-      components={{
-        p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
-        strong: ({ children }) => <strong className="font-black text-slate-950">{children}</strong>,
-        em: ({ children }) => <em className="italic">{children}</em>,
-        ul: ({ children }) => <ul className="mb-1 ml-4 list-disc space-y-0.5">{children}</ul>,
-        ol: ({ children }) => <ol className="mb-1 ml-4 list-decimal space-y-0.5">{children}</ol>,
-        li: ({ children }) => <li>{children}</li>,
-        code: ({ children }) => <code className="rounded bg-slate-100 px-1 py-0.5 text-xs font-mono">{children}</code>,
-      }}
-    >
-      {text}
-    </ReactMarkdown>
-  );
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+
+  lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      elements.push(<br key={i} />);
+      return;
+    }
+    // 글머리 기호 (• 또는 - 또는 * 로 시작)
+    if (/^[•\-\*]\s/.test(trimmed)) {
+      elements.push(
+        <div key={i} className="flex gap-1.5">
+          <span className="mt-0.5 shrink-0 text-slate-400">•</span>
+          <span>{parseLine(trimmed.replace(/^[•\-\*]\s/, ''))}</span>
+        </div>
+      );
+    } else {
+      elements.push(<p key={i} className="leading-relaxed">{parseLine(trimmed)}</p>);
+    }
+  });
+
+  return <div className="space-y-1">{elements}</div>;
 }
 
 function TypingDots() {
