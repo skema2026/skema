@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 import { api } from '@/lib/api';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
@@ -19,12 +20,21 @@ const QUICK_CHIPS = [
 ];
 
 function renderText(text: string) {
-  return text.split('\n').map((line, i) => (
-    <span key={i}>
-      {line}
-      {i < text.split('\n').length - 1 && <br />}
-    </span>
-  ));
+  return (
+    <ReactMarkdown
+      components={{
+        p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+        strong: ({ children }) => <strong className="font-black text-slate-950">{children}</strong>,
+        em: ({ children }) => <em className="italic">{children}</em>,
+        ul: ({ children }) => <ul className="mb-1 ml-4 list-disc space-y-0.5">{children}</ul>,
+        ol: ({ children }) => <ol className="mb-1 ml-4 list-decimal space-y-0.5">{children}</ol>,
+        li: ({ children }) => <li>{children}</li>,
+        code: ({ children }) => <code className="rounded bg-slate-100 px-1 py-0.5 text-xs font-mono">{children}</code>,
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
 }
 
 function TypingDots() {
