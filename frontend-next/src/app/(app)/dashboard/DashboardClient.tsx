@@ -394,7 +394,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [aiAction, setAiAction] = useState<string | null>(null);
   const [aiReview, setAiReview] = useState<{ title: string; reply: string } | null>(null);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
-  const [timetableView, setTimetableView] = useState<TimetableView>('week');
+  const [timetableView, setTimetableView] = useState<TimetableView>('day');
   const [dayOffset, setDayOffset] = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
