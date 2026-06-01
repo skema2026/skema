@@ -106,6 +106,8 @@ export type NotificationPrefs = {
   motivation: boolean;
   weekly_report: boolean;
   comparison: boolean;
+  group_member_post: boolean;
+  log_like: boolean;
 };
 
 const DEFAULT_PREFS: NotificationPrefs = {
@@ -116,6 +118,8 @@ const DEFAULT_PREFS: NotificationPrefs = {
   motivation: true,
   weekly_report: true,
   comparison: false,
+  group_member_post: true,
+  log_like: true,
 };
 
 export function useNotificationPrefs() {

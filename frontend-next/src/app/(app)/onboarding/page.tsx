@@ -43,10 +43,10 @@ interface PersonalSchedule {
 
 const DAY_LABELS = ['월','화','수','목','금','토','일'] as const;
 const USER_TYPES = [
-  { id: 'exam_prep', label: '수험 준비', icon: 'menu_book', desc: '수능/자격/입시 등', color: '#c3d0ff', iconColor: '#2563eb' },
-  { id: 'civil_service', label: '공무원', icon: 'account_balance', desc: '공시 등 시험 준비', color: '#ffdcc6', iconColor: '#844000' },
-  { id: 'student', label: '대학생', icon: 'school', desc: '대학/대학원 학생', color: '#d1fae5', iconColor: '#065f46' },
-  { id: 'worker', label: '직장인', icon: 'work', desc: '업무/자기계발', color: '#fef3c7', iconColor: '#92400e' },
+  { id: 'exam_prep',   label: '취준 & 시험준비생', icon: 'menu_book',    desc: '취업/공무원/자격증/입시 등', color: '#c3d0ff', iconColor: '#2563eb' },
+  { id: 'high_school', label: '중고등학생',         icon: 'school',       desc: '내신/수능 준비',             color: '#d1fae5', iconColor: '#065f46' },
+  { id: 'worker',      label: '직장인',             icon: 'work',         desc: '업무 외 자기계발',           color: '#fef3c7', iconColor: '#92400e' },
+  { id: 'other',       label: '기타',               icon: 'person',       desc: '위 유형에 해당 없는 경우',   color: '#f1f5f9', iconColor: '#475569' },
 ];
 // 대학생은 타입 선택 없이 항상 student
 
@@ -304,8 +304,7 @@ export default function OnboardingPage() {
 
     try {
       const sleepTimes = directSleep ?? parseTime(finalAnswers.sleep || '');
-      // 대학생은 type-select 없으므로 'student' 기본값
-      const effectiveType = selectedType || 'student';
+      const effectiveType = selectedType || (isCollegeStudent ? 'student' : 'other');
       await updateProfile.mutateAsync({
         user_type: effectiveType,
         occupation: USER_TYPES.find((t) => t.id === effectiveType)?.label || '',
@@ -535,7 +534,9 @@ export default function OnboardingPage() {
             <button
               onClick={() => {
                 setIsCollegeStudent(false);
-                setPhase('type-select');
+                setStepIdx(0);
+                setMessages([{ role: 'ai', text: CHAT_STEPS_NON_COLLEGE[0].question }]);
+                setPhase('chat');
               }}
               className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{ background: '#fff', borderColor: '#ebeef1', boxShadow: '0 2px 12px rgba(26,77,178,0.06)' }}
@@ -1162,11 +1163,11 @@ export default function OnboardingPage() {
             </button>
             <div>
               <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>추가 시험 입력</h2>
-              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '3단계 / 5단계' : '2단계 / 4단계'}</p>
+              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '3단계 / 5단계' : '1단계 / 3단계'}</p>
             </div>
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '60%' : '50%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '60%' : '33%', background: '#2563eb' }} />
           </div>
 
           <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>
@@ -1335,11 +1336,11 @@ export default function OnboardingPage() {
             </button>
             <div>
               <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>개인 일정 입력</h2>
-              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '4단계 / 5단계' : '3단계 / 4단계'}</p>
+              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '4단계 / 5단계' : '2단계 / 3단계'}</p>
             </div>
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '80%' : '75%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '80%' : '66%', background: '#2563eb' }} />
           </div>
 
           <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>
@@ -1553,7 +1554,7 @@ export default function OnboardingPage() {
             </button>
             <div>
               <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>수면 시간 설정</h2>
-              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '5단계 / 5단계' : '4단계 / 4단계'}</p>
+              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '5단계 / 5단계' : '3단계 / 3단계'}</p>
             </div>
           </div>
 
@@ -1642,7 +1643,7 @@ export default function OnboardingPage() {
     );
   }
 
-  // 채팅 화면 (레거시 — 직접 접근 시 fallback)
+  // 채팅 화면
   const currentStep = activeSteps[stepIdx];
   const progress = (stepIdx / activeSteps.length) * 100;
 
@@ -1653,14 +1654,19 @@ export default function OnboardingPage() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setPhase(isCollegeStudent ? 'personal-schedule' : 'type-select')}
+              onClick={() => {
+                setMessages([]);
+                setStepIdx(0);
+                setAnswers({});
+                setPhase(isCollegeStudent ? 'personal-schedule' : 'college-check');
+              }}
               className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors"
             >
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
             <div>
               <p className="font-bold text-sm" style={{ color: '#181c1e' }}>
-                {isCollegeStudent ? '학습 목표 설정' : (USER_TYPES.find((t) => t.id === selectedType)?.label + ' 맞춤 설정')}
+                {isCollegeStudent ? '학습 목표 설정' : '기본 정보 입력'}
               </p>
               <p className="text-xs" style={{ color: '#3f4b61' }}>{stepIdx + 1} / {activeSteps.length} 단계</p>
             </div>

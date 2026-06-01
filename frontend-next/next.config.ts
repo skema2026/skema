@@ -10,11 +10,12 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname),
   },
   async rewrites() {
-    if (isProd) return [];
+    const internalUrl = process.env.INTERNAL_API_URL
+      || (isProd ? 'http://backend:8000' : 'http://localhost:8000');
     return [
       {
         source: '/proxy/:path*',
-        destination: 'http://localhost:8000/:path*',
+        destination: `${internalUrl}/:path*`,
       },
     ];
   },
