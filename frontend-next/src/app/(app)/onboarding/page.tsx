@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -405,24 +405,34 @@ export default function OnboardingPage() {
           }
         }
       } else {
-        // 비대학생 온보딩: chat 답변에서 시험/일정 파싱 후 등록
-        const scheduleText = finalAnswers.schedule;
-        if (scheduleText && scheduleText !== '없음') {
+        // 비대학생 온보딩: external-exam / personal-schedule 에서 입력한 상태 직접 저장
+        for (const exam of externalExams) {
+          if (!exam.date || !exam.name) continue;
           try {
-            await api.post('/ai/chat', {
-              message: `\ub2e4\uc74c \uc218\uc5c5/\uc815\uae30 \uc77c\uc815\uc744 \ub4f1\ub85d\ud574\uc918: ${scheduleText}`,
-              messages: [],
+            const { data } = await api.post<{ id: number }>('/exam-schedules', {
+              title: exam.name,
+              subject: exam.name,
+              exam_date: exam.date,
             });
-          } catch { /* 실패해도 온보딩 무시 */ }
-        }
-
-        const examText = finalAnswers.exam;
-        const parsedExams = examText && examText !== '없음' ? _parseExamText(examText) : [];
-        for (const exam of parsedExams) {
-          try {
-            const { data } = await api.post<{ id: number }>('/exam-schedules', exam);
             savedExamIds.push(data.id);
           } catch { /* 개별 시험 등록 실패 시 무시 */ }
+        }
+
+        for (const sched of personalSchedules) {
+          if (!sched.title || !sched.start_time || !sched.end_time) continue;
+          try {
+            await api.post('/schedules', {
+              title: sched.title,
+              recurring_day: sched.recurring_day,
+              days: sched.is_recurring ? sched.days : undefined,
+              start_time: sched.start_time,
+              end_time: sched.end_time,
+              schedule_type: 'activity',
+              schedule_source: 'user_created',
+              ...(sched.is_recurring ? {} : { date: sched.date || undefined }),
+              color: '#A855F7',
+            });
+          } catch { /* 개별 일정 등록 실패 시 무시 */ }
         }
       }
 
@@ -436,7 +446,7 @@ export default function OnboardingPage() {
 
   const handleTypeSelect = (typeId: string) => {
     setSelectedType(typeId);
-    setPhase('sleep');
+    setPhase('external-exam');
   };
 
   /** 대학생 온보딩: personal-schedule 완료 후 chat 진입 */
@@ -1147,16 +1157,16 @@ export default function OnboardingPage() {
       <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-lg">
           <div className="flex items-center gap-3 mb-6">
-            <button onClick={() => setPhase('eta-review')} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#fff', border: '1px solid #ebeef1' }}>
+            <button onClick={() => setPhase(isCollegeStudent ? 'eta-review' : 'type-select')} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#fff', border: '1px solid #ebeef1' }}>
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
             <div>
               <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>추가 시험 입력</h2>
-              <p className="text-xs" style={{ color: '#3f4b61' }}>3단계 / 5단계</p>
+              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '3단계 / 5단계' : '2단계 / 4단계'}</p>
             </div>
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: '60%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '60%' : '50%', background: '#2563eb' }} />
           </div>
 
           <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>
@@ -1325,11 +1335,11 @@ export default function OnboardingPage() {
             </button>
             <div>
               <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>개인 일정 입력</h2>
-              <p className="text-xs" style={{ color: '#3f4b61' }}>4단계 / 5단계</p>
+              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '4단계 / 5단계' : '3단계 / 4단계'}</p>
             </div>
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: '80%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '80%' : '75%', background: '#2563eb' }} />
           </div>
 
           <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>
@@ -1524,7 +1534,7 @@ export default function OnboardingPage() {
 
   // 수면 시간 입력 화면
   if (phase === 'sleep') {
-    const backTarget = isCollegeStudent ? 'personal-schedule' : 'type-select';
+    const backTarget = 'personal-schedule';
     const handleSleepSubmit = () => {
       finishOnboarding({}, { sleep_start: sleepStart, sleep_end: sleepEnd });
     };
@@ -1543,7 +1553,7 @@ export default function OnboardingPage() {
             </button>
             <div>
               <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>수면 시간 설정</h2>
-              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '5단계 / 5단계' : '마지막 단계'}</p>
+              <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '5단계 / 5단계' : '4단계 / 4단계'}</p>
             </div>
           </div>
 
