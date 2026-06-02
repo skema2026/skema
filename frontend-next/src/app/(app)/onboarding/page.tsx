@@ -53,17 +53,17 @@ const USER_TYPES = [
 const CHAT_STEPS_COLLEGE = [
   {
     key: 'goal_tasks',
-    question: `어떤 목표와 과목들로 공부하시나요?`,
+    question: `어떤 목표로, 어떤 과목을 공부하고 계세요?`,
     hint: '목표 과목/내용을 입력해주세요',
     quick: ['예시 보기'],
     examples: {
-      '예시 보기': `예시:\n"수능준비, 대학입시, 영어"\n"수학, 영어과목"`,
+      '예시 보기': `이렇게 적어주시면 돼요 😊\n· 수능준비, 대학입시, 영어\n· 수학, 영어`,
     },
   },
   {
     key: 'sleep',
-    question: `수면 시간대를 알려주세요
-수면 시간은 최소 6시간 이상 입력해 주세요.`,
+    question: `보통 몇 시에 자고 몇 시에 일어나세요?
+수면은 최소 6시간 이상으로 알려주세요.`,
     hint: '예) 밤 11시 취침, 아침 7시 기상',
     quick: ['23시 취침, 7시 기상', '24시 취침, 8시 기상', '1시 취침, 8시 기상'],
   },
@@ -72,22 +72,22 @@ const CHAT_STEPS_COLLEGE = [
 const CHAT_STEPS_NON_COLLEGE = [
   {
     key: 'goal_tasks',
-    question: `어떤 목표와 과목들로 공부하시나요?`,
+    question: `어떤 목표로, 어떤 과목을 공부하고 계세요?`,
     hint: '목표 과목/내용을 입력해주세요',
     quick: ['예시 보기'],
     examples: {
-      '예시 보기': `예시:\n"수능준비, 대학입시, 영어"\n"정보처리기사, 자격증"\n"수학, 영어과목"`,
+      '예시 보기': `이렇게 적어주시면 돼요 😊\n· 수능준비, 대학입시, 영어\n· 정보처리기사, 자격증\n· 수학, 영어`,
     },
   },
   {
     key: 'schedule',
-    question: `정기적인 업무나 학원 일정이 있나요?
+    question: `매주 반복되는 일정이 있나요?
+업무나 학원 수업처럼요.
 
-예시:
-"화수목 9시~11시 어학원 수업"
-"화목 14시~16시 영어"
+예) 화수목 9시~11시 어학원 수업
+예) 화목 14시~16시 영어
 
-없으면 "없음"을 선택해 주세요`,
+없으면 아래 "없음"을 눌러주세요`,
     hint: '정기 일정을 입력해주세요',
     quick: ['없음'],
   },
@@ -95,18 +95,17 @@ const CHAT_STEPS_NON_COLLEGE = [
     key: 'exam',
     question: `다가오는 시험 일정이 있나요?
 
-예시:
-"4월 15일 중간고사"
-"5월 20일 발표 시험"
+예) 4월 15일 중간고사
+예) 5월 20일 발표 시험
 
-없으면 "없음"을 선택해 주세요`,
+없으면 아래 "없음"을 눌러주세요`,
     hint: '시험 일정을 입력해주세요',
     quick: ['없음'],
   },
   {
     key: 'sleep',
-    question: `수면 시간대를 알려주세요
-수면 시간은 최소 6시간 이상 입력해 주세요.`,
+    question: `보통 몇 시에 자고 몇 시에 일어나세요?
+수면은 최소 6시간 이상으로 알려주세요.`,
     hint: '예) 밤 11시 취침, 아침 7시 기상',
     quick: ['23시 취침, 7시 기상', '24시 취침, 8시 기상', '1시 취침, 8시 기상'],
   },
@@ -299,7 +298,7 @@ function _validateStep(key: string, text: string): StepResult {
 
   if (key === 'goal_tasks') {
     if (t.length < 2) {
-      return { ok: false, error: '목표나 과목을 조금 더 구체적으로 알려주세요 🙏\n예: "정보처리기사, 자격증" 또는 "수학, 영어"' };
+      return { ok: false, error: '조금만 더 자세히 알려주실래요? 😊\n예) 정보처리기사, 자격증\n예) 수학, 영어' };
     }
     return { ok: true };
   }
@@ -308,34 +307,34 @@ function _validateStep(key: string, text: string): StepResult {
     if (_isNoneAnswer(t)) return { ok: true, schedules: [] };
     const parsed = _parseScheduleText(t);
     if (parsed.length === 0) {
-      return { ok: false, error: '일정을 정확히 인식하지 못했어요 🙏\n요일과 시간을 함께 적어주세요. 예: "화수목 9시~11시 어학원 수업"\n없으면 "없음"이라고 입력해 주세요.' };
+      return { ok: false, error: '요일과 시간을 함께 적어주시면 정확히 잡아드릴게요 😊\n예) 화수목 9시~11시 어학원 수업\n없으면 아래 "없음"을 눌러주세요' };
     }
     const fmt = parsed.map((s) => `· ${s.days.map((d) => DAY_LABELS[recurringDayToIndex(d)]).join('·')} ${s.start_time}~${s.end_time} ${s.title}`).join('\n');
-    return { ok: true, schedules: parsed, confirm: `다음 일정을 등록했어요 ✅\n${fmt}` };
+    return { ok: true, schedules: parsed, confirm: `좋아요! 이렇게 등록해 둘게요 ✅\n${fmt}` };
   }
 
   if (key === 'exam') {
     if (_isNoneAnswer(t)) return { ok: true, exams: [] };
     const parsed = _parseExamText(t);
     if (parsed.length === 0) {
-      return { ok: false, error: '시험 일정을 정확히 인식하지 못했어요 🙏\n날짜와 시험명을 함께 적어주세요. 예: "4월 15일 중간고사"\n없으면 "없음"이라고 입력해 주세요.' };
+      return { ok: false, error: '날짜와 시험 이름을 함께 적어주세요 😊\n예) 4월 15일 중간고사\n없으면 아래 "없음"을 눌러주세요' };
     }
     const exams: ExternalExam[] = parsed.map((e, i) => ({ _id: `ex-${Date.now()}-${i}`, name: e.title, date: e.exam_date }));
     const fmt = exams.map((e) => `· ${e.date} ${e.name}`).join('\n');
-    return { ok: true, exams, confirm: `다음 시험을 등록했어요 ✅\n${fmt}` };
+    return { ok: true, exams, confirm: `좋아요! 이렇게 등록해 둘게요 ✅\n${fmt}` };
   }
 
   if (key === 'sleep') {
     const toks = _parseTimeTokens(t);
     if (toks.length < 2) {
-      return { ok: false, error: '취침 시간과 기상 시간을 모두 알려주세요 🙏\n예: "밤 11시 취침, 아침 7시 기상"' };
+      return { ok: false, error: '취침 시간과 기상 시간을 둘 다 알려주세요 😊\n예) 밤 11시 취침, 아침 7시 기상' };
     }
     const dur = _sleepHours(toks[0], toks[1]);
     const durLabel = dur % 1 === 0 ? `${dur}` : dur.toFixed(1);
     if (dur < 6) {
-      return { ok: false, error: `수면 시간이 ${durLabel}시간으로 너무 짧아요 😴\n최소 6시간 이상으로 다시 입력해 주세요.` };
+      return { ok: false, error: `입력하신 수면 시간이 ${durLabel}시간이에요 😴\n건강한 계획을 위해 최소 6시간 이상으로 다시 알려주실래요?` };
     }
-    return { ok: true, confirm: `수면 시간을 ${toks[0]}~${toks[1]} (${durLabel}시간)로 설정했어요 😴` };
+    return { ok: true, confirm: `좋아요, ${toks[0]}~${toks[1]} (${durLabel}시간)으로 맞춰둘게요 😴` };
   }
 
   return { ok: true };
