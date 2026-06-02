@@ -3,6 +3,8 @@
 > **"내 시간표를 AI가 이해하고, 함께 관리한다"**  
 > 단국대학교 2026-1 캡스톤디자인 프로젝트
 
+**배포 주소:** https://capstone-design-2026-1.vercel.app
+
 ---
 
 ## 프로젝트 소개
@@ -48,7 +50,7 @@ SKEMA는 대학생의 시간표 관리 문제를 AI로 해결하는 웹 애플�
 
 ### 계정
 - 이메일·비밀번호 회원가입 / 로그인
-- 카카오·Google OAuth 소셜 로그인
+- 카카오·Google·Naver OAuth 소셜 로그인
 - 온보딩 (사용자 유형, 수면 시간, 에타 시간표 파싱)
 - 타 사용자 프로필 조회 (스트릭·기록·게시글)
 
@@ -63,7 +65,7 @@ SKEMA는 대학생의 시간표 관리 문제를 AI로 해결하는 웹 애플�
 | 프레임워크 | FastAPI |
 | ORM | SQLAlchemy + Alembic |
 | DB | MySQL 8.0 |
-| AI | Anthropic Claude (claude-opus-4-5, claude-sonnet-4-5) |
+| AI | OpenAI GPT-4.1 |
 | 인증 | JWT (python-jose) + OAuth2 |
 | 알림 | Web Push (pywebpush, VAPID) + APScheduler |
 | 스토리지 | 로컬 볼륨 (/app/uploads) |
@@ -80,7 +82,11 @@ SKEMA는 대학생의 시간표 관리 문제를 AI로 해결하는 웹 애플�
 | 알림 | Service Worker + Web Push API |
 
 ### 인프라
-- Docker Compose (개발·프로덕션 분리)
+| 항목 | 내용 |
+|------|------|
+| 프론트엔드 배포 | Vercel |
+| 백엔드 배포 | Railway |
+| 로컬 개발 | Docker Compose |
 
 ---
 
@@ -126,7 +132,7 @@ capstone-design-2026-1/
 ```bash
 # 1. 환경변수 설정
 cp .env.example .env
-# .env 파일에서 ANTHROPIC_API_KEY, VAPID 키 등 설정
+# .env 파일에서 OPENAI_API_KEY, VAPID 키 등 설정
 
 # 2. 백엔드 + DB 실행
 docker compose up -d
