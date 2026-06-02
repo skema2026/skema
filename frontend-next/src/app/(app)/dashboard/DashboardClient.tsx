@@ -580,15 +580,9 @@ useEffect(() => {
     .slice(0, 3);
   const upcomingExam = upcomingExams[0] ?? null;
 
-  // 사이드바 "다가오는 중요 일정" 카드용 데이터
-  // 대학생: 시험만, 비대학생: 시험 + 미래 일정(date 지정된 일회성 일정)
+  // 사이드바 "다가오는 중요 일정" 카드용 데이터 — 대학생·비대학생 모두 시험만 표시
   const sidebarExams = upcomingExams.slice(0, 5);
-  const sidebarOneTimeEvents = profile?.is_college_student
-    ? []
-    : schedules
-        .filter((s) => !!s.date && s.date >= todayStr)  // date 있으면 일회성 일정
-        .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
-        .slice(0, 5);
+  const sidebarOneTimeEvents: typeof schedules = [];
 
   const getDaysUntil = (date: string) =>
     Math.ceil((new Date(`${date}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000);
@@ -1542,9 +1536,7 @@ ${missedLines}
 
                 {/* 다가오는 중요 일정 */}
                 <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-                  <p className="mb-3 text-[11px] font-black text-slate-400">
-                    {profile?.is_college_student ? '시험 일정' : '중요 일정'}
-                  </p>
+                  <p className="mb-3 text-[11px] font-black text-slate-400">시험 일정</p>
                   {sidebarExams.length === 0 && sidebarOneTimeEvents.length === 0 ? (
                     <p className="text-xs font-bold text-slate-400">등록된 일정이 없어요</p>
                   ) : (
