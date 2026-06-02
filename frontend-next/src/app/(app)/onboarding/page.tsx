@@ -53,13 +53,12 @@ const USER_TYPES = [
 const CHAT_STEPS_COLLEGE = [
   {
     key: 'goal_tasks',
-    question: `어떤 목표와 과목들로 공부하시나요?
-
-예시:
-"수능준비, 대학입시, 영어"
-"수학, 영어과목"`,
+    question: `어떤 목표와 과목들로 공부하시나요?`,
     hint: '목표 과목/내용을 입력해주세요',
-    quick: ['예시 보기']
+    quick: ['예시 보기'],
+    examples: {
+      '예시 보기': `예시:\n"수능준비, 대학입시, 영어"\n"수학, 영어과목"`,
+    },
   },
   {
     key: 'sleep',
@@ -73,14 +72,12 @@ const CHAT_STEPS_COLLEGE = [
 const CHAT_STEPS_NON_COLLEGE = [
   {
     key: 'goal_tasks',
-    question: `어떤 목표와 과목들로 공부하시나요?
-
-예시:
-"수능준비, 대학입시, 영어"
-"정보처리기사, 자격증"
-"수학, 영어과목"`,
+    question: `어떤 목표와 과목들로 공부하시나요?`,
     hint: '목표 과목/내용을 입력해주세요',
     quick: ['예시 보기'],
+    examples: {
+      '예시 보기': `예시:\n"수능준비, 대학입시, 영어"\n"정보처리기사, 자격증"\n"수학, 영어과목"`,
+    },
   },
   {
     key: 'schedule',
@@ -88,7 +85,7 @@ const CHAT_STEPS_NON_COLLEGE = [
 
 예시:
 "화수목 9시~11시 어학원 수업"
-"화목요 14시~16시 영어"
+"화목 14시~16시 영어"
 
 없으면 "없음"을 선택해 주세요`,
     hint: '정기 일정을 입력해주세요',
@@ -171,6 +168,177 @@ function _parseExamText(raw: string): Array<{ title: string; exam_date: string; 
   }
 
   return results;
+}
+
+const _DAY_CH_TO_RD: Record<string, RecurringDay> = {
+  '월': 'MON', '화': 'TUE', '수': 'WED', '목': 'THU', '금': 'FRI', '토': 'SAT', '일': 'SUN',
+};
+const _ALL_DAYS: RecurringDay[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+/** "없음" 계열 응답 판별 */
+function _isNoneAnswer(text: string): boolean {
+  return /^(없음|없어요|없습니다|없다|없|아니요|아니오|아뇨|해당없음|x|-)$/i.test(text.trim());
+}
+
+/**
+ * 자유 텍스트에서 시각 토큰을 모두 추출한다. ("HH:MM" 배열)
+ * 오전/오후/밤/아침 등 한국어 시간대 표현을 24시간제로 변환.
+ *   "밤 11시" → "23:00"   "오후 2시반" → "14:30"   "9~11" → ["09:00","11:00"]
+ */
+function _parseTimeTokens(text: string): string[] {
+  const out: string[] = [];
+  const re = /(오전|오후|아침|점심|저녁|밤|새벽|낮|정오|자정)?\s*(\d{1,2})\s*(?::\s*(\d{2})|시\s*(반|\d{1,2}\s*분)?)?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const period = m[1];
+    let h = parseInt(m[2], 10);
+    let min = 0;
+    if (m[3]) min = parseInt(m[3], 10);
+    else if (m[4]) min = /반/.test(m[4]) ? 30 : (parseInt(m[4], 10) || 0);
+
+    if (period === '오후' || period === '저녁' || period === '밤' || period === '낮' || period === '점심') {
+      if (h < 12) h += 12;
+    } else if (period === '오전' || period === '아침' || period === '새벽') {
+      if (h === 12) h = 0;
+    } else if (period === '자정') h = 0;
+    else if (period === '정오') h = 12;
+
+    if (h === 24) h = 0;
+    if (h > 23 || min > 59) continue;
+    out.push(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** 취침~기상 수면 시간(시간 단위, 자정 넘김 처리) */
+function _sleepHours(start: string, end: string): number {
+  const toMin = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+  let dur = toMin(end) - toMin(start);
+  if (dur <= 0) dur += 24 * 60;
+  return Math.round((dur / 60) * 10) / 10;
+}
+
+/** 요일 영역에서 반복 요일 추출. 공백/쉼표 구분 토큰이 "전부 요일 글자"일 때만 인정 → "수영" 오인식 방지 */
+function _extractDays(region: string): RecurringDay[] {
+  if (/매일/.test(region)) return [..._ALL_DAYS];
+  if (/평일/.test(region)) return ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+  if (/주말/.test(region)) return ['SAT', 'SUN'];
+  const days: RecurringDay[] = [];
+  for (const rawTok of region.split(/[\s,]+/)) {
+    const tok = rawTok.replace(/(요일|요|마다)$/, '');
+    if (!tok || ![...tok].every((ch) => ch in _DAY_CH_TO_RD)) continue;
+    for (const ch of tok) {
+      const d = _DAY_CH_TO_RD[ch];
+      if (d && !days.includes(d)) days.push(d);
+    }
+  }
+  return days;
+}
+
+/**
+ * 정기 일정 자유 텍스트 → PersonalSchedule[].
+ * 한 줄 = 한 일정. 요일과 시작·종료 시각을 모두 인식해야 채택, 아니면 그 줄은 버린다.
+ *   "화수목 9시~11시 어학원 수업" → 화·수·목 09:00~11:00 "어학원 수업"
+ */
+function _parseScheduleText(raw: string): PersonalSchedule[] {
+  if (!raw || _isNoneAnswer(raw)) return [];
+  const toMin = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+  const results: PersonalSchedule[] = [];
+  raw.split(/\n/).map((l) => l.trim()).filter(Boolean).forEach((line, i) => {
+    const times = _parseTimeTokens(line);
+    if (times.length < 2) return;
+    const days = _extractDays(line);   // 요일이 시각 앞/뒤 어디 있든 인식 (토큰 기반이라 "수영"의 '수' 오인식 없음)
+    if (days.length === 0) return;
+
+    // "오후 9시~11시"처럼 종료 시각에 시간대 표현이 빠져 시작보다 빠르면 오후(+12)로 보정
+    let [start, end] = [times[0], times[1]];
+    if (toMin(end) <= toMin(start)) {
+      const [eh, em] = end.split(':').map(Number);
+      if (eh + 12 <= 23 && (eh + 12) * 60 + em > toMin(start)) {
+        end = `${String(eh + 12).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+      }
+    }
+
+    // 제목: 요일·시각·연결어 토큰을 제거한 나머지 단어들 (요일 앞/뒤 어디에 있든 보존)
+    const title = line.split(/[\s,]+/).map((w) => {
+      if (/^(평일|매일|주말|주중)$/.test(w)) return '';                            // 요일 키워드
+      const stripped = w.replace(/(요일|요|마다)$/, '');
+      if (stripped && [...stripped].every((c) => c in _DAY_CH_TO_RD)) return '';   // 순수 요일 토큰
+      return w
+        .replace(/(오전|오후|아침|점심|저녁|밤|새벽|낮|정오|자정)/g, '')
+        .replace(/\d{1,2}\s*(?::\s*\d{2}|시\s*(?:반|\d{1,2}\s*분)?)?/g, '')
+        .replace(/[~\-–]/g, '')
+        .replace(/(에서|부터|까지)/g, '')
+        .trim();
+    }).filter(Boolean).join(' ') || '일정';
+
+    results.push({
+      _id: `ps-${Date.now()}-${i}`,
+      title,
+      recurring_day: days[0],
+      days,
+      start_time: start,
+      end_time: end,
+      is_recurring: true,
+      date: '',
+    });
+  });
+  return results;
+}
+
+type StepResult =
+  | { ok: true; schedules?: PersonalSchedule[]; exams?: ExternalExam[]; confirm?: string }
+  | { ok: false; error: string };
+
+/**
+ * 비대학생 온보딩 채팅의 단계별 답변 검증·파싱.
+ * 제대로 인식하지 못하면 ok:false + 안내 문구를 돌려주어 같은 단계에서 다시 묻도록 한다.
+ */
+function _validateStep(key: string, text: string): StepResult {
+  const t = text.trim();
+
+  if (key === 'goal_tasks') {
+    if (t.length < 2) {
+      return { ok: false, error: '목표나 과목을 조금 더 구체적으로 알려주세요 🙏\n예: "정보처리기사, 자격증" 또는 "수학, 영어"' };
+    }
+    return { ok: true };
+  }
+
+  if (key === 'schedule') {
+    if (_isNoneAnswer(t)) return { ok: true, schedules: [] };
+    const parsed = _parseScheduleText(t);
+    if (parsed.length === 0) {
+      return { ok: false, error: '일정을 정확히 인식하지 못했어요 🙏\n요일과 시간을 함께 적어주세요. 예: "화수목 9시~11시 어학원 수업"\n없으면 "없음"이라고 입력해 주세요.' };
+    }
+    const fmt = parsed.map((s) => `· ${s.days.map((d) => DAY_LABELS[recurringDayToIndex(d)]).join('·')} ${s.start_time}~${s.end_time} ${s.title}`).join('\n');
+    return { ok: true, schedules: parsed, confirm: `다음 일정을 등록했어요 ✅\n${fmt}` };
+  }
+
+  if (key === 'exam') {
+    if (_isNoneAnswer(t)) return { ok: true, exams: [] };
+    const parsed = _parseExamText(t);
+    if (parsed.length === 0) {
+      return { ok: false, error: '시험 일정을 정확히 인식하지 못했어요 🙏\n날짜와 시험명을 함께 적어주세요. 예: "4월 15일 중간고사"\n없으면 "없음"이라고 입력해 주세요.' };
+    }
+    const exams: ExternalExam[] = parsed.map((e, i) => ({ _id: `ex-${Date.now()}-${i}`, name: e.title, date: e.exam_date }));
+    const fmt = exams.map((e) => `· ${e.date} ${e.name}`).join('\n');
+    return { ok: true, exams, confirm: `다음 시험을 등록했어요 ✅\n${fmt}` };
+  }
+
+  if (key === 'sleep') {
+    const toks = _parseTimeTokens(t);
+    if (toks.length < 2) {
+      return { ok: false, error: '취침 시간과 기상 시간을 모두 알려주세요 🙏\n예: "밤 11시 취침, 아침 7시 기상"' };
+    }
+    const dur = _sleepHours(toks[0], toks[1]);
+    const durLabel = dur % 1 === 0 ? `${dur}` : dur.toFixed(1);
+    if (dur < 6) {
+      return { ok: false, error: `수면 시간이 ${durLabel}시간으로 너무 짧아요 😴\n최소 6시간 이상으로 다시 입력해 주세요.` };
+    }
+    return { ok: true, confirm: `수면 시간을 ${toks[0]}~${toks[1]} (${durLabel}시간)로 설정했어요 😴` };
+  }
+
+  return { ok: true };
 }
 
 export default function OnboardingPage() {
@@ -284,11 +452,10 @@ export default function OnboardingPage() {
   };
 
   const parseTime = (text: string) => {
-    const nums = text.match(/\d+/g)?.map(Number) || [];
-    const toHHMM = (h: number) => `${String(h % 24).padStart(2, '0')}:00`;
+    const toks = _parseTimeTokens(text);
     return {
-      sleep_start: nums[0] !== undefined ? toHHMM(nums[0]) : '23:00',
-      sleep_end: nums[1] !== undefined ? toHHMM(nums[1]) : '07:00',
+      sleep_start: toks[0] ?? '23:00',
+      sleep_end: toks[1] ?? '07:00',
     };
   };
 
@@ -460,15 +627,33 @@ export default function OnboardingPage() {
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', text: userText }]);
 
-    const newAnswers = { ...answers, [activeSteps[stepIdx].key]: userText };
+    const step = activeSteps[stepIdx];
+    const result = _validateStep(step.key, userText);
+
+    // \ub2f5\uc744 \uc81c\ub300\ub85c \uc778\uc2dd\ud558\uc9c0 \ubabb\ud558\uba74 \ub2e4\uc74c \ub2e8\uacc4\ub85c \ub118\uc5b4\uac00\uc9c0 \uc54a\uace0 \uac19\uc740 \ub2e8\uacc4\uc5d0\uc11c \ub2e4\uc2dc \ubb3b\ub294\ub2e4
+    if (!result.ok) {
+      setIsProcessing(true);
+      setTimeout(() => {
+        setMessages((prev) => [...prev, { role: 'ai', text: result.error }]);
+        setIsProcessing(false);
+      }, 400);
+      return;
+    }
+
+    // \ud30c\uc2f1 \uacb0\uacfc\ub97c \uc628\ubcf4\ub529 \uc800\uc7a5\uc5d0 \uc4f0\uc774\ub294 \uc0c1\ud0dc\uc5d0 \ubc18\uc601 (\ube44\ub300\ud559\uc0dd: finishOnboarding\uc774 \uc774 \ubc30\uc5f4\uc744 \uc800\uc7a5)
+    if (result.schedules?.length) setPersonalSchedules((prev) => [...prev, ...result.schedules!]);
+    if (result.exams?.length) setExternalExams((prev) => [...prev, ...result.exams!]);
+
+    const newAnswers = { ...answers, [step.key]: userText };
     setAnswers(newAnswers);
     const nextIdx = stepIdx + 1;
+    const confirmMsg: Message[] = result.confirm ? [{ role: 'ai', text: result.confirm }] : [];
 
     if (nextIdx < activeSteps.length) {
       setStepIdx(nextIdx);
       setIsProcessing(true);
       setTimeout(() => {
-        setMessages((prev) => [...prev, { role: 'ai', text: activeSteps[nextIdx].question }]);
+        setMessages((prev) => [...prev, ...confirmMsg, { role: 'ai', text: activeSteps[nextIdx].question }]);
         setIsProcessing(false);
       }, 500);
     } else {
@@ -476,7 +661,8 @@ export default function OnboardingPage() {
       setTimeout(() => {
         setMessages((prev) => [
           ...prev,
-          { role: 'ai', text: '\uc54c\uac4c\uc2b5\ub2c8\ub2e4! AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \uc0dd\uc131\ud558\uace0 \uc788\uc2b5\ub2c8\ub2e4 \ud83d\uddd3\ufe0f' },
+          ...confirmMsg,
+          { role: 'ai', text: '\uc54c\uaca0\uc2b5\ub2c8\ub2e4! AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \uc0dd\uc131\ud558\uace0 \uc788\uc2b5\ub2c8\ub2e4 \ud83d\uddd3\ufe0f' },
         ]);
         setIsProcessing(false);
         finishOnboarding(newAnswers);
@@ -1730,7 +1916,18 @@ export default function OnboardingPage() {
             {currentStep.quick.map((q) => (
               <button
                 key={q}
-                onClick={() => handleSend(q)}
+                onClick={() => {
+                  const exampleText = (currentStep as { examples?: Record<string, string> }).examples?.[q];
+                  if (exampleText) {
+                    setMessages((prev) => [
+                      ...prev,
+                      { role: 'user', text: q },
+                      { role: 'ai', text: exampleText },
+                    ]);
+                  } else {
+                    handleSend(q);
+                  }
+                }}
                 className="px-3 py-1.5 text-xs rounded-full font-medium transition-all border-2 hover:border-blue-400 hover:text-blue-600"
                 style={{ borderColor: '#c3d0ff', color: '#2563eb', background: '#f0f4ff' }}
               >
