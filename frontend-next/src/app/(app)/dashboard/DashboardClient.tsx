@@ -579,6 +579,17 @@ useEffect(() => {
     .sort((a, b) => a.exam_date.localeCompare(b.exam_date))
     .slice(0, 3);
   const upcomingExam = upcomingExams[0] ?? null;
+
+  // 사이드바 "다가오는 중요 일정" 카드용 데이터
+  // 대학생: 시험만, 비대학생: 시험 + 미래 일정(date 지정된 일회성 일정)
+  const sidebarExams = upcomingExams.slice(0, 5);
+  const sidebarOneTimeEvents = profile?.is_college_student
+    ? []
+    : schedules
+        .filter((s) => !!s.date && s.date >= todayStr)  // date 있으면 일회성 일정
+        .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+        .slice(0, 5);
+
   const getDaysUntil = (date: string) =>
     Math.ceil((new Date(`${date}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000);
   const formatDday = (days: number) => (days <= 0 ? 'D-day' : `D-${days}`);
@@ -1528,6 +1539,53 @@ ${missedLines}
               </div>
 
               <aside className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto">
+
+                {/* 다가오는 중요 일정 */}
+                <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
+                  <p className="mb-3 text-[11px] font-black text-slate-400">
+                    {profile?.is_college_student ? '시험 일정' : '중요 일정'}
+                  </p>
+                  {sidebarExams.length === 0 && sidebarOneTimeEvents.length === 0 ? (
+                    <p className="text-xs font-bold text-slate-400">등록된 일정이 없어요</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {sidebarExams.map((exam) => {
+                        const days = getDaysUntil(exam.exam_date);
+                        return (
+                          <div key={`sidebar-exam-${exam.id}`} className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+                              <MaterialIcon icon="quiz" size={16} color="#d97706" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-black text-slate-900">{exam.title}</span>
+                              <span className="text-[10px] font-bold text-slate-400">{exam.exam_date}</span>
+                            </span>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${days <= 0 ? 'bg-red-100 text-red-700' : days <= 7 ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-600'}`}>
+                              {days <= 0 ? 'D-day' : `D-${days}`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {sidebarOneTimeEvents.map((s) => {
+                        const days = getDaysUntil(s.date!);
+                        return (
+                          <div key={`sidebar-event-${s.id}`} className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/40 px-3 py-2.5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100">
+                              <MaterialIcon icon="event" size={16} color="#2563eb" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-black text-slate-900">{s.title}</span>
+                              <span className="text-[10px] font-bold text-slate-400">{s.date} {s.start_time}~{s.end_time}</span>
+                            </span>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${days <= 0 ? 'bg-red-100 text-red-700' : days <= 3 ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-600'}`}>
+                              {days <= 0 ? 'D-day' : `D-${days}`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
                 {/* AI 핵심 작업 */}
                 <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">

@@ -330,8 +330,8 @@ function _validateStep(key: string, text: string): StepResult {
     const dur = _sleepHours(toks[0], toks[1]);
     const durLabel = dur % 1 === 0 ? `${dur}` : dur.toFixed(1);
     // 수면이 짧아도 되묻지 않고 그대로 반영 — 짧을 때만 가볍게 알려줌
-    const note = dur < 6 ? '\n알겠어요, 입력하신 대로 설정할게요 👍' : '';
-    return { ok: true, confirm: `좋아요, ${toks[0]}~${toks[1]} (${durLabel}시간)으로 맞춰둘게요 😴${note}` };
+    const note = dur < 6 ? `\n${durLabel}시간은 짧아서 더 자는 것이 좋아요 😴` : '';
+    return { ok: true, confirm: `좋아요, 반영할게요!${note}` };
   }
 
   return { ok: true };
