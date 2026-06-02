@@ -62,8 +62,7 @@ const CHAT_STEPS_COLLEGE = [
   },
   {
     key: 'sleep',
-    question: `보통 몇 시에 자고 몇 시에 일어나세요?
-수면은 최소 6시간 이상으로 알려주세요.`,
+    question: `보통 몇 시에 자고 몇 시에 일어나세요?`,
     hint: '예) 밤 11시 취침, 아침 7시 기상',
     quick: ['23시 취침, 7시 기상', '24시 취침, 8시 기상', '1시 취침, 8시 기상'],
   },
@@ -104,8 +103,7 @@ const CHAT_STEPS_NON_COLLEGE = [
   },
   {
     key: 'sleep',
-    question: `보통 몇 시에 자고 몇 시에 일어나세요?
-수면은 최소 6시간 이상으로 알려주세요.`,
+    question: `보통 몇 시에 자고 몇 시에 일어나세요?`,
     hint: '예) 밤 11시 취침, 아침 7시 기상',
     quick: ['23시 취침, 7시 기상', '24시 취침, 8시 기상', '1시 취침, 8시 기상'],
   },
@@ -331,10 +329,9 @@ function _validateStep(key: string, text: string): StepResult {
     }
     const dur = _sleepHours(toks[0], toks[1]);
     const durLabel = dur % 1 === 0 ? `${dur}` : dur.toFixed(1);
-    if (dur < 6) {
-      return { ok: false, error: `입력하신 수면 시간이 ${durLabel}시간이에요 😴\n건강한 계획을 위해 최소 6시간 이상으로 다시 알려주실래요?` };
-    }
-    return { ok: true, confirm: `좋아요, ${toks[0]}~${toks[1]} (${durLabel}시간)으로 맞춰둘게요 😴` };
+    // 수면이 짧아도 되묻지 않고 그대로 반영 — 짧을 때만 가볍게 알려줌
+    const note = dur < 6 ? '\n조금 짧지만 입력하신 대로 반영할게요 🙂' : '';
+    return { ok: true, confirm: `좋아요, ${toks[0]}~${toks[1]} (${durLabel}시간)으로 맞춰둘게요 😴${note}` };
   }
 
   return { ok: true };

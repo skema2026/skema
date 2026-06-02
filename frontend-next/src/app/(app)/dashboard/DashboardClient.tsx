@@ -590,7 +590,8 @@ useEffect(() => {
     timetableView === 'day' ? formatLongDate(dayDate) :
     timetableView === 'week' ? weekLabel :
     monthLabel;
-  const needsTimetableUpload = schedules.length === 0 || etaScheduleCount === 0;
+  // 에타 시간표 업로드는 대학생 전용 기능 → 비대학생에겐 "시간표 인식 필요" 안내를 띄우지 않는다
+  const needsTimetableUpload = profile?.is_college_student === true && (schedules.length === 0 || etaScheduleCount === 0);
   const examNeedsAttention = upcomingExam ? getDaysUntil(upcomingExam.exam_date) <= 7 : false;
   const issueItems = [
     ...(todayConflictSchedules.length
