@@ -32,7 +32,7 @@ class User(Base):
     events = relationship("Event", back_populates="user", cascade="all, delete-orphan")
     share_tokens = relationship("ShareToken", back_populates="user", cascade="all, delete-orphan")
     ai_chat_logs = relationship("AIChatLog", back_populates="user", cascade="all, delete-orphan")
-    login_logs = relationship("LoginLog", back_populates="user", cascade="all, delete-orphan")
+    login_logs = relationship("LoginLog", back_populates="user", passive_deletes="all")
 
 
 class UserProfile(Base):

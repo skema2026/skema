@@ -218,7 +218,7 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
 
 // ── 업로드 모달 ───────────────────────────────────────────────────────────────
 
-type RecordState = 'idle' | 'requesting' | 'recording' | 'done';
+type RecordState = 'idle' | 'requesting' | 'preview' | 'recording' | 'done';
 
 function UploadModal({
   groups,
@@ -248,10 +248,11 @@ function UploadModal({
   const [recordState, setRecordState] = useState<RecordState>('idle');
   const [countdown, setCountdown]     = useState(RECORD_SECS);
   const [facingMode, setFacingMode]   = useState<'user' | 'environment'>('user');
+  const [audioEnabled, setAudioEnabled] = useState(true);
 
-  // recording 상태로 전환된 뒤 video 요소가 마운트되면 stream 연결
+  // preview/recording 상태로 전환된 뒤 video 요소가 마운트되면 stream 연결
   useEffect(() => {
-    if (recordState === 'recording' && liveVideoRef.current && streamRef.current) {
+    if ((recordState === 'preview' || recordState === 'recording') && liveVideoRef.current && streamRef.current) {
       liveVideoRef.current.srcObject = streamRef.current;
       liveVideoRef.current.play().catch(() => {});
     }
@@ -263,65 +264,76 @@ function UploadModal({
 
   const handleFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)); setRecordState('done'); };
 
-  const startRecording = async (facing: 'user' | 'environment' = facingMode) => {
+  // 1단계: 카메라만 켜서 라이브 프리뷰
+  const startPreview = async (facing: 'user' | 'environment' = facingMode) => {
     setRecordState('requesting');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: facing } },
-        audio: true,
+        audio: audioEnabled,
       });
       streamRef.current = stream;
-
-      // Chrome/Android: webm 우선, Safari: mp4 폴백
-      const mimeType =
-        MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' :
-        MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' :
-        MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' :
-        MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
-
-      const recorder = new MediaRecorder(stream, { mimeType });
-      recorderRef.current = recorder;
-      const chunks: BlobPart[] = [];
-
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onstop = () => {
-        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-        const baseType = mimeType.split(';')[0];
-        const blob = new Blob(chunks, { type: baseType });
-        handleFile(new File([blob], `recording.${ext}`, { type: baseType }));
-        stream.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-      };
-
-      setRecordState('recording');
-      setCountdown(RECORD_SECS);
-      recorder.start(100); // 100ms마다 데이터 수집 → 빈 blob 방지
-
-      let count = RECORD_SECS;
-      const timer = setInterval(() => {
-        count--;
-        setCountdown(count);
-        if (count <= 0) { clearInterval(timer); recorder.stop(); }
-      }, 1000);
-    } catch {
-      toast.error('카메라/마이크 권한을 허용해주세요.');
+      setRecordState('preview');
+    } catch (err: unknown) {
+      const name = (err as { name?: string }).name;
+      if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        toast.error('카메라를 찾을 수 없습니다. 파일에서 올려주세요.');
+      } else {
+        toast.error('카메라/마이크 권한을 허용해주세요.');
+      }
       setRecordState('idle');
     }
+  };
+
+  // 2단계: 이미 켜진 카메라로 녹화 시작
+  const beginRecording = () => {
+    const stream = streamRef.current;
+    if (!stream) return;
+
+    const mimeType =
+      MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' :
+      MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' :
+      MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' :
+      MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+
+    const recorder = new MediaRecorder(stream, { mimeType });
+    recorderRef.current = recorder;
+    const chunks: BlobPart[] = [];
+
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const baseType = mimeType.split(';')[0];
+      const blob = new Blob(chunks, { type: baseType });
+      handleFile(new File([blob], `recording.${ext}`, { type: baseType }));
+      stream.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    };
+
+    setRecordState('recording');
+    setCountdown(RECORD_SECS);
+    recorder.start(100);
+
+    let count = RECORD_SECS;
+    const timer = setInterval(() => {
+      count--;
+      setCountdown(count);
+      if (count <= 0) { clearInterval(timer); recorder.stop(); }
+    }, 1000);
   };
 
   const flipCamera = async () => {
     const next = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(next);
-    // 녹화 중이면 중단 후 반대 카메라로 재시작
-    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-      recorderRef.current.stop();
-    }
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
     setRecordState('idle');
+    await startPreview(next);
   };
 
   const resetVideo = () => {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
     setFile(null);
@@ -400,20 +412,14 @@ function UploadModal({
 
         {/* 영상 촬영 영역 */}
         <div className="mb-3 overflow-hidden rounded-2xl bg-slate-900" style={{ aspectRatio: '4/3' }}>
+          {/* 대기 — 카메라 켜기 버튼 */}
           {recordState === 'idle' && (
-            <div className="relative flex h-full flex-col items-center justify-center gap-3">
-              {/* 카메라 전환 버튼 */}
-              <button type="button" onClick={flipCamera}
-                className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-slate-700/80 text-white transition hover:bg-slate-600">
-                <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
-              </button>
-              <button type="button" onClick={() => startRecording(facingMode)}
+            <div className="flex h-full flex-col items-center justify-center gap-3">
+              <button type="button" onClick={() => startPreview(facingMode)}
                 className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-lg transition active:scale-95">
                 <MaterialIcon icon="videocam" size={28} color="#fff" />
               </button>
-              <p className="text-xs font-black text-slate-400">
-                3초 촬영 · {facingMode === 'user' ? '전면' : '후면'} 카메라
-              </p>
+              <p className="text-xs font-black text-slate-400">카메라 켜기</p>
               <button type="button" onClick={() => fileRef.current?.click()}
                 className="flex items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-xs font-black text-slate-300 transition hover:bg-slate-700">
                 <MaterialIcon icon="upload_file" size={14} color="currentColor" />
@@ -422,12 +428,42 @@ function UploadModal({
             </div>
           )}
 
+          {/* 권한 요청 중 */}
           {recordState === 'requesting' && (
             <div className="flex h-full items-center justify-center">
               <p className="text-sm font-black text-white">카메라 권한 요청 중...</p>
             </div>
           )}
 
+          {/* 라이브 프리뷰 — 녹화 전 */}
+          {recordState === 'preview' && (
+            <div className="relative h-full">
+              <video ref={liveVideoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+              {/* 상단 버튼들 */}
+              <div className="absolute top-2 right-2 flex gap-2">
+                <button type="button" onClick={flipCamera}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700/80 text-white">
+                  <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
+                </button>
+                <button type="button" onClick={() => setAudioEnabled(v => !v)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full ${audioEnabled ? 'bg-blue-600' : 'bg-slate-700/80'} text-white`}>
+                  <MaterialIcon icon={audioEnabled ? 'videocam' : 'videocam_off'} size={16} color="currentColor" />
+                </button>
+              </div>
+              <p className="absolute bottom-12 inset-x-0 text-center text-[11px] font-black text-white/70">
+                {audioEnabled ? '소리 켜짐' : '소리 꺼짐'}
+              </p>
+              {/* 녹화 시작 버튼 */}
+              <div className="absolute bottom-3 inset-x-0 flex justify-center">
+                <button type="button" onClick={beginRecording}
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 shadow-lg transition active:scale-95 border-4 border-white">
+                  <span className="h-6 w-6 rounded-full bg-white" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 녹화 중 — 카운트다운 */}
           {recordState === 'recording' && (
             <div className="relative h-full">
               <video ref={liveVideoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
@@ -438,14 +474,10 @@ function UploadModal({
                 <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
                 <span className="text-[11px] font-black text-white">REC</span>
               </div>
-              {/* 녹화 중 카메라 전환 */}
-              <button type="button" onClick={flipCamera}
-                className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-slate-700/80 text-white">
-                <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
-              </button>
             </div>
           )}
 
+          {/* 촬영 완료 — 미리보기 */}
           {recordState === 'done' && preview && (
             <div className="relative h-full">
               <video src={preview} controls playsInline className="h-full w-full object-cover" />

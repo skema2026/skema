@@ -110,10 +110,7 @@ def update_user_record(db: Session, user: User, updates: dict) -> User:
 
 
 def delete_user(db: Session, user: User) -> None:
-    db.query(LoginLog).filter(LoginLog.user_id == user.id).update(
-        {LoginLog.user_id: None},
-        synchronize_session=False,
-    )
+    # passive_deletes="all" 설정 → login_logs의 user_id는 DB 레벨 SET NULL로 처리
     db.delete(user)
     db.commit()
 
