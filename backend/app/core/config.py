@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
@@ -6,6 +7,7 @@ from pydantic_settings import BaseSettings
 _cfg_logger = logging.getLogger(__name__)
 
 _DEFAULT_SECRET = "change-this-secret-key-in-production"
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -48,6 +50,10 @@ class Settings(BaseSettings):
     VAPID_PUBLIC_KEY: str = ""
     VAPID_PRIVATE_KEY: str = ""
     VAPID_SUBJECT: str = "mailto:admin@example.com"
+
+    # ── Uploads ───────────────────────────────────────────────────────────────
+    # Docker/Railway: /app/uploads, local: backend/uploads
+    UPLOAD_DIR: str = str(_BACKEND_ROOT / "uploads")
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

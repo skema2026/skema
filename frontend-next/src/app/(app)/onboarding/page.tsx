@@ -1327,14 +1327,16 @@ export default function OnboardingPage() {
       return true;
     };
 
-    const updateExamDraft = (patch: Partial<Omit<ExternalExam, '_id'>>, autoRegister = false) => {
+    const updateExamDraft = (patch: Partial<Omit<ExternalExam, '_id'>>) => {
       const nextDraft = { ...examDraft, ...patch };
       setExamError('');
-      if (autoRegister && externalExams.length === 0 && nextDraft.name.trim() && nextDraft.date) {
-        registerExam(nextDraft);
-        return;
-      }
       setExamDraft(nextDraft);
+    };
+
+    const registerInitialExamIfReady = (draft: Omit<ExternalExam, '_id'> = examDraft) => {
+      if (externalExams.length > 0) return;
+      if (!draft.name.trim() || !draft.date) return;
+      registerExam(draft);
     };
 
     return (
@@ -1366,9 +1368,12 @@ export default function OnboardingPage() {
                 style={{ borderColor: '#ebeef1', background: 'rgba(255,255,255,0.6)' }}
                 placeholder="예: 중간고사, 토익"
                 value={examDraft.name}
-                onChange={(e) => updateExamDraft({ name: e.target.value }, true)}
+                onChange={(e) => updateExamDraft({ name: e.target.value })}
                 onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#ebeef1';
+                  registerInitialExamIfReady({ ...examDraft, name: e.target.value });
+                }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && externalExams.length > 0) registerExam(); }}
               />
             </label>
@@ -1391,7 +1396,8 @@ export default function OnboardingPage() {
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   style={{ zIndex: 1 }}
                   value={examDraft.date}
-                  onChange={(e) => updateExamDraft({ date: e.target.value }, true)}
+                  onChange={(e) => updateExamDraft({ date: e.target.value })}
+                  onBlur={(e) => registerInitialExamIfReady({ ...examDraft, date: e.target.value })}
                   aria-label="시험 날짜 선택"
                 />
               </div>

@@ -49,6 +49,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       BACKEND_URL: ${BACKEND_URL}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}

@@ -118,9 +118,9 @@ app.include_router(group_router)        # /groups/*
 
 # 업로드 파일 정적 서빙
 import os as _os
-_os.makedirs("/app/uploads/studylogs", exist_ok=True)
-_os.makedirs("/app/uploads/posts", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="/app/uploads"), name="uploads")
+_os.makedirs(_os.path.join(settings.UPLOAD_DIR, "studylogs"), exist_ok=True)
+_os.makedirs(_os.path.join(settings.UPLOAD_DIR, "posts"), exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────

@@ -729,8 +729,6 @@ ${upcomingExamLines}
   /** AI 액션 후 관련 모든 쿼리 무효화 */
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    queryClient.invalidateQueries({ queryKey: ['schedules', 'today'] });
-    queryClient.invalidateQueries({ queryKey: ['schedules', 'conflicts'] });
     queryClient.invalidateQueries({ queryKey: ['exams'] });
   };
 

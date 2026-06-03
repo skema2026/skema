@@ -46,9 +46,14 @@ FRONTEND_URL=https://skema.example.com
 BACKEND_URL=https://api.skema.example.com
 NEXT_PUBLIC_API_URL=https://api.skema.example.com
 CORS_ORIGINS=https://skema.example.com
+UPLOAD_DIR=/app/uploads
 ```
 
 `NEXT_PUBLIC_API_URL`은 Next.js 빌드 결과에 포함됩니다. 값을 바꾼 뒤에는 프론트엔드를 다시 빌드해야 합니다.
+
+업로드 사진을 보존하려면 백엔드 컨테이너의 `UPLOAD_DIR` 경로에 persistent volume을 연결해야 합니다.
+Railway에 배포하는 경우 Railway Volume을 만들고, 마운트 경로를 `UPLOAD_DIR` 값과 동일하게 맞춥니다.
+볼륨을 사용하지 않으면 재배포나 컨테이너 재시작 후 업로드 파일이 사라질 수 있습니다.
 
 푸시 알림을 사용하려면 VAPID 키를 생성해 `.env.production`에 추가합니다.
 

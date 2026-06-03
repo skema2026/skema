@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.models import User
+from app.core.config import settings
 from app.core.security import get_current_user, get_db
 from app.schedule.models import Schedule
 
@@ -28,7 +29,7 @@ from .streak import compute_streak
 
 router = APIRouter(prefix="/study-logs", tags=["study-logs"])
 
-UPLOAD_DIR = "/app/uploads/studylogs"
+UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "studylogs")
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 

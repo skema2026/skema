@@ -56,8 +56,6 @@ export function AIChat({ onClose, className, height = 'calc(100vh - 56px)' }: AI
    */
   const invalidateAfterReply = () => {
     queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    queryClient.invalidateQueries({ queryKey: ['schedules', 'today'] });
-    queryClient.invalidateQueries({ queryKey: ['schedules', 'conflicts'] });
     queryClient.invalidateQueries({ queryKey: ['exams'] }); // 항상 갱신
   };
 

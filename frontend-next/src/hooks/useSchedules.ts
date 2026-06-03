@@ -102,8 +102,6 @@ export function useCreateSchedule() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['schedules'] });
-      qc.invalidateQueries({ queryKey: ['schedules', 'today'] });
-      qc.invalidateQueries({ queryKey: ['schedules', 'conflicts'] });
     },
   });
 }
@@ -130,8 +128,6 @@ export function useUpdateSchedule() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['schedules'] });
-      qc.invalidateQueries({ queryKey: ['schedules', 'today'] });
-      qc.invalidateQueries({ queryKey: ['schedules', 'conflicts'] });
     },
   });
 }
@@ -157,57 +153,6 @@ export function useDeleteSchedule() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['schedules'] });
-      qc.invalidateQueries({ queryKey: ['schedules', 'today'] });
-      qc.invalidateQueries({ queryKey: ['schedules', 'conflicts'] });
-    },
-  });
-}
-
-// ── 일정 완료 처리 (POST /schedules/{id}/complete) ────────────────────────────
-
-export function useCompleteSchedule() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => {
-      const { data } = await api.post<Schedule>(`/schedules/${id}/complete`);
-      return data;
-    },
-    onMutate: async (id) => {
-      await qc.cancelQueries({ queryKey: ['schedules'] });
-      await qc.cancelQueries({ queryKey: ['schedules', 'today'] });
-      const prev = qc.getQueryData<Schedule[]>(['schedules']);
-      const prevToday = qc.getQueryData<Schedule[]>(['schedules', 'today']);
-      const patch = (old: Schedule[] | undefined) =>
-        old?.map((s) => (s.id === id ? { ...s, is_completed: true } : s)) ?? [];
-      qc.setQueryData<Schedule[]>(['schedules'], patch);
-      qc.setQueryData<Schedule[]>(['schedules', 'today'], patch);
-      return { prev, prevToday };
-    },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(['schedules'], ctx.prev);
-      if (ctx?.prevToday) qc.setQueryData(['schedules', 'today'], ctx.prevToday);
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['schedules'] });
-      qc.invalidateQueries({ queryKey: ['schedules', 'today'] });
-    },
-  });
-}
-
-// ── 일정 연기 (POST /schedules/{id}/postpone) ─────────────────────────────────
-
-export function usePostponeSchedule() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, days = 1 }: { id: number; days?: number }) => {
-      const { data } = await api.post<Schedule>(`/schedules/${id}/postpone`, null, {
-        params: { days },
-      });
-      return data;
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['schedules'] });
-      qc.invalidateQueries({ queryKey: ['schedules', 'today'] });
     },
   });
 }
@@ -223,22 +168,17 @@ export function useToggleComplete() {
     },
     onMutate: async ({ id, is_completed }) => {
       await qc.cancelQueries({ queryKey: ['schedules'] });
-      await qc.cancelQueries({ queryKey: ['schedules', 'today'] });
       const prev = qc.getQueryData<Schedule[]>(['schedules']);
-      const prevToday = qc.getQueryData<Schedule[]>(['schedules', 'today']);
       const patch = (old: Schedule[] | undefined) =>
         old?.map((s) => (s.id === id ? { ...s, is_completed } : s)) ?? [];
       qc.setQueryData<Schedule[]>(['schedules'], patch);
-      qc.setQueryData<Schedule[]>(['schedules', 'today'], patch);
-      return { prev, prevToday };
+      return { prev };
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(['schedules'], ctx.prev);
-      if (ctx?.prevToday) qc.setQueryData(['schedules', 'today'], ctx.prevToday);
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['schedules'] });
-      qc.invalidateQueries({ queryKey: ['schedules', 'today'] });
     },
   });
 }
