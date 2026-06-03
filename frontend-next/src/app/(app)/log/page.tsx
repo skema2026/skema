@@ -233,7 +233,7 @@ function UploadModal({
   scheduleId?: number;
   scheduleTitle?: string;
 }) {
-  const RECORD_SECS = 10;
+  const RECORD_SECS = 3;
 
   const create       = useCreateStudyLog();
   const fileRef      = useRef<HTMLInputElement>(null);
@@ -385,7 +385,7 @@ function UploadModal({
                 className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-lg transition active:scale-95">
                 <MaterialIcon icon="videocam" size={28} color="#fff" />
               </button>
-              <p className="text-xs font-black text-slate-400">최대 10초 촬영하기</p>
+              <p className="text-xs font-black text-slate-400">3초 촬영하기</p>
               <button type="button" onClick={() => fileRef.current?.click()}
                 className="flex items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-xs font-black text-slate-300 transition hover:bg-slate-700">
                 <MaterialIcon icon="upload_file" size={14} color="currentColor" />
