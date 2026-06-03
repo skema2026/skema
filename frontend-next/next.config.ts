@@ -1,14 +1,10 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
   output: isProd ? "standalone" : undefined,
   allowedDevOrigins: ['bba1-221-141-198-104.ngrok-free.app'],
-  turbopack: {
-    root: path.resolve(__dirname),
-  },
   async rewrites() {
     const internalUrl = process.env.INTERNAL_API_URL
       || (isProd ? 'http://backend:8000' : 'http://localhost:8000');
