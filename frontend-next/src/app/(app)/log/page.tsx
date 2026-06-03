@@ -265,10 +265,12 @@ function UploadModal({
   const startRecording = async () => {
     setRecordState('requesting');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
+      // facingMode를 ideal로 설정 → 데스크톱 웹캠에서도 실패 없이 동작
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } }, audio: true });
       streamRef.current = stream;
 
-      const mimeType = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
+      // MP4 우선 시도 → Safari 호환성 확보. Chrome/Android는 webm 폴백
+      const mimeType = ['video/mp4', 'video/mp4;codecs=h264', 'video/webm;codecs=vp9', 'video/webm']
         .find(t => MediaRecorder.isTypeSupported(t)) ?? 'video/webm';
       const recorder = new MediaRecorder(stream, { mimeType });
       recorderRef.current = recorder;
@@ -402,7 +404,7 @@ function UploadModal({
 
           {recordState === 'recording' && (
             <div className="relative h-full">
-              <video ref={liveVideoRef} muted playsInline className="h-full w-full object-cover" />
+              <video ref={liveVideoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-[80px] font-black text-white drop-shadow-lg">{countdown}</span>
               </div>
@@ -522,6 +524,7 @@ function MemberCard({
                   controls
                   playsInline
                   className="h-full w-full object-cover"
+                  onError={e => { (e.target as HTMLVideoElement).style.display = 'none'; }}
                 />
               ) : (
                 <img
@@ -825,6 +828,7 @@ export default function LogPage() {
                                 controls
                                 playsInline
                                 className="h-full w-full object-cover"
+                                onError={e => { (e.target as HTMLVideoElement).style.display = 'none'; }}
                               />
                             ) : (
                               <>
