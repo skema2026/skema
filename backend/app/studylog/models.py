@@ -34,7 +34,7 @@ class StudyGroupMember(Base):
     joined_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     group = relationship("StudyGroup", back_populates="members")
-    user  = relationship("User")
+    user  = relationship("User", passive_deletes=True)
 
     __table_args__ = (
         UniqueConstraint("group_id", "user_id", name="uq_group_member"),

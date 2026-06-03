@@ -53,7 +53,7 @@ def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = Non
     my_reactions = [r.emoji for r in log.reactions if r.user_id == current_user_id]
     reactions_out = [{"emoji": e, "count": c} for e, c in reaction_counts.items()]
 
-    username = log.user.username if log.user else "unknown"
+    username = (log.user.username or "") if log.user else ""
 
     schedule_title_val = None
     if log.schedule_id and db:

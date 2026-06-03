@@ -12,7 +12,7 @@ class ReactionOut(BaseModel):
 class StudyLogOut(BaseModel):
     id: int
     user_id: int
-    username: str
+    username: str = ""
     schedule_id: Optional[int] = None
     schedule_title: Optional[str] = None
     photo_url: Optional[str] = None
