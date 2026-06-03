@@ -242,13 +242,14 @@ def get_group_feed(
             .options(joinedload(StudyLog.reactions))
             .all()
         )
-        # user_id → 가장 최근 log (하루에 여러 개면 최신 1개만)
-        log_by_user: dict[int, StudyLog] = {}
-        for log in sorted(logs, key=lambda l: l.created_at):
-            log_by_user[log.user_id] = log
+        # user_id → 해당 날짜의 전체 로그 목록 (여러 개 허용)
+        logs_sorted = sorted(logs, key=lambda l: l.created_at)
+        log_by_user: dict[int, list[StudyLog]] = {}
+        for log in logs_sorted:
+            log_by_user.setdefault(log.user_id, []).append(log)
 
         # schedule titles
-        sched_ids = {l.schedule_id for l in log_by_user.values() if l.schedule_id}
+        sched_ids = {l.schedule_id for ll in log_by_user.values() for l in ll if l.schedule_id}
         sched_map: dict[int, str] = {}
         if sched_ids:
             scheds = db.query(Schedule).filter(Schedule.id.in_(sched_ids)).all()
@@ -256,23 +257,23 @@ def get_group_feed(
 
         slots: list[MemberSlot] = []
         for uid, uname in members:
-            log = log_by_user.get(uid)
-            if log:
-                counts = Counter(r.emoji for r in log.reactions)
-                my_r   = [r.emoji for r in log.reactions if r.user_id == current_user.id]
-                slot = MemberSlot(
-                    user_id=uid, username=uname,
-                    log_id=log.id,
-                    photo_url=_photo_url(log.photo_path) if log.photo_path else None,
-                    caption=log.caption,
-                    schedule_title=sched_map.get(log.schedule_id) if log.schedule_id else None,
-                    created_at=log.created_at,
-                    reactions=[{"emoji": e, "count": c} for e, c in counts.items()],
-                    my_reactions=my_r,
-                )
+            user_logs = log_by_user.get(uid, [])
+            if user_logs:
+                for log in user_logs:
+                    counts = Counter(r.emoji for r in log.reactions)
+                    my_r   = [r.emoji for r in log.reactions if r.user_id == current_user.id]
+                    slots.append(MemberSlot(
+                        user_id=uid, username=uname,
+                        log_id=log.id,
+                        photo_url=_photo_url(log.photo_path) if log.photo_path else None,
+                        caption=log.caption,
+                        schedule_title=sched_map.get(log.schedule_id) if log.schedule_id else None,
+                        created_at=log.created_at,
+                        reactions=[{"emoji": e, "count": c} for e, c in counts.items()],
+                        my_reactions=my_r,
+                    ))
             else:
-                slot = MemberSlot(user_id=uid, username=uname)
-            slots.append(slot)
+                slots.append(MemberSlot(user_id=uid, username=uname))
 
         result.append(GroupFeedDay(date=target_date.isoformat(), slots=slots))
 

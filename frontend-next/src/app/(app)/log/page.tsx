@@ -714,14 +714,16 @@ function GroupFeed({
       {feed?.map(day => {
         const isToday = day.date === new Date().toISOString().slice(0, 10);
         const dateLabel = isToday ? '오늘' : day.date.slice(5).replace('-', '/');
-        const postedCount = day.slots.filter(s => s.log_id).length;
+        // 올린 사람 수 (중복 제거), 전체 멤버 수 (빈 슬롯 포함 유니크 user_id)
+        const postedUsers = new Set(day.slots.filter(s => s.log_id).map(s => s.user_id)).size;
+        const totalUsers  = new Set(day.slots.map(s => s.user_id)).size;
 
         return (
           <div key={day.date} className="mb-6">
             <div className="mb-2 flex items-center gap-2">
               <p className="text-sm font-black text-slate-950">{dateLabel}</p>
-              <StatusPill tone={postedCount === day.slots.length ? 'green' : 'slate'}>
-                {postedCount}/{day.slots.length}명
+              <StatusPill tone={postedUsers === totalUsers ? 'green' : 'slate'}>
+                {postedUsers}/{totalUsers}명
               </StatusPill>
             </div>
             <div className="space-y-3">
