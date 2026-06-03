@@ -418,15 +418,18 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const certLiveVideoRef = useRef<HTMLVideoElement>(null);
   const certRecorderRef  = useRef<MediaRecorder | null>(null);
   const certStreamRef    = useRef<MediaStream | null>(null);
+
+  const certLiveVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
+    certLiveVideoRef.current = node;
+    if (node && certStreamRef.current) {
+      node.srcObject = certStreamRef.current;
+      node.play().catch(() => {});
+    }
+  }, []);
   const createStudyLog = useCreateStudyLog();
   const certFileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (certRecordState === 'recording' && certLiveVideoRef.current && certStreamRef.current) {
-      certLiveVideoRef.current.srcObject = certStreamRef.current;
-      certLiveVideoRef.current.play().catch(() => {});
-    }
-  }, [certRecordState]);
+  // certLiveVideoCallbackRef가 stream 연결을 처리하므로 별도 useEffect 불필요
 
   const flipCertCamera = () => {
     setCertFacingMode(prev => prev === 'user' ? 'environment' : 'user');
@@ -1937,7 +1940,7 @@ ${missedLines}
               )}
               {certRecordState === 'recording' && (
                 <div className="relative h-full">
-                  <video ref={certLiveVideoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+                  <video ref={certLiveVideoCallbackRef} autoPlay muted playsInline className="h-full w-full object-cover" />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-[72px] font-black text-white drop-shadow-lg">{certCountdown}</span>
                   </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import MaterialIcon from '@/components/common/MaterialIcon';
@@ -250,13 +250,14 @@ function UploadModal({
   const [facingMode, setFacingMode]   = useState<'user' | 'environment'>('user');
   const [audioEnabled, setAudioEnabled] = useState(true);
 
-  // preview/recording 상태로 전환된 뒤 video 요소가 마운트되면 stream 연결
-  useEffect(() => {
-    if ((recordState === 'preview' || recordState === 'recording') && liveVideoRef.current && streamRef.current) {
-      liveVideoRef.current.srcObject = streamRef.current;
-      liveVideoRef.current.play().catch(() => {});
+  // video 요소가 마운트되는 즉시 stream 연결 (콜백 ref → useEffect 타이밍 문제 해결)
+  const liveVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
+    liveVideoRef.current = node;
+    if (node && streamRef.current) {
+      node.srcObject = streamRef.current;
+      node.play().catch(() => {});
     }
-  }, [recordState]);
+  }, []);
 
   useEffect(() => {
     return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
@@ -438,7 +439,7 @@ function UploadModal({
           {/* 라이브 프리뷰 — 녹화 전 */}
           {recordState === 'preview' && (
             <div className="relative h-full">
-              <video ref={liveVideoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+              <video ref={liveVideoCallbackRef} autoPlay muted playsInline className="h-full w-full object-cover" />
               {/* 상단 버튼들 */}
               <div className="absolute top-2 right-2 flex gap-2">
                 <button type="button" onClick={flipCamera}
@@ -466,7 +467,7 @@ function UploadModal({
           {/* 녹화 중 — 카운트다운 */}
           {recordState === 'recording' && (
             <div className="relative h-full">
-              <video ref={liveVideoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+              <video ref={liveVideoCallbackRef} autoPlay muted playsInline className="h-full w-full object-cover" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-[80px] font-black text-white drop-shadow-lg">{countdown}</span>
               </div>
