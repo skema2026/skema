@@ -580,7 +580,7 @@ function GroupFeed({
   group: GroupOut;
   currentUserId?: number;
 }) {
-  const { data: feed, isLoading } = useGroupFeed(group.id);
+  const { data: feed, isLoading, isError, refetch } = useGroupFeed(group.id);
   const deleteLog = useDeleteStudyLog();
   const leave = useLeaveGroup();
   const [showInfo, setShowInfo] = useState(false);
@@ -598,6 +598,12 @@ function GroupFeed({
   };
 
   if (isLoading) return <div className="flex h-40 items-center justify-center text-sm text-slate-400">불러오는 중...</div>;
+  if (isError) return (
+    <div className="flex h-40 flex-col items-center justify-center gap-3">
+      <p className="text-sm text-slate-400">피드를 불러오지 못했어요</p>
+      <button type="button" onClick={() => refetch()} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">다시 시도</button>
+    </div>
+  );
 
   return (
     <div>
