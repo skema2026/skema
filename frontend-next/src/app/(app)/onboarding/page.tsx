@@ -248,7 +248,8 @@ function _parseScheduleText(raw: string): PersonalSchedule[] {
     if (days.length === 0) return;
 
     // "오후 9시~11시"처럼 종료 시각에 시간대 표현이 빠져 시작보다 빠르면 오후(+12)로 보정
-    let [start, end] = [times[0], times[1]];
+    const start = times[0];
+    let end = times[1];
     if (toMin(end) <= toMin(start)) {
       const [eh, em] = end.split(':').map(Number);
       if (eh + 12 <= 23 && (eh + 12) * 60 + em > toMin(start)) {

@@ -170,7 +170,6 @@ def get_user_public_profile(
     - 글로벌 공개 기록 목록 (최신 10개, 그룹 기록 제외)
     - 현재/최장 스트릭
     """
-    from app.community.models import Post
     from app.studylog.models import StudyLog
     from app.studylog.streak import compute_streak
 
@@ -178,15 +177,7 @@ def get_user_public_profile(
     if not target:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
-    from sqlalchemy.orm import joinedload as _jl
-    posts = (
-        db.query(Post)
-        .filter(Post.author_id == user_id)
-        .options(_jl(Post.likes))
-        .order_by(Post.created_at.desc())
-        .limit(10)
-        .all()
-    )
+    posts = []
 
     logs = (
         db.query(StudyLog)

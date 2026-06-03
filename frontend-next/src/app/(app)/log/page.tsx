@@ -73,8 +73,9 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
       await join.mutateAsync(inviteCode.trim().toUpperCase());
       toast.success('그룹에 참여했어요!');
       onClose();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail ?? '코드를 확인해주세요.');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      toast.error(err?.response?.data?.detail ?? '코드를 확인해주세요.');
     }
   };
 
@@ -353,7 +354,7 @@ function MemberCard({
   const likeCount = slot.reactions.find(r => r.emoji === '👍')?.count ?? 0;
 
   const relTime = slot.created_at ? (() => {
-    const diff = Date.now() - new Date(slot.created_at).getTime();
+    const diff = new Date().getTime() - new Date(slot.created_at).getTime();
     const m = Math.floor(diff / 60000);
     if (m < 1) return '방금';
     if (m < 60) return `${m}분 전`;

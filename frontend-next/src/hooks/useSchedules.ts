@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { indexToRecurringDay } from '@/lib/recurringDay';
-import { ConflictItem, RecurringDay, Schedule } from '@/types';
+import { RecurringDay, Schedule } from '@/types';
 
 type RawSchedule = Partial<Schedule> & {
   course_name?: string;
@@ -66,34 +66,6 @@ export function useSchedules(initialData?: Schedule[]) {
     placeholderData: initialData,
     staleTime: 0,
     refetchOnMount: 'always',
-  });
-}
-
-// ── 오늘 할 일 (서버 계산, 반복 + 특정 날짜 합산) ────────────────────────────
-
-export function useTodaySchedules() {
-  return useQuery({
-    queryKey: ['schedules', 'today'],
-    queryFn: async () => {
-      const { data } = await api.get<RawSchedule[]>('/schedules/today');
-      return data.map(normalizeSchedule);
-    },
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
-  });
-}
-
-// ── 충돌 감지 ─────────────────────────────────────────────────────────────────
-
-export function useConflicts() {
-  return useQuery({
-    queryKey: ['schedules', 'conflicts'],
-    queryFn: async () => {
-      const { data } = await api.get<ConflictItem[]>('/schedules/conflicts');
-      return data;
-    },
-    staleTime: 30_000, // 30초 캐시
   });
 }
 
