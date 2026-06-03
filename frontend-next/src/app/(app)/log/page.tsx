@@ -247,6 +247,7 @@ function UploadModal({
   const [groupId, setGroupId]         = useState<number | null>(null);
   const [recordState, setRecordState] = useState<RecordState>('idle');
   const [countdown, setCountdown]     = useState(RECORD_SECS);
+  const [facingMode, setFacingMode]   = useState<'user' | 'environment'>('user');
 
   // recording 상태로 전환된 뒤 video 요소가 마운트되면 stream 연결
   useEffect(() => {
@@ -262,16 +263,22 @@ function UploadModal({
 
   const handleFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)); setRecordState('done'); };
 
-  const startRecording = async () => {
+  const startRecording = async (facing: 'user' | 'environment' = facingMode) => {
     setRecordState('requesting');
     try {
-      // facingMode를 ideal로 설정 → 데스크톱 웹캠에서도 실패 없이 동작
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } }, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facing } },
+        audio: true,
+      });
       streamRef.current = stream;
 
-      // MP4 우선 시도 → Safari 호환성 확보. Chrome/Android는 webm 폴백
-      const mimeType = ['video/mp4', 'video/mp4;codecs=h264', 'video/webm;codecs=vp9', 'video/webm']
-        .find(t => MediaRecorder.isTypeSupported(t)) ?? 'video/webm';
+      // Chrome/Android: webm 우선, Safari: mp4 폴백
+      const mimeType =
+        MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' :
+        MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' :
+        MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' :
+        MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+
       const recorder = new MediaRecorder(stream, { mimeType });
       recorderRef.current = recorder;
       const chunks: BlobPart[] = [];
@@ -279,13 +286,13 @@ function UploadModal({
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
       recorder.onstop = () => {
         const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-        const blob = new Blob(chunks, { type: mimeType });
-        handleFile(new File([blob], `recording.${ext}`, { type: mimeType }));
+        const baseType = mimeType.split(';')[0];
+        const blob = new Blob(chunks, { type: baseType });
+        handleFile(new File([blob], `recording.${ext}`, { type: baseType }));
         stream.getTracks().forEach(t => t.stop());
         streamRef.current = null;
       };
 
-      // 상태 변경 → useEffect에서 video에 stream 연결
       setRecordState('recording');
       setCountdown(RECORD_SECS);
       recorder.start();
@@ -300,6 +307,18 @@ function UploadModal({
       toast.error('카메라/마이크 권한을 허용해주세요.');
       setRecordState('idle');
     }
+  };
+
+  const flipCamera = async () => {
+    const next = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(next);
+    // 녹화 중이면 중단 후 반대 카메라로 재시작
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop();
+    }
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    setRecordState('idle');
   };
 
   const resetVideo = () => {
@@ -382,12 +401,19 @@ function UploadModal({
         {/* 영상 촬영 영역 */}
         <div className="mb-3 overflow-hidden rounded-2xl bg-slate-900" style={{ aspectRatio: '4/3' }}>
           {recordState === 'idle' && (
-            <div className="flex h-full flex-col items-center justify-center gap-3">
-              <button type="button" onClick={startRecording}
+            <div className="relative flex h-full flex-col items-center justify-center gap-3">
+              {/* 카메라 전환 버튼 */}
+              <button type="button" onClick={flipCamera}
+                className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-slate-700/80 text-white transition hover:bg-slate-600">
+                <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
+              </button>
+              <button type="button" onClick={() => startRecording(facingMode)}
                 className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-lg transition active:scale-95">
                 <MaterialIcon icon="videocam" size={28} color="#fff" />
               </button>
-              <p className="text-xs font-black text-slate-400">3초 촬영하기</p>
+              <p className="text-xs font-black text-slate-400">
+                3초 촬영 · {facingMode === 'user' ? '전면' : '후면'} 카메라
+              </p>
               <button type="button" onClick={() => fileRef.current?.click()}
                 className="flex items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-xs font-black text-slate-300 transition hover:bg-slate-700">
                 <MaterialIcon icon="upload_file" size={14} color="currentColor" />
@@ -412,6 +438,11 @@ function UploadModal({
                 <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
                 <span className="text-[11px] font-black text-white">REC</span>
               </div>
+              {/* 녹화 중 카메라 전환 */}
+              <button type="button" onClick={flipCamera}
+                className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-slate-700/80 text-white">
+                <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
+              </button>
             </div>
           )}
 

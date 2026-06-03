@@ -411,6 +411,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [certGroupId, setCertGroupId]   = useState<number | null>(null);
   const [certCaption, setCertCaption] = useState('');
   const [certRecordState, setCertRecordState] = useState<'idle'|'requesting'|'recording'|'done'>('idle');
+  const [certFacingMode, setCertFacingMode]   = useState<'user'|'environment'>('user');
   const [certCountdown, setCertCountdown] = useState(CERT_SECS);
   const [certFile, setCertFile] = useState<File | null>(null);
   const [certPreview, setCertPreview] = useState<string | null>(null);
@@ -427,21 +428,33 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     }
   }, [certRecordState]);
 
-  const startCertRecording = async () => {
+  const flipCertCamera = () => {
+    setCertFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+    if (certRecorderRef.current && certRecorderRef.current.state !== 'inactive') certRecorderRef.current.stop();
+    certStreamRef.current?.getTracks().forEach(t => t.stop());
+    certStreamRef.current = null;
+    setCertRecordState('idle');
+  };
+
+  const startCertRecording = async (facing: 'user' | 'environment' = certFacingMode) => {
     setCertRecordState('requesting');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } }, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } }, audio: true });
       certStreamRef.current = stream;
-      const mimeType = ['video/mp4', 'video/mp4;codecs=h264', 'video/webm;codecs=vp9', 'video/webm']
-        .find(t => MediaRecorder.isTypeSupported(t)) ?? 'video/webm';
+      const mimeType =
+        MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' :
+        MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' :
+        MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' :
+        MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
       const recorder = new MediaRecorder(stream, { mimeType });
       certRecorderRef.current = recorder;
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
       recorder.onstop = () => {
         const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-        const blob = new Blob(chunks, { type: mimeType });
-        const file = new File([blob], `cert.${ext}`, { type: mimeType });
+        const baseType = mimeType.split(';')[0];
+        const blob = new Blob(chunks, { type: baseType });
+        const file = new File([blob], `cert.${ext}`, { type: baseType });
         setCertFile(file);
         setCertPreview(URL.createObjectURL(blob));
         stream.getTracks().forEach(t => t.stop());
@@ -1899,12 +1912,18 @@ ${missedLines}
             {/* 영상 촬영 영역 */}
             <div className="mb-3 overflow-hidden rounded-2xl bg-slate-900" style={{ aspectRatio: '4/3' }}>
               {certRecordState === 'idle' && (
-                <div className="flex h-full flex-col items-center justify-center gap-3">
-                  <button type="button" onClick={startCertRecording}
+                <div className="relative flex h-full flex-col items-center justify-center gap-3">
+                  <button type="button" onClick={flipCertCamera}
+                    className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-700/80 text-white">
+                    <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
+                  </button>
+                  <button type="button" onClick={() => startCertRecording(certFacingMode)}
                     className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 shadow-lg transition active:scale-95">
                     <MaterialIcon icon="videocam" size={24} color="#fff" />
                   </button>
-                  <p className="text-xs font-black text-slate-400">3초 촬영하기</p>
+                  <p className="text-xs font-black text-slate-400">
+                    3초 촬영 · {certFacingMode === 'user' ? '전면' : '후면'} 카메라
+                  </p>
                   <button type="button" onClick={() => certFileRef.current?.click()}
                     className="flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-300">
                     <MaterialIcon icon="upload_file" size={12} color="currentColor" />파일에서 올리기
