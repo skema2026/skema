@@ -221,7 +221,7 @@ def get_group_feed(
         .options(joinedload(StudyGroupMember.user))
         .all()
     )
-    members = [(m.user_id, m.user.username) for m in memberships]
+    members = [(m.user_id, m.user.username or "") for m in memberships]
 
     today_kst = datetime.now(KST).date()
     days = min(max(days, 1), 30)

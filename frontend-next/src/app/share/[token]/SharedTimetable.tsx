@@ -63,8 +63,10 @@ export function SharedTimetable({ token }: { token: string }) {
           <p className="mt-1 text-lg font-extrabold text-slate-950">{data.username}님의 시간표</p>
         </div>
       )}
-      <div style={{ height: 640 }}>
-        <Timetable schedules={data.schedules.filter((schedule) => scheduleVisibleIn(schedule, 'week'))} readOnly />
+      <div className="overflow-x-auto">
+        <div style={{ height: 640, minWidth: 600 }}>
+          <Timetable schedules={data.schedules.filter((schedule) => scheduleVisibleIn(schedule, 'week'))} readOnly />
+        </div>
       </div>
     </div>
   );
