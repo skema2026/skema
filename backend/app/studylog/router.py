@@ -30,8 +30,8 @@ from .streak import compute_streak
 router = APIRouter(prefix="/study-logs", tags=["study-logs"])
 
 UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "studylogs")
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
-MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+ALLOWED_TYPES = {"video/webm", "video/mp4", "video/quicktime", "video/x-matroska"}
+MAX_BYTES = 100 * 1024 * 1024  # 100 MB
 
 
 def _ensure_upload_dir():
@@ -71,15 +71,15 @@ def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = Non
 
 @router.post("", status_code=201, response_model=StudyLogOut)
 async def create_study_log(
-    photo: Optional[UploadFile] = File(None),
+    video: Optional[UploadFile] = File(None),
     caption: Optional[str] = Form(None),
     group_id: Optional[int] = Form(None),
     schedule_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not photo and not caption:
-        raise HTTPException(status_code=400, detail="사진 또는 텍스트 중 하나는 필요합니다.")
+    if not video and not caption:
+        raise HTTPException(status_code=400, detail="영상 또는 텍스트 중 하나는 필요합니다.")
 
     # 그룹 멤버 검증
     if group_id:
@@ -91,14 +91,14 @@ async def create_study_log(
             raise HTTPException(status_code=403, detail="해당 그룹의 멤버가 아닙니다.")
 
     photo_path = None
-    if photo and photo.filename:
-        if photo.content_type not in ALLOWED_TYPES:
-            raise HTTPException(status_code=415, detail="jpeg/png/webp 이미지만 업로드 가능합니다.")
-        content = await photo.read()
+    if video and video.filename:
+        if video.content_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=415, detail="webm/mp4 영상만 업로드 가능합니다.")
+        content = await video.read()
         if len(content) > MAX_BYTES:
-            raise HTTPException(status_code=413, detail="파일 크기는 10MB 이하여야 합니다.")
+            raise HTTPException(status_code=413, detail="파일 크기는 100MB 이하여야 합니다.")
         _ensure_upload_dir()
-        ext = photo.filename.rsplit(".", 1)[-1] if "." in photo.filename else "jpg"
+        ext = video.filename.rsplit(".", 1)[-1] if "." in video.filename else "webm"
         filename = f"{uuid.uuid4().hex}.{ext}"
         photo_path = os.path.join(UPLOAD_DIR, filename)
         with open(photo_path, "wb") as f:

@@ -38,12 +38,13 @@ def delete_token(db: Session, token_id: int, user_id: int) -> None:
     repository.delete_token(db, token)
 
 
-def get_schedules_by_share_token(db: Session, token_str: str):
+def get_schedules_by_share_token(db: Session, token_str: str) -> dict:
     """
     공개 공유 링크에서 토큰을 검증하고 해당 유저의 수업 목록을 반환.
     비활성 또는 만료 토큰이면 404.
     """
     from app.schedule.models import Schedule
+    from app.auth.models import User
 
     share_token = repository.get_active_token(db, token_str)
     if not share_token:
@@ -51,4 +52,6 @@ def get_schedules_by_share_token(db: Session, token_str: str):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="유효하지 않거나 만료된 공유 링크입니다.",
         )
-    return db.query(Schedule).filter(Schedule.user_id == share_token.user_id).all()
+    schedules = db.query(Schedule).filter(Schedule.user_id == share_token.user_id).all()
+    user = db.query(User).filter(User.id == share_token.user_id).first()
+    return {"schedules": schedules, "username": user.username if user else None}

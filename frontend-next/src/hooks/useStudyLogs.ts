@@ -56,9 +56,7 @@ export function useCreateStudyLog() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (form: FormData) => {
-      const { data } = await api.post<StudyLogItem>('/study-logs', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const { data } = await api.post<StudyLogItem>('/study-logs', form);
       return data;
     },
     onSuccess: () => {

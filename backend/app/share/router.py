@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.core.config import settings
 from app.core.security import get_current_user, get_db
-from app.schedule.schemas import ScheduleResponse
 from app.share import service
 from app.share.schemas import ShareTokenCreate, ShareTokenResponse
 
@@ -64,10 +63,11 @@ def delete_token(
 
 # ── 공개 공유 뷰 (인증 불필요) ────────────────────────────────────────────────
 
-@router.get("/share/{token}", response_model=list[ScheduleResponse])
+@router.get("/share/{token}")
 def get_shared_timetable(token: str, db: Session = Depends(get_db)):
     """
     공유 토큰으로 수업 시간표를 공개 조회합니다.
     비활성 또는 만료된 토큰이면 404를 반환합니다.
+    반환: { schedules: [...], username: str | null }
     """
     return service.get_schedules_by_share_token(db, token)

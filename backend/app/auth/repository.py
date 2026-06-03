@@ -46,11 +46,13 @@ def create_social_user(
     provider: str,
     social_id: str,
     hashed_password: str,
+    username: str | None = None,
     kakao_access_token: str | None = None,
     kakao_refresh_token: str | None = None,
 ) -> User:
     user = User(
         email=email,
+        username=username,
         hashed_password=hashed_password,
         social_provider=provider,
         social_id=social_id,

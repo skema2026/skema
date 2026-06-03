@@ -258,9 +258,17 @@ def get_or_create_social_user(
             return user
 
     fallback_email = email or f"{provider}_{social_id}@social.skema"
+    # display_name을 username 후보로 사용하되 중복이면 소셜 ID 뒤 8자 추가
+    candidate = display_name.strip() if display_name else None
+    if candidate:
+        if repository.get_user_by_username(db, candidate):
+            candidate = f"{candidate}_{social_id[:8]}"
+        if repository.get_user_by_username(db, candidate):
+            candidate = None  # 그래도 충돌하면 None으로
     return repository.create_social_user(
         db,
         email=fallback_email,
+        username=candidate,
         provider=provider,
         social_id=social_id,
         hashed_password=hash_password(secrets.token_hex(32)),

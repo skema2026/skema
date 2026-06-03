@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import MaterialIcon from '@/components/common/MaterialIcon';
@@ -45,6 +45,7 @@ function StatusPill({
 
 const AVATAR_COLORS = ['#2563eb', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 function avatarColor(userId: number) { return AVATAR_COLORS[userId % AVATAR_COLORS.length]; }
+const isVideoUrl = (url: string) => /\.(webm|mp4|mov|mkv)$/i.test(url);
 
 // ── 그룹 만들기 / 참여 모달 ───────────────────────────────────────────────────
 
@@ -217,6 +218,8 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
 
 // ── 업로드 모달 ───────────────────────────────────────────────────────────────
 
+type RecordState = 'idle' | 'requesting' | 'recording' | 'done';
+
 function UploadModal({
   groups,
   defaultGroupId,
@@ -230,23 +233,81 @@ function UploadModal({
   scheduleId?: number;
   scheduleTitle?: string;
 }) {
-  const create  = useCreateStudyLog();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview]   = useState<string | null>(null);
-  const [file, setFile]         = useState<File | null>(null);
-  const [caption, setCaption]   = useState('');
-  const [groupId, setGroupId] = useState<number | null>(defaultGroupId ?? (groups[0]?.id ?? null));
+  const create       = useCreateStudyLog();
+  const fileRef      = useRef<HTMLInputElement>(null);
+  const liveVideoRef = useRef<HTMLVideoElement>(null);
+  const recorderRef  = useRef<MediaRecorder | null>(null);
+  const streamRef    = useRef<MediaStream | null>(null);
 
-  const handleFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)); };
+  const [preview, setPreview]         = useState<string | null>(null);
+  const [file, setFile]               = useState<File | null>(null);
+  const [caption, setCaption]         = useState('');
+  const [groupId, setGroupId]         = useState<number | null>(defaultGroupId ?? (groups[0]?.id ?? null));
+  const [recordState, setRecordState] = useState<RecordState>('idle');
+  const [countdown, setCountdown]     = useState(3);
+
+  useEffect(() => {
+    return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
+  }, []);
+
+  const handleFile = (f: File) => { setFile(f); setPreview(URL.createObjectURL(f)); setRecordState('done'); };
+
+  const startRecording = async () => {
+    setRecordState('requesting');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
+      streamRef.current = stream;
+      if (liveVideoRef.current) {
+        liveVideoRef.current.srcObject = stream;
+        liveVideoRef.current.play();
+      }
+
+      const mimeType = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
+        .find(t => MediaRecorder.isTypeSupported(t)) ?? 'video/webm';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recorderRef.current = recorder;
+      const chunks: BlobPart[] = [];
+
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(chunks, { type: mimeType });
+        handleFile(new File([blob], `recording.${ext}`, { type: mimeType }));
+        stream.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      };
+
+      setRecordState('recording');
+      setCountdown(3);
+      recorder.start();
+
+      let count = 3;
+      const timer = setInterval(() => {
+        count--;
+        setCountdown(count);
+        if (count <= 0) { clearInterval(timer); recorder.stop(); }
+      }, 1000);
+    } catch {
+      toast.error('카메라/마이크 권한을 허용해주세요.');
+      setRecordState('idle');
+    }
+  };
+
+  const resetVideo = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    setFile(null);
+    setPreview(null);
+    setRecordState('idle');
+  };
 
   const handleSubmit = async () => {
-    if (!file && !caption.trim()) { toast.error('사진 또는 한 마디를 입력해주세요.'); return; }
+    if (!file && !caption.trim()) { toast.error('영상 또는 한 마디를 입력해주세요.'); return; }
     const form = new FormData();
-    if (file)           form.append('photo', file);
+    if (file)           form.append('video', file);
     if (caption.trim()) form.append('caption', caption);
     if (groupId)        form.append('group_id', String(groupId));
     if (scheduleId)     form.append('schedule_id', String(scheduleId));
-    form.append('is_public', 'false'); // 스터디 로그는 항상 비공개
     try {
       await create.mutateAsync(form);
       toast.success('기록이 등록됐습니다!');
@@ -259,7 +320,7 @@ function UploadModal({
       <div className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-2xl">
         <div className="mb-4 flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
-            <MaterialIcon icon="edit" size={16} color="#fff" />
+            <MaterialIcon icon="videocam" size={16} color="#fff" />
           </div>
           <p className="flex-1 text-base font-black text-slate-950">기록 남기기</p>
           <button type="button" onClick={onClose} className="text-slate-400">
@@ -280,10 +341,7 @@ function UploadModal({
             <p className="mb-1.5 text-[11px] font-black text-slate-400">올릴 그룹</p>
             <div className="flex flex-wrap gap-2">
               {groups.map(g => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setGroupId(g.id)}
+                <button key={g.id} type="button" onClick={() => setGroupId(g.id)}
                   className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
                     groupId === g.id
                       ? 'border-blue-500 bg-blue-600 text-white'
@@ -297,38 +355,68 @@ function UploadModal({
           </div>
         )}
 
-        {/* 사진 */}
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className="mb-3 flex w-full items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 transition hover:bg-blue-50"
-          style={{ minHeight: preview ? undefined : '80px', aspectRatio: preview ? '4/3' : undefined }}
-        >
-          {preview ? (
-            <img src={preview} alt="preview" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex items-center gap-2 py-4 text-slate-400">
-              <MaterialIcon icon="add_photo_alternate" size={20} color="currentColor" />
-              <p className="text-xs font-black">사진 추가 (선택사항)</p>
+        {/* 영상 촬영 영역 */}
+        <div className="mb-3 overflow-hidden rounded-2xl bg-slate-900" style={{ aspectRatio: '4/3' }}>
+          {recordState === 'idle' && (
+            <div className="flex h-full flex-col items-center justify-center gap-3">
+              <button type="button" onClick={startRecording}
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-lg transition active:scale-95">
+                <MaterialIcon icon="videocam" size={28} color="#fff" />
+              </button>
+              <p className="text-xs font-black text-slate-400">3초 촬영하기</p>
+              <button type="button" onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-xs font-black text-slate-300 transition hover:bg-slate-700">
+                <MaterialIcon icon="upload_file" size={14} color="currentColor" />
+                파일에서 올리기
+              </button>
             </div>
           )}
-        </button>
-        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+
+          {recordState === 'requesting' && (
+            <div className="flex h-full items-center justify-center">
+              <p className="text-sm font-black text-white">카메라 권한 요청 중...</p>
+            </div>
+          )}
+
+          {recordState === 'recording' && (
+            <div className="relative h-full">
+              <video ref={liveVideoRef} muted playsInline className="h-full w-full object-cover" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[80px] font-black text-white drop-shadow-lg">{countdown}</span>
+              </div>
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-red-500 px-2.5 py-1">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                <span className="text-[11px] font-black text-white">REC</span>
+              </div>
+            </div>
+          )}
+
+          {recordState === 'done' && preview && (
+            <div className="relative h-full">
+              <video src={preview} controls playsInline className="h-full w-full object-cover" />
+              <button type="button" onClick={resetVideo}
+                className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80">
+                <MaterialIcon icon="refresh" size={14} color="currentColor" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <input ref={fileRef} type="file" accept="video/*" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
 
         <textarea
           placeholder="오늘의 공부 한 마디..."
           value={caption}
           onChange={e => setCaption(e.target.value.slice(0, 200))}
-          rows={3}
+          rows={2}
           className="mb-3 w-full resize-none rounded-2xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
         />
-
 
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={create.isPending}
+          disabled={create.isPending || recordState === 'recording' || recordState === 'requesting'}
           className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-40"
         >
           {create.isPending ? '등록 중...' : '기록 남기기'}
@@ -400,19 +488,28 @@ function MemberCard({
         </div>
       </div>
 
-      {/* 사진 또는 미올림 플레이스홀더 */}
+      {/* 영상/미올림 플레이스홀더 */}
       {hasLog ? (
         <>
-          {/* 사진 — 전체 너비, 16:9 비율로 콤팩트하게 */}
+          {/* 영상 — 전체 너비, 16:9 비율 */}
           {slot.photo_url && (
-            <div className="relative w-full overflow-hidden bg-slate-100" style={{ aspectRatio: '16/9' }}>
-              <img
-                src={photoUrl(slot.photo_url)}
-                alt="공부 인증"
-                className="h-full w-full object-cover"
-              />
-              {/* 사진 위 캡션 오버레이 (사진+텍스트 둘 다 있을 때) */}
-              {slot.caption && (
+            <div className="relative w-full overflow-hidden bg-slate-900" style={{ aspectRatio: '16/9' }}>
+              {isVideoUrl(slot.photo_url) ? (
+                <video
+                  src={photoUrl(slot.photo_url)}
+                  controls
+                  playsInline
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <img
+                  src={photoUrl(slot.photo_url)}
+                  alt="공부 인증"
+                  className="h-full w-full object-cover"
+                />
+              )}
+              {/* 캡션 오버레이 (영상+텍스트 둘 다 있을 때) */}
+              {slot.caption && !isVideoUrl(slot.photo_url) && (
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
                   <p className="text-xs font-bold text-white line-clamp-2">{slot.caption}</p>
                 </div>
@@ -693,12 +790,23 @@ export default function LogPage() {
                           </button>
                         </div>
                         {log.photo_url && (
-                          <div className="relative w-full overflow-hidden bg-slate-100" style={{ aspectRatio: '16/9' }}>
-                            <img src={`${process.env.NEXT_PUBLIC_API_URL ?? '/proxy'}${log.photo_url}`} alt="기록" className="h-full w-full object-cover" />
-                            {log.caption && (
-                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
-                                <p className="text-xs font-bold text-white line-clamp-2">{log.caption}</p>
-                              </div>
+                          <div className="relative w-full overflow-hidden bg-slate-900" style={{ aspectRatio: '16/9' }}>
+                            {isVideoUrl(log.photo_url) ? (
+                              <video
+                                src={`${process.env.NEXT_PUBLIC_API_URL ?? '/proxy'}${log.photo_url}`}
+                                controls
+                                playsInline
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <>
+                                <img src={`${process.env.NEXT_PUBLIC_API_URL ?? '/proxy'}${log.photo_url}`} alt="기록" className="h-full w-full object-cover" />
+                                {log.caption && (
+                                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
+                                    <p className="text-xs font-bold text-white line-clamp-2">{log.caption}</p>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         )}
