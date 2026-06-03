@@ -406,11 +406,72 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [studyHoursPerDay, setStudyHoursPerDay] = useState(2);
   const [isFreeTimeDialogOpen, setIsFreeTimeDialogOpen] = useState(false);
   const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
+  const CERT_SECS = 3;
   const [certSchedule, setCertSchedule] = useState<{ id: number; title: string } | null>(null);
   const [certGroupId, setCertGroupId]   = useState<number | null>(null);
   const [certCaption, setCertCaption] = useState('');
+  const [certRecordState, setCertRecordState] = useState<'idle'|'requesting'|'recording'|'done'>('idle');
+  const [certCountdown, setCertCountdown] = useState(CERT_SECS);
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [certPreview, setCertPreview] = useState<string | null>(null);
+  const certLiveVideoRef = useRef<HTMLVideoElement>(null);
+  const certRecorderRef  = useRef<MediaRecorder | null>(null);
+  const certStreamRef    = useRef<MediaStream | null>(null);
   const createStudyLog = useCreateStudyLog();
   const certFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (certRecordState === 'recording' && certLiveVideoRef.current && certStreamRef.current) {
+      certLiveVideoRef.current.srcObject = certStreamRef.current;
+      certLiveVideoRef.current.play().catch(() => {});
+    }
+  }, [certRecordState]);
+
+  const startCertRecording = async () => {
+    setCertRecordState('requesting');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } }, audio: true });
+      certStreamRef.current = stream;
+      const mimeType = ['video/mp4', 'video/mp4;codecs=h264', 'video/webm;codecs=vp9', 'video/webm']
+        .find(t => MediaRecorder.isTypeSupported(t)) ?? 'video/webm';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      certRecorderRef.current = recorder;
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(chunks, { type: mimeType });
+        const file = new File([blob], `cert.${ext}`, { type: mimeType });
+        setCertFile(file);
+        setCertPreview(URL.createObjectURL(blob));
+        stream.getTracks().forEach(t => t.stop());
+        certStreamRef.current = null;
+        setCertRecordState('done');
+      };
+      setCertRecordState('recording');
+      setCertCountdown(CERT_SECS);
+      recorder.start();
+      let count = CERT_SECS;
+      const timer = setInterval(() => {
+        count--;
+        setCertCountdown(count);
+        if (count <= 0) { clearInterval(timer); recorder.stop(); }
+      }, 1000);
+    } catch {
+      toast.error('카메라/마이크 권한을 허용해주세요.');
+      setCertRecordState('idle');
+    }
+  };
+
+  const resetCertModal = () => {
+    certStreamRef.current?.getTracks().forEach(t => t.stop());
+    certStreamRef.current = null;
+    setCertFile(null);
+    setCertPreview(null);
+    setCertRecordState('idle');
+    setCertCaption('');
+    setCertGroupId(null);
+  };
   const { data: myGroups = [] } = useMyGroups();
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
   const queryClient = useQueryClient();
@@ -1320,11 +1381,11 @@ ${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
                                         {done && (
                                           <button
                                             type="button"
-                                            title="인증샷 올리기"
+                                            title="영상 기록 올리기"
                                             onClick={() => setCertSchedule({ id: schedule.id, title: schedule.title })}
                                             className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-50 text-blue-500 transition hover:bg-blue-100"
                                           >
-                                            <MaterialIcon icon="photo_camera" size={12} color="currentColor" />
+                                            <MaterialIcon icon="videocam" size={12} color="currentColor" />
                                           </button>
                                         )}
                                       </div>
@@ -1799,42 +1860,19 @@ ${missedLines}
 
       <ClassForm />
 
-      {/* 인증샷 — 완료 체크 연동, 그룹 피드로 업로드 */}
-      <input
-        ref={certFileRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file || !certSchedule) return;
-          const form = new FormData();
-          form.append('photo', file);
-          form.append('schedule_id', String(certSchedule.id));
-          form.append('is_public', 'false');
-          if (certCaption.trim()) form.append('caption', certCaption.trim());
-          if (certGroupId) form.append('group_id', String(certGroupId));
-          try {
-            await createStudyLog.mutateAsync(form);
-            toast.success('기록이 올라갔어요!');
-          } catch {
-            toast.error('업로드에 실패했습니다.');
-          }
-          setCertSchedule(null);
-          setCertCaption('');
-          e.target.value = '';
-        }}
+      {/* 인증 영상 — 완료 체크 연동, 그룹 피드로 업로드 */}
+      <input ref={certFileRef} type="file" accept="video/*" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) { setCertFile(f); setCertPreview(URL.createObjectURL(f)); setCertRecordState('done'); } e.target.value = ''; }}
       />
       {certSchedule && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 backdrop-blur-sm sm:items-center">
           <div className="w-full max-w-sm rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-2xl">
-            {/* 헤더 */}
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-base font-black text-slate-950">기록 남기기</p>
                 <p className="text-xs font-bold text-blue-600">{certSchedule.title} 완료</p>
               </div>
-              <button type="button" onClick={() => setCertSchedule(null)} className="text-slate-400">
+              <button type="button" onClick={() => { resetCertModal(); setCertSchedule(null); }} className="text-slate-400">
                 <MaterialIcon icon="close" size={20} color="currentColor" />
               </button>
             </div>
@@ -1842,19 +1880,15 @@ ${missedLines}
             {/* 그룹 선택 */}
             {myGroups.length > 0 && (
               <div className="mb-3">
-                <p className="mb-1.5 text-[11px] font-black text-slate-400">올릴 그룹</p>
+                <p className="mb-1.5 text-[11px] font-black text-slate-400">올릴 그룹 <span className="text-slate-300">(선택 안 하면 내 기록에만)</span></p>
                 <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setCertGroupId(null)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${certGroupId === null ? 'border-slate-700 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-500'}`}>
+                    내 기록에만
+                  </button>
                   {myGroups.map(g => (
-                    <button
-                      key={g.id}
-                      type="button"
-                      onClick={() => setCertGroupId(prev => prev === g.id ? null : g.id)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
-                        certGroupId === g.id
-                          ? 'border-blue-500 bg-blue-600 text-white'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
-                      }`}
-                    >
+                    <button key={g.id} type="button" onClick={() => setCertGroupId(prev => prev === g.id ? null : g.id)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${certGroupId === g.id ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
                       {g.name}
                     </button>
                   ))}
@@ -1862,45 +1896,76 @@ ${missedLines}
               </div>
             )}
 
-            {/* 캡션 */}
-            <textarea
-              placeholder="한 마디 남기기 (선택사항)"
-              value={certCaption}
-              onChange={e => setCertCaption(e.target.value.slice(0, 200))}
-              rows={2}
+            {/* 영상 촬영 영역 */}
+            <div className="mb-3 overflow-hidden rounded-2xl bg-slate-900" style={{ aspectRatio: '4/3' }}>
+              {certRecordState === 'idle' && (
+                <div className="flex h-full flex-col items-center justify-center gap-3">
+                  <button type="button" onClick={startCertRecording}
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 shadow-lg transition active:scale-95">
+                    <MaterialIcon icon="videocam" size={24} color="#fff" />
+                  </button>
+                  <p className="text-xs font-black text-slate-400">3초 촬영하기</p>
+                  <button type="button" onClick={() => certFileRef.current?.click()}
+                    className="flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-300">
+                    <MaterialIcon icon="upload_file" size={12} color="currentColor" />파일에서 올리기
+                  </button>
+                </div>
+              )}
+              {certRecordState === 'requesting' && (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-sm font-black text-white">카메라 권한 요청 중...</p>
+                </div>
+              )}
+              {certRecordState === 'recording' && (
+                <div className="relative h-full">
+                  <video ref={certLiveVideoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[72px] font-black text-white drop-shadow-lg">{certCountdown}</span>
+                  </div>
+                  <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                    <span className="text-[10px] font-black text-white">REC</span>
+                  </div>
+                </div>
+              )}
+              {certRecordState === 'done' && certPreview && (
+                <div className="relative h-full">
+                  <video src={certPreview} controls playsInline className="h-full w-full object-cover" />
+                  <button type="button" onClick={() => { setCertFile(null); setCertPreview(null); setCertRecordState('idle'); }}
+                    className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white">
+                    <MaterialIcon icon="refresh" size={12} color="currentColor" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <textarea placeholder="한 마디 남기기 (선택사항)" value={certCaption}
+              onChange={e => setCertCaption(e.target.value.slice(0, 200))} rows={2}
               className="mb-3 w-full resize-none rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
             />
 
-
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => certFileRef.current?.click()}
-                className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-black text-white"
-              >
-                사진 찍어 기록하기
-              </button>
-              <button
-                type="button"
+              <button type="button" disabled={createStudyLog.isPending || certRecordState === 'recording' || certRecordState === 'requesting'}
                 onClick={async () => {
-                  if (!certCaption.trim()) { toast.error('사진 또는 한 마디를 입력해주세요.'); return; }
+                  if (!certFile && !certCaption.trim()) { toast.error('영상 또는 한 마디를 입력해주세요.'); return; }
                   const form = new FormData();
+                  if (certFile) form.append('video', certFile);
                   form.append('schedule_id', String(certSchedule.id));
-                  form.append('caption', certCaption.trim());
-                  form.append('is_public', 'false');
+                  if (certCaption.trim()) form.append('caption', certCaption.trim());
                   if (certGroupId) form.append('group_id', String(certGroupId));
                   try {
                     await createStudyLog.mutateAsync(form);
                     toast.success('기록이 올라갔어요!');
+                    resetCertModal();
                     setCertSchedule(null);
-                    setCertCaption('');
-                  } catch {
-                    toast.error('업로드에 실패했습니다.');
-                  }
+                  } catch { toast.error('업로드에 실패했습니다.'); }
                 }}
-                className="rounded-xl border border-slate-200 px-3 py-3 text-sm font-black text-slate-700"
-              >
-                텍스트만
+                className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-black text-white disabled:opacity-40">
+                {createStudyLog.isPending ? '등록 중...' : '기록 남기기'}
+              </button>
+              <button type="button" onClick={() => { resetCertModal(); setCertSchedule(null); }}
+                className="rounded-xl border border-slate-200 px-3 py-3 text-sm font-black text-slate-700">
+                취소
               </button>
             </div>
           </div>
