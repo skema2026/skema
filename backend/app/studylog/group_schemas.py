@@ -10,7 +10,7 @@ class GroupCreate(BaseModel):
 
 class MemberOut(BaseModel):
     user_id: int
-    username: str
+    username: str = ""
     joined_at: datetime
 
     model_config = {"from_attributes": True}
@@ -34,7 +34,7 @@ class GroupDetail(GroupOut):
 # BeReal 스타일 피드 — 날짜별 멤버 x 기록 매트릭스
 class MemberSlot(BaseModel):
     user_id: int
-    username: str
+    username: str = ""
     # 오늘 올린 기록 (없으면 None)
     log_id: Optional[int] = None
     photo_url: Optional[str] = None
