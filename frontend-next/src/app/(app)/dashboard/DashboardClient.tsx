@@ -463,7 +463,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
       };
       setCertRecordState('recording');
       setCertCountdown(CERT_SECS);
-      recorder.start();
+      recorder.start(100);
       let count = CERT_SECS;
       const timer = setInterval(() => {
         count--;

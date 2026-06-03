@@ -295,7 +295,7 @@ function UploadModal({
 
       setRecordState('recording');
       setCountdown(RECORD_SECS);
-      recorder.start();
+      recorder.start(100); // 100ms마다 데이터 수집 → 빈 blob 방지
 
       let count = RECORD_SECS;
       const timer = setInterval(() => {
