@@ -242,7 +242,7 @@ def get_group_feed(
             .options(joinedload(StudyLog.reactions))
             .all()
         )
-        # user_id → 해당 날짜의 전체 로그 목록 (여러 개 허용)
+        # user_id → 해당 날짜의 전체 로그 목록 (여러 개 허용, 하루 1개 제한 없음)
         logs_sorted = sorted(logs, key=lambda l: l.created_at)
         log_by_user: dict[int, list[StudyLog]] = {}
         for log in logs_sorted:
