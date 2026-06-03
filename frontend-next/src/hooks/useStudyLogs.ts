@@ -61,6 +61,7 @@ export function useCreateStudyLog() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['study-logs'] });
+      qc.invalidateQueries({ queryKey: ['groups'] });
     },
   });
 }
@@ -74,6 +75,7 @@ export function useDeleteStudyLog() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['study-logs'] });
+      qc.invalidateQueries({ queryKey: ['groups'] });
     },
   });
 }
