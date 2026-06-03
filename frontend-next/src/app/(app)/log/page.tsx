@@ -233,6 +233,8 @@ function UploadModal({
   scheduleId?: number;
   scheduleTitle?: string;
 }) {
+  const RECORD_SECS = 10;
+
   const create       = useCreateStudyLog();
   const fileRef      = useRef<HTMLInputElement>(null);
   const liveVideoRef = useRef<HTMLVideoElement>(null);
@@ -244,7 +246,15 @@ function UploadModal({
   const [caption, setCaption]         = useState('');
   const [groupId, setGroupId]         = useState<number | null>(null);
   const [recordState, setRecordState] = useState<RecordState>('idle');
-  const [countdown, setCountdown]     = useState(3);
+  const [countdown, setCountdown]     = useState(RECORD_SECS);
+
+  // recording 상태로 전환된 뒤 video 요소가 마운트되면 stream 연결
+  useEffect(() => {
+    if (recordState === 'recording' && liveVideoRef.current && streamRef.current) {
+      liveVideoRef.current.srcObject = streamRef.current;
+      liveVideoRef.current.play().catch(() => {});
+    }
+  }, [recordState]);
 
   useEffect(() => {
     return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
@@ -257,10 +267,6 @@ function UploadModal({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
       streamRef.current = stream;
-      if (liveVideoRef.current) {
-        liveVideoRef.current.srcObject = stream;
-        liveVideoRef.current.play();
-      }
 
       const mimeType = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
         .find(t => MediaRecorder.isTypeSupported(t)) ?? 'video/webm';
@@ -277,11 +283,12 @@ function UploadModal({
         streamRef.current = null;
       };
 
+      // 상태 변경 → useEffect에서 video에 stream 연결
       setRecordState('recording');
-      setCountdown(3);
+      setCountdown(RECORD_SECS);
       recorder.start();
 
-      let count = 3;
+      let count = RECORD_SECS;
       const timer = setInterval(() => {
         count--;
         setCountdown(count);
@@ -378,7 +385,7 @@ function UploadModal({
                 className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-lg transition active:scale-95">
                 <MaterialIcon icon="videocam" size={28} color="#fff" />
               </button>
-              <p className="text-xs font-black text-slate-400">3초 촬영하기</p>
+              <p className="text-xs font-black text-slate-400">최대 10초 촬영하기</p>
               <button type="button" onClick={() => fileRef.current?.click()}
                 className="flex items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-xs font-black text-slate-300 transition hover:bg-slate-700">
                 <MaterialIcon icon="upload_file" size={14} color="currentColor" />
