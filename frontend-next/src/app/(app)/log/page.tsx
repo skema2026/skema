@@ -242,14 +242,9 @@ function UploadModal({
   const [preview, setPreview]         = useState<string | null>(null);
   const [file, setFile]               = useState<File | null>(null);
   const [caption, setCaption]         = useState('');
-  const [groupId, setGroupId]         = useState<number | null>(defaultGroupId ?? (groups[0]?.id ?? null));
+  const [groupId, setGroupId]         = useState<number | null>(null);
   const [recordState, setRecordState] = useState<RecordState>('idle');
   const [countdown, setCountdown]     = useState(3);
-
-  // groups가 나중에 로드되거나 defaultGroupId가 바뀌면 groupId 동기화
-  useEffect(() => {
-    setGroupId(prev => prev ?? defaultGroupId ?? groups[0]?.id ?? null);
-  }, [defaultGroupId, groups]);
 
   useEffect(() => {
     return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
@@ -343,10 +338,25 @@ function UploadModal({
         {/* 그룹 선택 */}
         {groups.length > 0 && (
           <div className="mb-3">
-            <p className="mb-1.5 text-[11px] font-black text-slate-400">올릴 그룹</p>
+            <p className="mb-1.5 text-[11px] font-black text-slate-400">올릴 그룹 <span className="text-slate-300">(선택 안 하면 내 기록에만 저장)</span></p>
             <div className="flex flex-wrap gap-2">
+              {/* 내 기록에만 */}
+              <button
+                type="button"
+                onClick={() => setGroupId(null)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
+                  groupId === null
+                    ? 'border-slate-700 bg-slate-800 text-white'
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'
+                }`}
+              >
+                내 기록에만
+              </button>
               {groups.map(g => (
-                <button key={g.id} type="button" onClick={() => setGroupId(g.id)}
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setGroupId(prev => prev === g.id ? null : g.id)}
                   className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
                     groupId === g.id
                       ? 'border-blue-500 bg-blue-600 text-white'
