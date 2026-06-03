@@ -244,7 +244,7 @@ function UploadModal({
   const [preview, setPreview]         = useState<string | null>(null);
   const [file, setFile]               = useState<File | null>(null);
   const [caption, setCaption]         = useState('');
-  const [groupIds, setGroupIds]       = useState<number[]>([]);
+  const [groupIds, setGroupIds]       = useState<number[]>(defaultGroupId ? [defaultGroupId] : []);
   const [recordState, setRecordState] = useState<RecordState>('idle');
   const [countdown, setCountdown]     = useState(RECORD_SECS);
   const [facingMode, setFacingMode]   = useState<'user' | 'environment'>('user');

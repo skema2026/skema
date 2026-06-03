@@ -1398,7 +1398,7 @@ ${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
                                           <button
                                             type="button"
                                             title="영상 기록 올리기"
-                                            onClick={() => setCertSchedule({ id: schedule.id, title: schedule.title })}
+                                            onClick={() => { setCertSchedule({ id: schedule.id, title: schedule.title }); setCertGroupIds(myGroups.map(g => g.id)); }}
                                             className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-50 text-blue-500 transition hover:bg-blue-100"
                                           >
                                             <MaterialIcon icon="videocam" size={12} color="currentColor" />
