@@ -733,9 +733,9 @@ function GroupFeed({
               </StatusPill>
             </div>
             <div className="space-y-3">
-              {day.slots.map(slot => (
+              {day.slots.map((slot, idx) => (
                 <MemberCard
-                  key={slot.user_id}
+                  key={slot.log_id ?? `empty-${slot.user_id}-${idx}`}
                   slot={slot}
                   isMe={slot.user_id === currentUserId}
                   onDelete={handleDelete}
