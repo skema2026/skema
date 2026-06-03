@@ -30,8 +30,14 @@ from .streak import compute_streak
 router = APIRouter(prefix="/study-logs", tags=["study-logs"])
 
 UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "studylogs")
-ALLOWED_TYPES = {"video/webm", "video/mp4", "video/quicktime", "video/x-matroska"}
+ALLOWED_BASE_TYPES = {"video/webm", "video/mp4", "video/quicktime", "video/x-matroska"}
 MAX_BYTES = 100 * 1024 * 1024  # 100 MB
+
+
+def _is_allowed_video(content_type: str) -> bool:
+    # MediaRecorder가 "video/webm;codecs=vp9" 형태로 보낼 수 있으므로 base type만 비교
+    base = content_type.split(";")[0].strip().lower()
+    return base in ALLOWED_BASE_TYPES
 
 
 def _ensure_upload_dir():
@@ -92,7 +98,7 @@ async def create_study_log(
 
     photo_path = None
     if video and video.filename:
-        if video.content_type not in ALLOWED_TYPES:
+        if not _is_allowed_video(video.content_type or ""):
             raise HTTPException(status_code=415, detail="webm/mp4 영상만 업로드 가능합니다.")
         content = await video.read()
         if len(content) > MAX_BYTES:

@@ -246,6 +246,11 @@ function UploadModal({
   const [recordState, setRecordState] = useState<RecordState>('idle');
   const [countdown, setCountdown]     = useState(3);
 
+  // groups가 나중에 로드되거나 defaultGroupId가 바뀌면 groupId 동기화
+  useEffect(() => {
+    setGroupId(prev => prev ?? defaultGroupId ?? groups[0]?.id ?? null);
+  }, [defaultGroupId, groups]);
+
   useEffect(() => {
     return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
   }, []);

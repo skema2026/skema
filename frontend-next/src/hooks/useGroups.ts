@@ -71,7 +71,7 @@ export function useGroupFeed(groupId: number | null, days = 7) {
       return data;
     },
     enabled: groupId !== null,
-    staleTime: 30_000,
+    staleTime: 0,
   });
 }
 
