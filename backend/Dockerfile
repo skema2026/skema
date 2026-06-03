@@ -19,6 +19,9 @@ COPY . .
 # entrypoint 실행 권한 + CRLF 제거 (Windows 클론 대비)
 RUN sed -i 's/\r//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
+# 업로드 파일 영구 보관을 위해 Railway Volume을 /app/uploads에 마운트해야 합니다
+VOLUME ["/app/uploads"]
+
 EXPOSE 8000
 
 ENTRYPOINT ["/app/entrypoint.sh"]
