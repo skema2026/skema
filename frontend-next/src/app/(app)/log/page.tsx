@@ -244,7 +244,7 @@ function UploadModal({
   const [preview, setPreview]         = useState<string | null>(null);
   const [file, setFile]               = useState<File | null>(null);
   const [caption, setCaption]         = useState('');
-  const [groupId, setGroupId]         = useState<number | null>(null);
+  const [groupIds, setGroupIds]       = useState<number[]>([]);
   const [recordState, setRecordState] = useState<RecordState>('idle');
   const [countdown, setCountdown]     = useState(RECORD_SECS);
   const [facingMode, setFacingMode]   = useState<'user' | 'environment'>('user');
@@ -344,13 +344,21 @@ function UploadModal({
 
   const handleSubmit = async () => {
     if (!file && !caption.trim()) { toast.error('영상 또는 한 마디를 입력해주세요.'); return; }
-    const form = new FormData();
-    if (file)           form.append('video', file);
-    if (caption.trim()) form.append('caption', caption);
-    if (groupId)        form.append('group_id', String(groupId));
-    if (scheduleId)     form.append('schedule_id', String(scheduleId));
+
+    const makeForm = (gid?: number) => {
+      const form = new FormData();
+      if (file)           form.append('video', file);
+      if (caption.trim()) form.append('caption', caption);
+      if (gid)            form.append('group_id', String(gid));
+      if (scheduleId)     form.append('schedule_id', String(scheduleId));
+      return form;
+    };
+
     try {
-      await create.mutateAsync(form);
+      // 그룹 미선택: 내 기록에만 1번 업로드
+      // 그룹 선택: 그룹마다 1번씩 업로드 (내 기록에도 자동으로 뜸)
+      const targets = groupIds.length > 0 ? groupIds : [undefined];
+      await Promise.all(targets.map(gid => create.mutateAsync(makeForm(gid))));
       toast.success('기록이 등록됐습니다!');
       onClose();
     } catch { toast.error('업로드에 실패했습니다.'); }
@@ -376,38 +384,36 @@ function UploadModal({
           </div>
         )}
 
-        {/* 그룹 선택 */}
+        {/* 그룹 선택 (복수 선택 가능) */}
         {groups.length > 0 && (
           <div className="mb-3">
-            <p className="mb-1.5 text-[11px] font-black text-slate-400">올릴 그룹 <span className="text-slate-300">(선택 안 하면 내 기록에만 저장)</span></p>
+            <p className="mb-1.5 text-[11px] font-black text-slate-400">
+              올릴 그룹 <span className="text-slate-300">(복수 선택 가능 · 그룹 선택하면 내 기록에도 자동으로 표시)</span>
+            </p>
             <div className="flex flex-wrap gap-2">
-              {/* 내 기록에만 */}
-              <button
-                type="button"
-                onClick={() => setGroupId(null)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
-                  groupId === null
-                    ? 'border-slate-700 bg-slate-800 text-white'
-                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'
-                }`}
-              >
-                내 기록에만
-              </button>
-              {groups.map(g => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setGroupId(prev => prev === g.id ? null : g.id)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
-                    groupId === g.id
-                      ? 'border-blue-500 bg-blue-600 text-white'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
-                  }`}
-                >
-                  {g.name}
-                </button>
-              ))}
+              {groups.map(g => {
+                const selected = groupIds.includes(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setGroupIds(prev =>
+                      selected ? prev.filter(id => id !== g.id) : [...prev, g.id]
+                    )}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
+                      selected
+                        ? 'border-blue-500 bg-blue-600 text-white'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                    }`}
+                  >
+                    {g.name}
+                  </button>
+                );
+              })}
             </div>
+            {groupIds.length === 0 && (
+              <p className="mt-1 text-[11px] text-slate-400">그룹 미선택 → 내 기록에만 저장</p>
+            )}
           </div>
         )}
 

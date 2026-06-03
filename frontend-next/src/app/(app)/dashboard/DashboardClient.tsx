@@ -408,7 +408,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
   const CERT_SECS = 3;
   const [certSchedule, setCertSchedule] = useState<{ id: number; title: string } | null>(null);
-  const [certGroupId, setCertGroupId]   = useState<number | null>(null);
+  const [certGroupIds, setCertGroupIds] = useState<number[]>([]);
   const [certCaption, setCertCaption] = useState('');
   const [certRecordState, setCertRecordState] = useState<'idle'|'requesting'|'recording'|'done'>('idle');
   const [certFacingMode, setCertFacingMode]   = useState<'user'|'environment'>('user');
@@ -486,7 +486,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
     setCertPreview(null);
     setCertRecordState('idle');
     setCertCaption('');
-    setCertGroupId(null);
+    setCertGroupIds([]);
   };
   const { data: myGroups = [] } = useMyGroups();
   const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
@@ -1893,22 +1893,27 @@ ${missedLines}
               </button>
             </div>
 
-            {/* 그룹 선택 */}
+            {/* 그룹 선택 (복수 선택 가능) */}
             {myGroups.length > 0 && (
               <div className="mb-3">
-                <p className="mb-1.5 text-[11px] font-black text-slate-400">올릴 그룹 <span className="text-slate-300">(선택 안 하면 내 기록에만)</span></p>
+                <p className="mb-1.5 text-[11px] font-black text-slate-400">
+                  올릴 그룹 <span className="text-slate-300">(복수 선택 가능 · 내 기록에도 자동 표시)</span>
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => setCertGroupId(null)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${certGroupId === null ? 'border-slate-700 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-500'}`}>
-                    내 기록에만
-                  </button>
-                  {myGroups.map(g => (
-                    <button key={g.id} type="button" onClick={() => setCertGroupId(prev => prev === g.id ? null : g.id)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${certGroupId === g.id ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
-                      {g.name}
-                    </button>
-                  ))}
+                  {myGroups.map(g => {
+                    const sel = certGroupIds.includes(g.id);
+                    return (
+                      <button key={g.id} type="button"
+                        onClick={() => setCertGroupIds(prev => sel ? prev.filter(id => id !== g.id) : [...prev, g.id])}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${sel ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
+                        {g.name}
+                      </button>
+                    );
+                  })}
                 </div>
+                {certGroupIds.length === 0 && (
+                  <p className="mt-1 text-[11px] text-slate-400">그룹 미선택 → 내 기록에만 저장</p>
+                )}
               </div>
             )}
 
@@ -1970,13 +1975,17 @@ ${missedLines}
               <button type="button" disabled={createStudyLog.isPending || certRecordState === 'recording' || certRecordState === 'requesting'}
                 onClick={async () => {
                   if (!certFile && !certCaption.trim()) { toast.error('영상 또는 한 마디를 입력해주세요.'); return; }
-                  const form = new FormData();
-                  if (certFile) form.append('video', certFile);
-                  form.append('schedule_id', String(certSchedule.id));
-                  if (certCaption.trim()) form.append('caption', certCaption.trim());
-                  if (certGroupId) form.append('group_id', String(certGroupId));
+                  const makeForm = (gid?: number) => {
+                    const form = new FormData();
+                    if (certFile) form.append('video', certFile);
+                    form.append('schedule_id', String(certSchedule.id));
+                    if (certCaption.trim()) form.append('caption', certCaption.trim());
+                    if (gid) form.append('group_id', String(gid));
+                    return form;
+                  };
                   try {
-                    await createStudyLog.mutateAsync(form);
+                    const targets = certGroupIds.length > 0 ? certGroupIds : [undefined];
+                    await Promise.all(targets.map((gid: number | undefined) => createStudyLog.mutateAsync(makeForm(gid))));
                     toast.success('기록이 올라갔어요!');
                     resetCertModal();
                     setCertSchedule(null);
