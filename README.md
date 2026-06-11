@@ -158,7 +158,7 @@ npm run dev
 | POST | `/auth/login` | 로그인 |
 | GET | `/schedules` | 일정 목록 |
 | POST | `/eta/parse-image` | 시간표 이미지 파싱 |
-| POST | `/ai-chat` | AI 채팅 |
+| POST | `/ai/chat` | AI 채팅 |
 | POST | `/study-logs` | 기록 생성 |
 | GET | `/study-logs/me` | 내 기록 목록 |
 | POST | `/groups` | 그룹 생성 |
