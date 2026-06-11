@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Timetable, getWeekStart } from '@/components/timetable/Timetable';
 import { ClassForm } from '@/components/class-form/ClassForm';
 import { useSchedules, useToggleComplete } from '@/hooks/useSchedules';
-import { useExams } from '@/hooks/useExams';
+import { useExams, useDeleteExam } from '@/hooks/useExams';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
@@ -162,6 +162,7 @@ function MobileWeekAgenda({
   days,
   todayStr,
   onScheduleClick,
+  onExamClick,
   onScrollToDate,
   onShowDayView,
   scrollToDateStr,
@@ -170,6 +171,7 @@ function MobileWeekAgenda({
   days: WeekAgendaDay[];
   todayStr: string;
   onScheduleClick: (schedule: Schedule) => void;
+  onExamClick: (exam: ExamSchedule) => void;
   onScrollToDate: (date: Date) => void;
   onShowDayView: (date: Date) => void;
   scrollToDateStr: string | null;
@@ -260,13 +262,18 @@ function MobileWeekAgenda({
 
                 <div className="space-y-1.5">
                   {day.exams.map((exam) => (
-                    <div key={`mobile-exam-${exam.id}`} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                    <button
+                      key={`mobile-exam-${exam.id}`}
+                      type="button"
+                      onClick={() => onExamClick(exam)}
+                      className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left transition hover:border-amber-300 hover:bg-amber-100"
+                    >
                       <div className="flex items-center gap-2">
                         <MaterialIcon icon="school" size={16} color="#d97706" />
                         <p className="min-w-0 flex-1 truncate text-sm font-black text-amber-900">{exam.title}</p>
                         <span className="text-xs font-black text-amber-700">{exam.exam_time || '종일'}</span>
                       </div>
-                    </div>
+                    </button>
                   ))}
 
                   {day.schedules.map((schedule) => (
@@ -383,6 +390,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const { openClassForm, isShareModalOpen, openShareModal, closeShareModal } = useUIStore();
   const { data: schedules = [] } = useSchedules(initialSchedules);
   const { data: exams = [] } = useExams();
+  const deleteExam = useDeleteExam();
   const toggleComplete = useToggleComplete();
   const { data: profile } = useProfile(initialProfile ?? undefined);
   const { prefs: notifPrefs } = useNotificationPrefs();
@@ -403,6 +411,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [weekScrollDate, setWeekScrollDate] = useState<string | null>(null);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const [examForStudyBlocks, setExamForStudyBlocks] = useState<{ id: number; title: string; exam_date: string } | null>(null);
+  const [examToDelete, setExamToDelete] = useState<ExamSchedule | null>(null);
   const [studyHoursPerDay, setStudyHoursPerDay] = useState(2);
   const [isFreeTimeDialogOpen, setIsFreeTimeDialogOpen] = useState(false);
   const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
@@ -1029,6 +1038,7 @@ ${upcomingExamLines}
                           days={weekAgendaDays}
                           todayStr={todayStr}
                           onScheduleClick={openClassForm}
+                          onExamClick={setExamToDelete}
                           onScrollToDate={(date) => setWeekScrollDate(toLocalDateString(date))}
                           onShowDayView={showDayViewForDate}
                           scrollToDateStr={weekScrollDate}
@@ -1310,9 +1320,11 @@ ${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
                       {dayExams.length > 0 && (
                         <div className="mb-3 space-y-2">
                           {dayExams.map((exam) => (
-                            <div
+                            <button
                               key={exam.id}
-                              className="flex w-full items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-left"
+                              type="button"
+                              onClick={() => setExamToDelete(exam)}
+                              className="flex w-full items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-left transition hover:border-amber-300 hover:bg-amber-100"
                             >
                               <span>
                                 <span className="block text-sm font-black text-amber-950">{exam.title}</span>
@@ -1320,8 +1332,8 @@ ${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
                                   {exam.exam_time || '시간 미정'}{exam.location ? ` · ${exam.location}` : ''}
                                 </span>
                               </span>
-                              <MaterialIcon icon="quiz" size={18} color="#d97706" />
-                            </div>
+                              <MaterialIcon icon="delete" size={18} color="#d97706" />
+                            </button>
                           ))}
                         </div>
                       )}
@@ -1619,7 +1631,12 @@ ${missedLines}
                       {sidebarExams.map((exam) => {
                         const days = getDaysUntil(exam.exam_date);
                         return (
-                          <div key={`sidebar-exam-${exam.id}`} className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5">
+                          <button
+                            key={`sidebar-exam-${exam.id}`}
+                            type="button"
+                            onClick={() => setExamToDelete(exam)}
+                            className="flex w-full items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5 text-left transition hover:border-amber-300 hover:bg-amber-100/70"
+                          >
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100">
                               <MaterialIcon icon="quiz" size={16} color="#d97706" />
                             </span>
@@ -1630,7 +1647,7 @@ ${missedLines}
                             <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${days <= 0 ? 'bg-red-100 text-red-700' : days <= 7 ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-600'}`}>
                               {days <= 0 ? 'D-day' : `D-${days}`}
                             </span>
-                          </div>
+                          </button>
                         );
                       })}
                       {sidebarOneTimeEvents.map((s) => {
@@ -1846,6 +1863,54 @@ ${missedLines}
               >
                 공부 일정 배치하기
               </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!examToDelete} onOpenChange={(open) => { if (!open) setExamToDelete(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>시험 삭제</DialogTitle>
+          </DialogHeader>
+          {examToDelete && (
+            <div className="py-2 space-y-4">
+              <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3">
+                <p className="text-sm font-black text-slate-950">{examToDelete.title}</p>
+                <p className="mt-0.5 text-xs font-bold text-amber-700">
+                  {examToDelete.exam_date}{examToDelete.exam_time ? ` · ${examToDelete.exam_time}` : ''}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-slate-600">
+                이 시험을 삭제할까요? 시험을 위해 만든 공부 일정도 함께 사라집니다.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExamToDelete(null)}
+                  disabled={deleteExam.isPending}
+                  className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = examToDelete;
+                    deleteExam.mutate(target.id, {
+                      onSuccess: () => {
+                        toast.success('시험이 삭제되었습니다');
+                        setExamToDelete(null);
+                      },
+                      onError: () => toast.error('삭제 중 오류가 발생했습니다'),
+                    });
+                  }}
+                  disabled={deleteExam.isPending}
+                  className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-black text-white transition hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deleteExam.isPending ? '삭제 중...' : '삭제'}
+                </button>
+              </div>
             </div>
           )}
         </DialogContent>
