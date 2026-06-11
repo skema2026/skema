@@ -107,16 +107,30 @@ def _check_no_conflict(
     end_time: str,
     recurring_day: str,
     exclude_id: int | None = None,
+    date: str | None = None,
 ) -> None:
-    """같은 요일에 시간이 겹치는 수업이 있으면 409."""
+    """시간이 겹치는 일정이 있으면 409.
+
+    프론트엔드 충돌 검사와 동일한 규칙:
+      - 같은 요일이어야 충돌 후보.
+      - 새 일정과 기존 일정이 모두 '특정 날짜'면 날짜가 정확히 같을 때만 충돌
+        (다른 날짜의 같은 요일은 충돌 아님).
+      - 한쪽이라도 매주 반복이면 요일 일치만으로 충돌.
+    """
     existing = repository.get_schedules(db, user_id)
     for s in existing:
         if exclude_id is not None and s.id == exclude_id:
             continue
-        if s.recurring_day.value == recurring_day and overlap(start_time, end_time, s.start_time, s.end_time):
+        s_day = s.recurring_day.value if s.recurring_day else None
+        if s_day != recurring_day:
+            continue
+        # 둘 다 특정 날짜면 날짜가 다를 경우 충돌 아님
+        if date and s.date and date != s.date:
+            continue
+        if overlap(start_time, end_time, s.start_time, s.end_time):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"'{s.course_name}' 수업과 시간이 겹칩니다. ({s.recurring_day.value} {s.start_time}~{s.end_time})",
+                detail=f"'{s.course_name}' 일정과 시간이 겹칩니다. ({s.recurring_day.value} {s.start_time}~{s.end_time})",
             )
 
 
@@ -126,7 +140,7 @@ def create_schedule(db: Session, user_id: int, data: ScheduleCreate) -> list[Sch
     base = data.model_dump(exclude={"days", "day_of_week", "title", "color"})
 
     for day in data.days:
-        _check_no_conflict(db, user_id, data.start_time, data.end_time, day)
+        _check_no_conflict(db, user_id, data.start_time, data.end_time, day, date=data.date)
         row_data = {**base, "recurring_day": DayOfWeek(day)}
         created.append(repository.create_schedule(db, user_id, row_data))
 
@@ -152,7 +166,8 @@ def update_schedule(db: Session, schedule_id: int, user_id: int, data: ScheduleU
         or new_day_str != (schedule.recurring_day.value if schedule.recurring_day else None)
     )
     if time_changed and new_day_str:
-        _check_no_conflict(db, user_id, new_start, new_end, new_day_str, exclude_id=schedule.id)
+        new_date = updates.get("date", schedule.date)
+        _check_no_conflict(db, user_id, new_start, new_end, new_day_str, exclude_id=schedule.id, date=new_date)
 
     return repository.update_schedule(db, schedule, updates)
 
