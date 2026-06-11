@@ -1038,7 +1038,7 @@ ${upcomingExamLines}
                           days={weekAgendaDays}
                           todayStr={todayStr}
                           onScheduleClick={openClassForm}
-                          onExamClick={setExamToDelete}
+                          onExamClick={(exam) => setExamForStudyBlocks({ id: exam.id, title: exam.title, exam_date: exam.exam_date })}
                           onScrollToDate={(date) => setWeekScrollDate(toLocalDateString(date))}
                           onShowDayView={showDayViewForDate}
                           scrollToDateStr={weekScrollDate}
@@ -1323,7 +1323,7 @@ ${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
                             <button
                               key={exam.id}
                               type="button"
-                              onClick={() => setExamToDelete(exam)}
+                              onClick={() => setExamForStudyBlocks({ id: exam.id, title: exam.title, exam_date: exam.exam_date })}
                               className="flex w-full items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-left transition hover:border-amber-300 hover:bg-amber-100"
                             >
                               <span>
@@ -1332,7 +1332,10 @@ ${upcomingExamLines ? `\n다가오는 시험:\n${upcomingExamLines}\n` : ''}
                                   {exam.exam_time || '시간 미정'}{exam.location ? ` · ${exam.location}` : ''}
                                 </span>
                               </span>
-                              <MaterialIcon icon="delete" size={18} color="#d97706" />
+                              <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-black text-amber-800">
+                                <MaterialIcon icon="menu_book" size={14} color="#b45309" />
+                                공부 배치
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -1634,7 +1637,7 @@ ${missedLines}
                           <button
                             key={`sidebar-exam-${exam.id}`}
                             type="button"
-                            onClick={() => setExamToDelete(exam)}
+                            onClick={() => setExamForStudyBlocks({ id: exam.id, title: exam.title, exam_date: exam.exam_date })}
                             className="flex w-full items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5 text-left transition hover:border-amber-300 hover:bg-amber-100/70"
                           >
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100">
@@ -1854,14 +1857,29 @@ ${missedLines}
                   setExamForStudyBlocks(null);
                   runAiCommand(
                     'study-blocks',
-                    `${e.title} 시험(${e.exam_date})까지 남은 기간을 기준으로, 하루 ${studyHoursPerDay}시간씩 공부 블록을 빈 시간에 자동으로 추가해줘. 기존 일정과 충돌하지 않는 시간대에 배치하고, 시험일에 가까울수록 더 집중되게 해줘.`,
-                    '공부 블록을 시간표에 추가했습니다',
+                    `${e.title} 시험(${e.exam_date}) 공부 일정을 다시 배치해줘. 이 시험을 위해 기존에 배치된 미완료 공부 블록이 있으면 모두 삭제하고, 남은 기간 동안 하루 ${studyHoursPerDay}시간씩 빈 시간에 새로 배치해줘. 기존 일정과 충돌하지 않는 시간대에 두고, 시험일에 가까울수록 더 집중되게 해줘.`,
+                    '공부 일정을 새로 배치했습니다',
                   );
                 }}
                 disabled={aiAction !== null}
                 className="w-full rounded-lg bg-blue-600 py-3 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
               >
-                공부 일정 배치하기
+                {aiAction === 'study-blocks' ? '배치 중...' : '공부 일정 배치하기'}
+              </button>
+              <p className="text-center text-[11px] font-bold text-slate-400">
+                이미 배치한 공부 일정은 자동으로 지우고 새로 만듭니다.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const full = exams.find((x) => x.id === examForStudyBlocks.id) ?? null;
+                  setExamForStudyBlocks(null);
+                  setExamToDelete(full);
+                }}
+                disabled={aiAction !== null}
+                className="w-full rounded-lg border border-red-200 py-2.5 text-sm font-black text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+              >
+                시험 삭제
               </button>
             </div>
           )}
