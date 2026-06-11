@@ -2,7 +2,7 @@ import secrets
 from datetime import datetime
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 
 from app.db.database import Base
 
@@ -53,7 +53,10 @@ class StudyLog(Base):
     is_public   = Column(Boolean, nullable=False, default=True)
     created_at  = Column(DateTime, nullable=False, default=datetime.utcnow)
 
-    user    = relationship("User", backref="study_logs")
+    # backref로 User.study_logs 컬렉션 생성. 회원 탈퇴(User 삭제) 시 SQLAlchemy가
+    # study_logs.user_id를 NULL로 UPDATE하려다 NOT NULL 제약을 위반하지 않도록
+    # passive_deletes=True로 DB의 ON DELETE CASCADE에 위임한다.
+    user    = relationship("User", backref=backref("study_logs", passive_deletes=True))
     group   = relationship("StudyGroup", back_populates="logs")
     reactions = relationship("StudyLogReaction", back_populates="log", cascade="all, delete-orphan")
 
