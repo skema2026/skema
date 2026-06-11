@@ -1,3 +1,4 @@
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.schedule.models import Event, ExamSchedule, Schedule
@@ -72,15 +73,40 @@ def update_exam(db: Session, exam: ExamSchedule, updates: dict) -> ExamSchedule:
     return exam
 
 
-def delete_exam(db: Session, exam: ExamSchedule) -> int:
-    # 시험에 연결된 학습 일정은 소프트 삭제(deleted_by_user=True)로 숨긴다.
-    # AI 삭제 경로와 동작을 일치시키고, 완료된 학습 기록은 보존하기 위함.
-    linked = db.query(Schedule).filter(Schedule.linked_exam_id == exam.id).all()
+def soft_delete_exam_study_schedules(db: Session, exam: ExamSchedule) -> int:
+    """시험에 딸린 학습 일정을 소프트 삭제(deleted_by_user=True)로 숨긴다.
+
+    두 종류를 모두 잡는다:
+      1) linked_exam_id로 명시적으로 연결된 일정 (generate_exam_prep_schedule 경로)
+      2) 연결 정보 없이 제목에 시험명/과목이 포함된 학습·과제 일정
+         (generate_study_schedule 등 linked_exam_id를 남기지 않는 경로 대비)
+    정규 수업은 건드리지 않도록 study/assignment 유형으로 제한한다.
+    소프트 삭제이므로 완료된 학습 기록은 보존된다.
+    """
+    keywords = {k.strip() for k in (exam.title, exam.subject) if k and k.strip()}
+    condition = Schedule.linked_exam_id == exam.id
+    if keywords:
+        title_match = or_(*[Schedule.title.ilike(f"%{kw}%") for kw in keywords])
+        condition = or_(
+            condition,
+            and_(Schedule.schedule_type.in_(["study", "assignment"]), title_match),
+        )
+
+    linked = (
+        db.query(Schedule)
+        .filter(Schedule.user_id == exam.user_id, condition)
+        .all()
+    )
     cleaned = 0
     for s in linked:
         if not s.deleted_by_user:
             s.deleted_by_user = True
             cleaned += 1
+    return cleaned
+
+
+def delete_exam(db: Session, exam: ExamSchedule) -> int:
+    cleaned = soft_delete_exam_study_schedules(db, exam)
     db.delete(exam)
     db.commit()
     return cleaned

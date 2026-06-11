@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.auth.models import UserProfile
+from app.schedule import repository as schedule_repository
 from app.schedule.models import ExamSchedule, Schedule
 from app.schedule.service import create_exam_record, create_schedule_record
 from app.core.time_utils import DAY_NAMES, DAY_NAMES_SHORT, minutes_to_time, overlap, time_to_minutes
@@ -456,17 +457,9 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         if not e:
             return f"❌ ID {eid} 시험 일정을 찾을 수 없습니다."
         exam_title = e.title
-        # 이 시험에 연결된 학습 일정은 source와 무관하게 모두 소프트 삭제한다.
-        # (linked_exam_id가 있다는 것 자체가 이 시험을 위해 생성된 학습 일정이라는 의미)
-        linked_study = db.query(Schedule).filter(
-            Schedule.user_id == user_id,
-            Schedule.linked_exam_id == eid,
-        ).all()
-        cleaned = 0
-        for ls in linked_study:
-            if not ls.deleted_by_user:
-                ls.deleted_by_user = True
-                cleaned += 1
+        # 연결된(linked_exam_id) 학습 일정 + 제목에 시험명/과목이 포함된 학습·과제 일정을
+        # 함께 소프트 삭제한다. REST 삭제 경로(repository.delete_exam)와 동일한 기준.
+        cleaned = schedule_repository.soft_delete_exam_study_schedules(db, e)
         db.delete(e)
         db.commit()
         cleaned_msg = f"\n🧹 연관 학습 일정 {cleaned}개 자동 정리" if cleaned > 0 else ""
