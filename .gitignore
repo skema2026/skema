@@ -57,7 +57,3 @@ backend/uploads/
 backend/deep-research-skills/
 backend/.venv/
 CON
-
-# ── 발표자료 스크립트 ──────────────────────────────────────
-make_ppt.py
-*.pptx
