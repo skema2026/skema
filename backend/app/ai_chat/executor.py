@@ -456,11 +456,11 @@ def _execute_tool(tool_name: str, tool_input: dict, db: Session, user_id: int) -
         if not e:
             return f"❌ ID {eid} 시험 일정을 찾을 수 없습니다."
         exam_title = e.title
-        # 이 시험을 위해 AI가 생성한 학습 일정도 함께 소프트 삭제
+        # 이 시험에 연결된 학습 일정은 source와 무관하게 모두 소프트 삭제한다.
+        # (linked_exam_id가 있다는 것 자체가 이 시험을 위해 생성된 학습 일정이라는 의미)
         linked_study = db.query(Schedule).filter(
             Schedule.user_id == user_id,
             Schedule.linked_exam_id == eid,
-            Schedule.schedule_source == "ai_generated",
         ).all()
         cleaned = 0
         for ls in linked_study:

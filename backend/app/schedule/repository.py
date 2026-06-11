@@ -73,10 +73,17 @@ def update_exam(db: Session, exam: ExamSchedule, updates: dict) -> ExamSchedule:
 
 
 def delete_exam(db: Session, exam: ExamSchedule) -> int:
-    linked_count = db.query(Schedule).filter(Schedule.linked_exam_id == exam.id).delete(synchronize_session=False)
+    # 시험에 연결된 학습 일정은 소프트 삭제(deleted_by_user=True)로 숨긴다.
+    # AI 삭제 경로와 동작을 일치시키고, 완료된 학습 기록은 보존하기 위함.
+    linked = db.query(Schedule).filter(Schedule.linked_exam_id == exam.id).all()
+    cleaned = 0
+    for s in linked:
+        if not s.deleted_by_user:
+            s.deleted_by_user = True
+            cleaned += 1
     db.delete(exam)
     db.commit()
-    return linked_count
+    return cleaned
 
 
 # ── Event ─────────────────────────────────────────────────────────────────────
