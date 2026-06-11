@@ -508,6 +508,7 @@ export default function OnboardingPage() {
               end_time: sched.end_time,
               schedule_type: 'activity',
               schedule_source: 'user_created',
+              view_scope: 'all',
               ...(sched.is_recurring ? {} : { date: sched.date || undefined }),
               color: '#A855F7',
             });
@@ -592,6 +593,7 @@ export default function OnboardingPage() {
               end_time: sched.end_time,
               schedule_type: 'activity',
               schedule_source: 'user_created',
+              view_scope: 'all',
               ...(sched.is_recurring ? {} : { date: sched.date || undefined }),
               color: '#A855F7',
             });

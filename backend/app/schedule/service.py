@@ -109,17 +109,21 @@ def _check_no_conflict(
     exclude_id: int | None = None,
     date: str | None = None,
 ) -> None:
-    """시간이 겹치는 일정이 있으면 409.
+    """시간이 겹치는 '수업'이 있으면 409.
 
-    프론트엔드 충돌 검사와 동일한 규칙:
-      - 같은 요일이어야 충돌 후보.
-      - 새 일정과 기존 일정이 모두 '특정 날짜'면 날짜가 정확히 같을 때만 충돌
-        (다른 날짜의 같은 요일은 충돌 아님).
-      - 한쪽이라도 매주 반복이면 요일 일치만으로 충돌.
+    충돌 검사는 수업(class) 간 중복 예약을 막기 위한 것이다. 회의·동아리 등
+    개인 활동(activity)·자율학습(study)·과제/시험(assignment)·개인(personal)
+    일정은 수업과 겹쳐도 등록을 허용한다(호출부에서 수업일 때만 검사).
+
+    같은 요일에서만 충돌 후보로 보고, 양쪽이 모두 '특정 날짜'면 날짜가 정확히
+    같을 때만 충돌(다른 날짜의 같은 요일은 충돌 아님)로 판정한다.
     """
     existing = repository.get_schedules(db, user_id)
     for s in existing:
         if exclude_id is not None and s.id == exclude_id:
+            continue
+        # 수업끼리만 충돌 검사 (legacy로 type이 비어있으면 수업으로 간주)
+        if (s.schedule_type or "class") != "class":
             continue
         s_day = s.recurring_day.value if s.recurring_day else None
         if s_day != recurring_day:
@@ -139,8 +143,10 @@ def create_schedule(db: Session, user_id: int, data: ScheduleCreate) -> list[Sch
     created = []
     base = data.model_dump(exclude={"days", "day_of_week", "title", "color"})
 
+    is_class = (data.schedule_type or "class") == "class"
     for day in data.days:
-        _check_no_conflict(db, user_id, data.start_time, data.end_time, day, date=data.date)
+        if is_class:
+            _check_no_conflict(db, user_id, data.start_time, data.end_time, day, date=data.date)
         row_data = {**base, "recurring_day": DayOfWeek(day)}
         created.append(repository.create_schedule(db, user_id, row_data))
 
@@ -165,7 +171,8 @@ def update_schedule(db: Session, schedule_id: int, user_id: int, data: ScheduleU
         or new_end != schedule.end_time
         or new_day_str != (schedule.recurring_day.value if schedule.recurring_day else None)
     )
-    if time_changed and new_day_str:
+    new_type = updates.get("schedule_type", schedule.schedule_type) or "class"
+    if time_changed and new_day_str and new_type == "class":
         new_date = updates.get("date", schedule.date)
         _check_no_conflict(db, user_id, new_start, new_end, new_day_str, exclude_id=schedule.id, date=new_date)
 
