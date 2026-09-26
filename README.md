@@ -3,7 +3,7 @@
 > **"내 시간표를 AI가 이해하고, 함께 관리한다"**  
 > 단국대학교 2026 졸업작품 (1학기 캡스톤디자인에서 개발 → 2학기 졸업작품으로 고도화) · 최종 발표 11/27(금)
 
-**배포 주소:** 새 주소 준비 중 (2026-10-11 예정) · 1학기 배포본: https://capstone-design-2026-1.vercel.app
+**배포 주소:** https://skema-opal.vercel.app · API: https://backend-production-e565.up.railway.app/docs
 
 **개발 보드:** https://github.com/orgs/skema2026/projects/1
 
