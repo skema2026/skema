@@ -7,7 +7,7 @@ job 함수들은 APScheduler BackgroundScheduler 에서 주기적으로 호출�
 jobs:
   job_weekly_report    — 매주 월요일 08:00   주간 수행률 / 미완료 / 이번주 일정
   job_daily_motivation — 매일 09:00          동기부여 메시지
-  job_reminders        — 30분마다            일정 시작 전 / 미완료 재촉
+  job_reminders        — 5분마다             일정 시작 전 / 미완료 재촉 (수업 제외)
   job_exam_alert       — 매일 08:00          D-7 / D-3 / D-1 / D-day 시험 알림
   job_comparison       — 매주 월요일 08:00   사용자 평균 대비 비교 (기본 OFF)
 """
@@ -16,10 +16,46 @@ from __future__ import annotations
 import logging
 import random
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from app.core.time_utils import time_to_minutes
 
 logger = logging.getLogger(__name__)
+
+KST = ZoneInfo("Asia/Seoul")
+
+# 리마인더 확인 간격(분). 블록이 :00·:30에 시작하므로 30분 간격이면
+# 5·10·15분 전 알림 시점을 매번 지나친다. 사용자가 고를 수 있는 가장 짧은
+# 알림 시점(5분)과 맞춘다.
+REMINDER_INTERVAL_MINUTES = 5
+
+# 끝났는데 미완료여도 '미완료' 알림을 보내지 않는 일정 유형.
+# 수업은 매주 반복되고 완료 체크 대상이 아니라서 매일 알림이 쌓인다.
+_NO_INCOMPLETE_REMINDER_TYPES = {"class"}
+
+
+def _kst_today() -> date:
+    """한국 시간 기준 오늘. 서버(Railway)가 UTC여도 날짜가 어긋나지 않게."""
+    return datetime.now(KST).date()
+
+
+def _reminder_kind(schedule, now_min: int, reminder_min: int) -> tuple[str, int] | None:
+    """오늘 일정 하나에 대해 보낼 리마인더 종류를 정한다.
+
+    반환: ("start", 시작까지 남은 분) / ("incomplete", 0) / None
+    """
+    if schedule.is_completed:
+        return None
+
+    start_min = time_to_minutes(schedule.start_time)
+    end_min = time_to_minutes(schedule.end_time)
+    diff = (start_min - now_min) % 1440  # 시작까지 남은 분 (자정 넘김 고려)
+
+    if 0 < diff <= reminder_min:
+        return ("start", diff)
+    if end_min < now_min and schedule.schedule_type not in _NO_INCOMPLETE_REMINDER_TYPES:
+        return ("incomplete", 0)
+    return None
 
 _MOTIVATIONS = [
     ("오늘도 한 걸음씩!", "작은 실천이 쌓여 큰 변화가 됩니다. 오늘 계획을 지금 시작하세요."),
@@ -125,7 +161,7 @@ def job_weekly_report():
     db = _get_db()
     try:
         users = db.query(User).filter(User.is_active == True).all()  # noqa: E712
-        today = date.today()
+        today = _kst_today()
         last_mon = today - timedelta(days=today.weekday() + 7)
         last_sun = last_mon + timedelta(days=6)
         this_mon = today - timedelta(days=today.weekday())
@@ -182,14 +218,13 @@ def job_daily_motivation():
 
 
 def job_reminders():
-    """30분마다: 일정 시작 전 / 종료 후 미완료 알림."""
+    """5분마다: 일정 시작 전 / 종료 후 미완료 알림."""
     from app.auth.models import User
     from app.schedule.models import Schedule
 
     db = _get_db()
     try:
-        from zoneinfo import ZoneInfo
-        now = datetime.now(ZoneInfo("Asia/Seoul"))
+        now = datetime.now(KST)
         today_str = now.strftime("%Y-%m-%d")
         today_dow = now.weekday()  # 0=Mon, 6=Sun — Schedule.day_of_week와 동일 기준
         now_min = now.hour * 60 + now.minute
@@ -204,18 +239,18 @@ def job_reminders():
                 if not is_today:
                     continue
 
-                start_min = time_to_minutes(s.start_time)
-                end_min = time_to_minutes(s.end_time)
-                diff = (start_min - now_min) % 1440  # 시작까지 남은 분 (자정 넘김 고려)
+                kind = _reminder_kind(s, now_min, reminder_min)
+                if kind is None:
+                    continue
 
-                if 0 < diff <= reminder_min and not s.is_completed:
+                if kind[0] == "start":
                     _push(
                         db, user.id, "reminder_start",
                         f"곧 시작: {s.title}",
-                        f"{diff}분 후 [{s.start_time}~{s.end_time}] 일정이 시작됩니다.",
+                        f"{kind[1]}분 후 [{s.start_time}~{s.end_time}] 일정이 시작됩니다.",
                         related_id=s.id,
                     )
-                elif end_min < now_min and not s.is_completed:
+                else:
                     _push(
                         db, user.id, "reminder_incomplete",
                         f"미완료: {s.title}",
@@ -287,7 +322,7 @@ def job_comparison():
             logger.info("job_comparison: skipped (only %d user)", len(users))
             return
 
-        today = date.today()
+        today = _kst_today()
         last_mon = today - timedelta(days=today.weekday() + 7)
         last_sun = last_mon + timedelta(days=6)
 
@@ -384,7 +419,7 @@ def start_scheduler():
         _scheduler.add_job(job_comparison,       CronTrigger(day_of_week="mon", hour=8, minute=0))
         _scheduler.add_job(job_exam_alert,       CronTrigger(hour=8, minute=0))
         _scheduler.add_job(job_daily_motivation, CronTrigger(hour=9, minute=0))
-        _scheduler.add_job(job_reminders,        CronTrigger(minute="*/30"), misfire_grace_time=60)
+        _scheduler.add_job(job_reminders,        CronTrigger(minute=f"*/{REMINDER_INTERVAL_MINUTES}"), misfire_grace_time=60)
         _scheduler.add_job(job_flush_like_queue, CronTrigger(minute="*/5"),  misfire_grace_time=60)
 
         _scheduler.start()
