@@ -4,13 +4,15 @@ const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
   output: isProd ? "standalone" : undefined,
-  allowedDevOrigins: ['bba1-221-141-198-104.ngrok-free.app'],
+
   async rewrites() {
-    const internalUrl = process.env.INTERNAL_API_URL
-      || (isProd ? 'http://backend:8000' : 'http://localhost:8000');
+    const internalUrl =
+      process.env.INTERNAL_API_URL ||
+      (isProd ? "http://backend:8000" : "http://localhost:8000");
+
     return [
       {
-        source: '/proxy/:path*',
+        source: "/proxy/:path*",
         destination: `${internalUrl}/:path*`,
       },
     ];
