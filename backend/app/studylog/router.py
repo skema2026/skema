@@ -10,16 +10,17 @@ DELETE /study-logs/{id}            — 내 기록 삭제
 POST   /study-logs/{id}/reactions  — 이모지 반응 추가/토글
 """
 
+import logging
 import os
-import uuid
 from collections import Counter
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session, joinedload
+from starlette.concurrency import run_in_threadpool
 
 from app.auth.models import User
-from app.core.config import settings
+from app.core import storage
 from app.core.security import get_current_user, get_db
 from app.schedule.models import Schedule
 
@@ -29,23 +30,9 @@ from .streak import compute_streak
 
 router = APIRouter(prefix="/study-logs", tags=["study-logs"])
 
-UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "studylogs")
-ALLOWED_BASE_TYPES = {"video/webm", "video/mp4", "video/quicktime", "video/x-matroska"}
+logger = logging.getLogger(__name__)
+
 MAX_BYTES = 100 * 1024 * 1024  # 100 MB
-
-
-def _is_allowed_video(content_type: str) -> bool:
-    # MediaRecorder가 "video/webm;codecs=vp9" 형태로 보낼 수 있으므로 base type만 비교
-    base = content_type.split(";")[0].strip().lower()
-    return base in ALLOWED_BASE_TYPES
-
-
-def _ensure_upload_dir():
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-
-def _photo_url(photo_path: str) -> str:
-    return f"/uploads/studylogs/{os.path.basename(photo_path)}"
 
 
 def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = None) -> StudyLogOut:
@@ -66,7 +53,7 @@ def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = Non
         username=username,
         schedule_id=log.schedule_id,
         schedule_title=schedule_title_val,
-        photo_url=_photo_url(log.photo_path) if log.photo_path else None,
+        photo_url=storage.video_url(log.photo_path),
         caption=log.caption,
         is_public=log.is_public,
         created_at=log.created_at,
@@ -96,19 +83,26 @@ async def create_study_log(
         if not is_member:
             raise HTTPException(status_code=403, detail="해당 그룹의 멤버가 아닙니다.")
 
-    photo_path = None
+    photo_path = None  # DB에는 주소가 아니라 저장소 키(studylogs/<uuid>.<ext>)를 넣는다
     if video and video.filename:
-        if not _is_allowed_video(video.content_type or ""):
-            raise HTTPException(status_code=415, detail="webm/mp4 영상만 업로드 가능합니다.")
-        content = await video.read()
-        if len(content) > MAX_BYTES:
+        # 업로드 본문은 Starlette 이 이미 임시 파일로 받아 두었다. 통째로 메모리에 읽지 않고
+        # 앞부분만 확인하고, 크기는 파일 끝 위치로 잰다.
+        fobj = video.file
+        head = fobj.read(storage.SNIFF_BYTES)
+        try:
+            ext, stored_type = storage.validate_upload(video.content_type or "", video.filename, head)
+        except storage.InvalidVideo as e:
+            raise HTTPException(status_code=415, detail=str(e))
+        fobj.seek(0, os.SEEK_END)
+        size = fobj.tell()
+        if size > MAX_BYTES:
             raise HTTPException(status_code=413, detail="파일 크기는 100MB 이하여야 합니다.")
-        _ensure_upload_dir()
-        ext = video.filename.rsplit(".", 1)[-1] if "." in video.filename else "webm"
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        photo_path = os.path.join(UPLOAD_DIR, filename)
-        with open(photo_path, "wb") as f:
-            f.write(content)
+        photo_path = storage.new_key(ext)
+        try:
+            await run_in_threadpool(storage.save, fobj, photo_path, stored_type)
+        except Exception:  # noqa: BLE001
+            logger.exception("영상 저장 실패: %s", photo_path)
+            raise HTTPException(status_code=502, detail="영상 저장에 실패했습니다. 잠시 후 다시 시도해주세요.")
 
     if schedule_id:
         sched = db.query(Schedule).filter(Schedule.id == schedule_id, Schedule.user_id == current_user.id).first()
@@ -123,8 +117,13 @@ async def create_study_log(
         caption=caption[:200] if caption else None,
         is_public=False,
     )
-    db.add(log)
-    db.commit()
+    try:
+        db.add(log)
+        db.commit()
+    except Exception:
+        db.rollback()
+        storage.delete(photo_path)  # DB 저장이 실패하면 방금 올린 영상이 고아로 남지 않게 지운다
+        raise
     db.refresh(log)
     log.user  # trigger load
 
@@ -234,8 +233,7 @@ def delete_study_log(
     log = db.query(StudyLog).filter(StudyLog.id == log_id, StudyLog.user_id == current_user.id).first()
     if not log:
         raise HTTPException(status_code=404, detail="로그를 찾을 수 없습니다.")
-    if log.photo_path and os.path.exists(log.photo_path):
-        os.remove(log.photo_path)
+    storage.delete(log.photo_path)
     db.delete(log)
     db.commit()
 

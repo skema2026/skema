@@ -55,7 +55,33 @@ class Settings(BaseSettings):
     # Docker/Railway: /app/uploads, local: backend/uploads
     UPLOAD_DIR: str = str(_BACKEND_ROOT / "uploads")
 
+    # ── 영상 저장소 ───────────────────────────────────────────────────────────
+    # local: UPLOAD_DIR 폴더에 저장하고 /uploads 로 공개 (로컬 개발 기본값)
+    # r2   : Cloudflare R2 비공개 버킷에 저장하고, 응답마다 서명 주소(기본 1시간)를 만들어 준다
+    STORAGE: str = "local"
+    R2_ENDPOINT_URL: str = ""  # https://<계정ID>.r2.cloudflarestorage.com
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET: str = ""
+    R2_URL_EXPIRES_SECONDS: int = 3600
+
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    @model_validator(mode="after")
+    def _check_storage(self):
+        self.STORAGE = self.STORAGE.strip().lower()
+        if self.STORAGE not in ("local", "r2"):
+            raise ValueError(f"STORAGE 는 'local' 또는 'r2' 여야 합니다. (현재: {self.STORAGE!r})")
+        if self.STORAGE == "r2":
+            missing = [
+                name
+                for name in ("R2_ENDPOINT_URL", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET")
+                if not getattr(self, name)
+            ]
+            if missing:
+                # 설정이 빠진 채로 뜨면 업로드가 조용히 로컬 디스크로 가거나 나중에 터진다. 시작할 때 막는다.
+                raise ValueError(f"STORAGE=r2 인데 다음 환경변수가 비어 있습니다: {', '.join(missing)}")
+        return self
 
     @model_validator(mode="after")
     def _warn_insecure_defaults(self):
