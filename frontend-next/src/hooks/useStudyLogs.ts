@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { mediaUrl } from '@/lib/media';
 
 export type ReactionOut = { emoji: string; count: number };
 
@@ -24,8 +25,7 @@ export type FeedResponse = {
   has_next: boolean;
 };
 
-const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? '/proxy';
-export const photoUrl = (path: string) => `${BACKEND}${path}`;
+export const photoUrl = mediaUrl;
 
 // 피드
 export function useStudyFeed(offset = 0, limit = 20) {

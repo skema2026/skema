@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { isVideoUrl } from '@/lib/media';
 import {
   GroupFeedDay,
   GroupOut,
@@ -45,7 +46,6 @@ function StatusPill({
 
 const AVATAR_COLORS = ['#2563eb', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 function avatarColor(userId: number) { return AVATAR_COLORS[userId % AVATAR_COLORS.length]; }
-const isVideoUrl = (url: string) => /\.(webm|mp4|mov|mkv)$/i.test(url);
 
 // ── 그룹 만들기 / 참여 모달 ───────────────────────────────────────────────────
 
@@ -896,7 +896,7 @@ export default function LogPage() {
                           <div className="relative w-full overflow-hidden bg-slate-900" style={{ aspectRatio: '16/9' }}>
                             {isVideoUrl(log.photo_url) ? (
                               <video
-                                src={`${process.env.NEXT_PUBLIC_API_URL ?? '/proxy'}${log.photo_url}`}
+                                src={photoUrl(log.photo_url)}
                                 controls
                                 playsInline
                                 className="h-full w-full object-cover"
@@ -904,7 +904,7 @@ export default function LogPage() {
                               />
                             ) : (
                               <>
-                                <img src={`${process.env.NEXT_PUBLIC_API_URL ?? '/proxy'}${log.photo_url}`} alt="기록" className="h-full w-full object-cover" />
+                                <img src={photoUrl(log.photo_url)} alt="기록" className="h-full w-full object-cover" />
                                 {log.caption && (
                                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
                                     <p className="text-xs font-bold text-white line-clamp-2">{log.caption}</p>

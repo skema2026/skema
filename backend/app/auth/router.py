@@ -34,6 +34,7 @@ from app.auth.schemas import (
     UserUpdate,
 )
 from app.auth.service import OAUTH_CONFIGS
+from app.core import storage
 from app.core.config import settings
 from app.core.security import create_access_token, get_current_user, get_db, is_admin_email
 
@@ -208,7 +209,7 @@ def get_user_public_profile(
             {
                 "id": l.id,
                 "caption": l.caption,
-                "photo_url": f"/uploads/studylogs/{__import__('os').path.basename(l.photo_path)}" if l.photo_path else None,
+                "photo_url": storage.video_url(l.photo_path),
                 "created_at": l.created_at.isoformat(),
             }
             for l in logs
