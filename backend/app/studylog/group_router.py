@@ -10,7 +10,6 @@ DELETE /groups/{id}/leave    — 그룹 탈퇴
 GET    /groups/{id}/feed     — BeReal 스타일 피드 (날짜별 멤버×기록)
 """
 
-import os
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -19,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.models import User
+from app.core import storage
 from app.core.security import get_current_user, get_db
 from app.schedule.models import Schedule
 
@@ -29,10 +29,6 @@ router = APIRouter(prefix="/groups", tags=["groups"])
 
 KST = ZoneInfo("Asia/Seoul")
 UPLOAD_BASE = "/proxy"
-
-
-def _photo_url(path: str) -> str:
-    return f"/uploads/studylogs/{os.path.basename(path)}"
 
 
 def _is_member(db: Session, group_id: int, user_id: int) -> bool:
@@ -265,7 +261,7 @@ def get_group_feed(
                     slots.append(MemberSlot(
                         user_id=uid, username=uname,
                         log_id=log.id,
-                        photo_url=_photo_url(log.photo_path) if log.photo_path else None,
+                        photo_url=storage.video_url(log.photo_path),
                         caption=log.caption,
                         schedule_title=sched_map.get(log.schedule_id) if log.schedule_id else None,
                         created_at=log.created_at,

@@ -116,11 +116,14 @@ app.include_router(studylog_router)     # /study-logs/*
 app.include_router(group_router)        # /groups/*
 
 
-# 업로드 파일 정적 서빙
-import os as _os
-_os.makedirs(_os.path.join(settings.UPLOAD_DIR, "studylogs"), exist_ok=True)
-_os.makedirs(_os.path.join(settings.UPLOAD_DIR, "posts"), exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+# 업로드 파일 정적 서빙 — STORAGE=local 일 때만 (로그인 없이 열리므로 로컬 개발 전용).
+# STORAGE=r2 이면 영상은 비공개 버킷에 있고 서명 주소로만 재생된다.
+# (posts 이미지는 커뮤니티 기능이 현재 미노출이라 R2 대상에 넣지 않았다)
+if settings.STORAGE == "local":
+    import os as _os
+    _os.makedirs(_os.path.join(settings.UPLOAD_DIR, "studylogs"), exist_ok=True)
+    _os.makedirs(_os.path.join(settings.UPLOAD_DIR, "posts"), exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────
