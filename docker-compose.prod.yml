@@ -50,6 +50,12 @@ services:
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       BACKEND_URL: ${BACKEND_URL}
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      # 영상 저장소 (local | r2)
+      STORAGE: ${STORAGE:-local}
+      R2_ENDPOINT_URL: ${R2_ENDPOINT_URL:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}

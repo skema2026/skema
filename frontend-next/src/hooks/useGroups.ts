@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { mediaUrl } from '@/lib/media';
 
 export type GroupOut = {
   id: number;
@@ -37,8 +38,7 @@ export type GroupFeedDay = {
   slots: MemberSlot[];
 };
 
-const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? '/proxy';
-export const photoUrl = (path: string) => `${BACKEND}${path}`;
+export const photoUrl = mediaUrl;
 
 export function useMyGroups() {
   return useQuery({

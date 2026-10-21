@@ -23,3 +23,6 @@ pdfplumber>=0.10.0
 
 # Web Push
 pywebpush>=2.0.0
+
+# Cloudflare R2 (S3 호환) 영상 저장
+boto3>=1.34.0

@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { isVideoUrl, mediaUrl } from '@/lib/media';
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? '/proxy';
 
@@ -117,7 +118,11 @@ export default function PublicProfilePage() {
                       <div key={log.id} className="flex gap-0 overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
                         {log.photo_url && (
                           <div className="w-20 shrink-0 bg-slate-100" style={{ aspectRatio: '1/1' }}>
-                            <img src={`${BACKEND}${log.photo_url}`} alt="기록" className="h-full w-full object-cover" />
+                            {isVideoUrl(log.photo_url) ? (
+                              <video src={mediaUrl(log.photo_url)} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                            ) : (
+                              <img src={mediaUrl(log.photo_url)} alt="기록" className="h-full w-full object-cover" />
+                            )}
                           </div>
                         )}
                         <div className="flex flex-col justify-between px-3 py-2.5">
