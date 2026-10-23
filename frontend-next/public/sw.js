@@ -11,8 +11,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'SKEMA';
   const options = {
     body: payload.body || '',
-    icon: '/skema-icon.svg',
-    badge: '/skema-icon.svg',
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     data: { url: payload.url || '/dashboard' },
     vibrate: [200, 100, 200],
   };
