@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
 const NAV_ITEMS = [
@@ -112,7 +113,13 @@ export default function LandingPage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2" aria-label="SKEMA 홈">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2563eb] shadow-sm">
-              <MaterialIcon icon="schedule" size={18} color="#fff" filled />
+              <Image
+              src="/icon-192.png"
+              alt="SKEMA 로고"
+              width={36}
+              height={36}
+              className="rounded-lg"
+              />
             </span>
             <span className="skema-headline text-lg font-extrabold tracking-normal">SKEMA</span>
           </Link>

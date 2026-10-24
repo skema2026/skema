@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { toast } from 'sonner';
 import { useRegister } from '@/hooks/useAuth';
 import MaterialIcon from '@/components/common/MaterialIcon';
@@ -104,7 +105,7 @@ export default function RegisterPage() {
         .rp-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
         .rp-logo-box {
           width: 34px; height: 34px; border-radius: 9px;
-          background: #2563eb;
+          background: transparent;
           display: flex; align-items: center; justify-content: center;
           box-shadow: 0 10px 26px rgba(19,63,124,0.22);
         }
@@ -269,7 +270,13 @@ export default function RegisterPage() {
         <nav className="rp-nav">
           <Link href="/" className="rp-logo">
             <div className="rp-logo-box">
-              <MaterialIcon icon="schedule" size={18} color="#fff" />
+              <Image 
+              src="/icon-192.png"
+              alt="SKEMA 로고"
+              width={34}
+              height={34}
+              style={{ borderRadius: '9px' }}
+              />
             </div>
             <span className="rp-logo-text">SKEMA</span>
           </Link>
