@@ -13,6 +13,7 @@ import AiActions from './_components/DashboardSidebar/AiActions';
 import FreeTimeDialog from './_components/dialogs/FreeTimeDialog';
 import StudyBlockDialog from './_components/dialogs/StudyBlockDialog';
 import DeleteExamDialog from './_components/dialogs/DeleteExamDialog';
+import RescheduleDialog from './_components/dialogs/RescheduleDialog';
 import IssueDialog, { type IssueItem } from './_components/dialogs/IssueDialog';
 import StudyLogModal from './_components/StudyLogModal';
 import { ClassForm } from '@/components/class-form/ClassForm';
@@ -30,7 +31,7 @@ import { useStreak } from '@/hooks/useStudyLogs';
 import { useMyGroups } from '@/hooks/useGroups';
 import { minutesToTime, timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
-import { ExamSchedule, Schedule, UserProfile } from '@/types';
+import { ExamSchedule, ReschedulePreview, Schedule, UserProfile } from '@/types';
 import {
   Dialog,
   DialogContent,
@@ -175,6 +176,7 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   const [isEtaReimportOpen, setIsEtaReimportOpen] = useState(false);
   const [notification, setNotification] = useState<Schedule | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [reschedulePreview, setReschedulePreview] = useState<ReschedulePreview | null>(null);
   const [aiAction, setAiAction] = useState<string | null>(null);
   const [aiReview, setAiReview] = useState<{ title: string; reply: string } | null>(null);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
@@ -443,22 +445,18 @@ useEffect(() => {
     }
   };
 
+  /** 다시 짜기 (#11): 미리보기를 받아 확인 창을 띄운다. 적용은 RescheduleDialog에서. */
   const handleReschedule = async () => {
     setIsRegenerating(true);
     try {
-      const { data } = await api.post<{ moved: number; today_tasks: { id: number; title: string }[] }>(
-        '/schedules/collect-incomplete',
-      );
-      invalidateAll();
-      if (data.moved > 0) {
-        toast.success(`미완료 일정 ${data.moved}개를 오늘 할 일로 옮겼습니다`);
-      } else if (data.today_tasks.length > 0) {
-        toast.success(`오늘 할 일 ${data.today_tasks.length}개가 있습니다`);
-      } else {
-        toast.success('미완료 일정이 없습니다');
+      const { data } = await api.post<ReschedulePreview>('/reschedule/preview');
+      if (data.summary.target === 0) {
+        toast.success('다시 짤 일정이 없어요');
+        return;
       }
+      setReschedulePreview(data);
     } catch {
-      toast.error('오류가 발생했습니다');
+      toast.error('다시 짜기 미리보기를 불러오지 못했어요');
     } finally {
       setIsRegenerating(false);
     }
@@ -829,12 +827,18 @@ useEffect(() => {
         aiAction={aiAction}
         runAiCommand={runAiCommand}
       />
+      <RescheduleDialog
+        preview={reschedulePreview}
+        onPreviewChange={setReschedulePreview}
+        onApplied={invalidateAll}
+      />
+
       <StudyBlockDialog
         exam={examForStudyBlocks}
         onExamChange={setExamForStudyBlocks}
         getDaysUntil={getDaysUntil}
         aiAction={aiAction}
-        runAiCommand={runAiCommand}
+        onGenerated={invalidateAll}
         exams={exams}
         onDeleteExam={setExamToDelete}
       />
