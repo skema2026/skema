@@ -8,7 +8,7 @@ import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 import { normalizeTimeString } from '@/lib/utils';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import MaterialIcon from '@/components/common/MaterialIcon';
-import type { RecurringDay } from '@/types';
+import type { RecurringDay, StudyBlocksGenerateResult } from '@/types';
 
 type Phase = 'college-check' | 'eta-upload' | 'eta-review' | 'external-exam' | 'personal-schedule' | 'type-select' | 'sleep' | 'chat' | 'generating' | 'done';
 type Message = { role: 'ai' | 'user'; text: string };
@@ -515,58 +515,16 @@ export default function OnboardingPage() {
           } catch { /* 개별 일정 등록 실패 시 무시 */ }
         }
 
-        // 시험별 공부 블록 자동 생성
-        const toDateStr = (d: Date) =>
-          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const durationMin = Math.round(studyHoursPerSession * 60);
-        const endMin = 19 * 60 + durationMin;
-        const end_time = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
-
-        for (let ei = 0; ei < savedExamIds.length; ei++) {
-          const exam = externalExams[ei];
-          const examId = savedExamIds[ei];
-          if (!exam || !examId) continue;
-
-          const examDateObj = new Date(exam.date + 'T00:00:00');
-          // studyStartDays=0 → 오늘부터 시험 전날까지
-          const today = new Date(); today.setHours(0, 0, 0, 0);
-          const actualStartDays = studyStartDays === 0
-            ? Math.max(1, Math.ceil((examDateObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
-            : studyStartDays;
-          const candidateDays: string[] = [];
-          for (let d = actualStartDays; d >= 1; d--) {
-            const day = new Date(examDateObj);
-            day.setDate(examDateObj.getDate() - d);
-            candidateDays.push(toDateStr(day));
-          }
-
-          const chosenDays: string[] = [];
-          if (studyDaysPerWeek >= 7) {
-            chosenDays.push(...candidateDays);
-          } else {
-            for (let j = 0; j < candidateDays.length; j += 7) {
-              const week = candidateDays.slice(j, j + 7);
-              chosenDays.push(...week.slice(0, Math.min(studyDaysPerWeek, week.length)));
-            }
-          }
-
-          for (const dateStr of chosenDays) {
-            const jsDay = new Date(dateStr + 'T00:00:00').getDay();
-            const dow = jsDay === 0 ? 6 : jsDay - 1;
-            try {
-              await api.post('/schedules', {
-                title: `📖 ${exam.name} 준비`,
-                recurring_day: indexToRecurringDay(dow),
-                date: dateStr,
-                start_time: '19:00',
-                end_time,
-                schedule_type: 'study',
-                schedule_source: 'user_created',
-                linked_exam_id: examId,
-                color: '#059669',
-              });
-            } catch { /* ignore */ }
-          }
+        // 시험별 공부 블록 자동 생성 (#12): 시험 전날까지 빈 시간에 30분 단위로 서버가 배치
+        if (savedExamIds.length > 0) {
+          try {
+            await api.post<StudyBlocksGenerateResult>('/study-blocks/generate', {
+              exam_ids: savedExamIds,
+              start_days_before: studyStartDays,
+              days_per_week: studyDaysPerWeek,
+              minutes_per_day: Math.max(30, Math.round(studyHoursPerSession * 60)),
+            });
+          } catch { /* 공부 블록 배치 실패 시 온보딩은 계속 진행 */ }
         }
       } else {
         // 비대학생 온보딩: external-exam / personal-schedule 에서 입력한 상태 직접 저장
