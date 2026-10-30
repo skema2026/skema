@@ -324,3 +324,77 @@ class EventResponse(BaseModel):
     memo: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+# ── 다시 짜기 (#11) ───────────────────────────────────────────────────────────
+
+def _check_slot_time(v: str) -> str:
+    if not _TIME_RE.match(v):
+        raise ValueError("시간 형식은 HH:MM 이어야 합니다.")
+    _, m = map(int, v.split(":"))
+    if m not in (0, 30) and v != "23:59":
+        raise ValueError("시간은 30분 단위(:00, :30)여야 합니다.")
+    return v
+
+
+class RescheduleSegment(BaseModel):
+    date: str
+    start_time: str
+    end_time: str
+
+    @field_validator("date")
+    @classmethod
+    def _date(cls, v: str) -> str:
+        Date.fromisoformat(v)
+        return v
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def _time(cls, v: str) -> str:
+        return _check_slot_time(v)
+
+    @model_validator(mode="after")
+    def _order(self):
+        if self.end_time <= self.start_time:
+            raise ValueError("end_time은 start_time보다 늦어야 합니다.")
+        return self
+
+
+class RescheduleMove(BaseModel):
+    schedule_id: int
+    to: list[RescheduleSegment]
+
+
+class RescheduleApplyRequest(BaseModel):
+    moves: list[RescheduleMove]
+
+
+# ── 시험 공부 블록 배치 (#12) ──────────────────────────────────────────────────
+
+class StudyBlocksGenerateRequest(BaseModel):
+    exam_ids: list[int]
+    start_days_before: int = 14   # 0이면 오늘부터 시험 전날까지
+    days_per_week: int = 3
+    minutes_per_day: int = 120    # 30분 단위로 내림
+    replace: bool = True          # 이 시험들의 안 한 자동 블록을 지우고 다시 만듦
+
+    @field_validator("days_per_week")
+    @classmethod
+    def _dpw(cls, v: int) -> int:
+        if not 1 <= v <= 7:
+            raise ValueError("days_per_week는 1~7 이어야 합니다.")
+        return v
+
+    @field_validator("minutes_per_day")
+    @classmethod
+    def _mpd(cls, v: int) -> int:
+        if not 30 <= v <= 720:
+            raise ValueError("minutes_per_day는 30~720 이어야 합니다.")
+        return v
+
+    @field_validator("start_days_before")
+    @classmethod
+    def _sdb(cls, v: int) -> int:
+        if not 0 <= v <= 120:
+            raise ValueError("start_days_before는 0~120 이어야 합니다.")
+        return v
