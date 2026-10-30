@@ -5,13 +5,15 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.core.security import get_current_user, get_db
-from app.schedule import repository, service
+from app.schedule import repository, reschedule, service, study_blocks
 from app.schedule.models import Schedule
 from app.studylog.streak import record_check_in
 from app.schedule.schemas import (
     EventCreate, EventResponse, EventUpdate,
     ExamScheduleCreate, ExamScheduleResponse, ExamScheduleUpdate,
+    RescheduleApplyRequest,
     ScheduleCreate, ScheduleResponse, ScheduleUpdate,
+    StudyBlocksGenerateRequest,
 )
 
 router = APIRouter(tags=["schedules"])
@@ -69,12 +71,16 @@ def delete_schedule(
     service.delete_schedule(db, schedule_id, current_user.id)
 
 
-@router.post("/schedules/collect-incomplete", status_code=status.HTTP_200_OK)
+@router.post("/schedules/collect-incomplete", status_code=status.HTTP_200_OK, deprecated=True)
 def collect_incomplete_to_today(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """미완료된 과거 날짜 일정을 오늘 날짜로 이동하고, 오늘 일정 중 미완료된 것을 목록으로 반환."""
+    """미완료된 과거 날짜 일정을 오늘 날짜로 이동하고, 오늘 일정 중 미완료된 것을 목록으로 반환.
+
+    deprecated: POST /reschedule/preview → /reschedule/apply 로 대체 (#11).
+    프론트가 새 API로 바뀌면 지운다.
+    """
     today = str(date.today())
 
     past_incomplete = (
@@ -110,6 +116,46 @@ def collect_incomplete_to_today(
         "moved": moved,
         "today_tasks": [{"id": s.id, "title": s.course_name} for s in today_incomplete],
     }
+
+
+# ── 다시 짜기 (#11) ───────────────────────────────────────────────────────────
+
+@router.post("/reschedule/preview", status_code=status.HTTP_200_OK)
+def reschedule_preview(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """못 한 공부·과제 블록을 어디로 옮길지 계산만 한다(DB 안 바뀜)."""
+    return reschedule.preview(db, current_user.id)
+
+
+@router.post("/reschedule/apply", status_code=status.HTTP_200_OK)
+def reschedule_apply(
+    data: RescheduleApplyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """미리보기의 moves를 그대로 받아 적용. 전부 되거나 전부 안 된다."""
+    return reschedule.apply(db, current_user.id, data.moves)
+
+
+# ── 시험 공부 블록 배치 (#12) ──────────────────────────────────────────────────
+
+@router.post("/study-blocks/generate", status_code=status.HTTP_201_CREATED)
+def generate_study_blocks(
+    data: StudyBlocksGenerateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """시험 전날까지 빈 시간에 30분 단위 공부 블록을 넣는다."""
+    return study_blocks.generate(
+        db, current_user.id,
+        exam_ids=data.exam_ids,
+        start_days_before=data.start_days_before,
+        days_per_week=data.days_per_week,
+        minutes_per_day=data.minutes_per_day,
+        replace=data.replace,
+    )
 
 
 # ── 시험 일정 ─────────────────────────────────────────────────────────────────
