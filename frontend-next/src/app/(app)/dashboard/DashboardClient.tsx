@@ -716,6 +716,7 @@ useEffect(() => {
                 <UpcomingExams
                   exams={sidebarExams}
                   events={sidebarOneTimeEvents}
+                  schedules={schedules}
                   getDaysUntil={getDaysUntil}
                   onExamClick={(exam) =>
                     setExamForStudyBlocks({
