@@ -23,6 +23,62 @@ export type Schedule = {
   original_generated_title?: string | null;
 };
 
+// 다시 짜기 (#11) — POST /reschedule/preview, /reschedule/apply
+export type RescheduleSegment = {
+  date: string; // YYYY-MM-DD
+  start_time: string; // HH:MM
+  end_time: string; // HH:MM
+};
+
+export type RescheduleMove = {
+  schedule_id: number;
+  title: string;
+  schedule_type: Schedule['schedule_type'];
+  linked_exam_id: number | null;
+  deadline: string;
+  from: RescheduleSegment;
+  to: RescheduleSegment[];
+};
+
+export type RescheduleUnplaced = {
+  schedule_id: number;
+  title: string;
+  deadline: string;
+  minutes: number;
+  reason: 'NO_SLOT' | 'DEADLINE_PASSED';
+};
+
+export type ReschedulePreview = {
+  generated_at: string;
+  moves: RescheduleMove[];
+  unplaced: RescheduleUnplaced[];
+  warning: string | null;
+  summary: { target: number; placed: number; unplaced: number };
+};
+
+export type RescheduleApplyResult = {
+  applied: number;
+  updated_ids: number[];
+  created_ids: number[];
+};
+
+// 시험 공부 블록 배치 (#12) — POST /study-blocks/generate
+export type StudyBlocksGenerateRequest = {
+  exam_ids: number[];
+  start_days_before?: number; // 0이면 오늘부터
+  days_per_week?: number; // 1~7
+  minutes_per_day?: number; // 30~720
+  replace?: boolean;
+};
+
+export type StudyBlocksGenerateResult = {
+  created: number;
+  removed: number;
+  blocks: { schedule_id: number; exam_id: number; title: string; date: string; start_time: string; end_time: string }[];
+  exams: { exam_id: number; title: string; planned_minutes: number; placed_minutes: number; block_count: number }[];
+  warning: string | null;
+};
+
 export type UserProfile = {
   id: number;
   user_id: number;

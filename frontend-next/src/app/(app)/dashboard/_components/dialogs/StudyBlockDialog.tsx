@@ -1,20 +1,22 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
+import { api } from '@/lib/api';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { ExamSchedule } from '@/types';
+import type { ExamSchedule, StudyBlocksGenerateResult } from '@/types';
 
 type StudyBlockDialogProps = {
   exam: Pick<ExamSchedule, 'id' | 'title' | 'exam_date'> | null;
   onExamChange: (exam: null) => void;
   getDaysUntil: (date: string) => number;
   aiAction: string | null;
-  runAiCommand: (action: string, prompt: string, successMessage: string) => Promise<void>;
+  onGenerated: () => void;
   exams: ExamSchedule[];
   onDeleteExam: (exam: ExamSchedule | null) => void;
 };
@@ -24,11 +26,40 @@ export default function StudyBlockDialog({
   onExamChange,
   getDaysUntil,
   aiAction,
-  runAiCommand,
+  onGenerated,
   exams,
   onDeleteExam,
 }: StudyBlockDialogProps) {
   const [studyHoursPerDay, setStudyHoursPerDay] = useState(2);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const busy = aiAction !== null || isGenerating;
+
+  /** 시험 전날까지 빈 시간에 30분 단위로 배치 (#12). AI 없이 서버 규칙으로. */
+  const generate = async (examId: number) => {
+    setIsGenerating(true);
+    try {
+      const { data } = await api.post<StudyBlocksGenerateResult>('/study-blocks/generate', {
+        exam_ids: [examId],
+        start_days_before: 0,
+        days_per_week: 7,
+        minutes_per_day: studyHoursPerDay * 60,
+        replace: true,
+      });
+      onGenerated();
+      if (data.created === 0) {
+        toast.error('시험 전날까지 빈 시간이 없어서 배치하지 못했어요');
+      } else if (data.warning) {
+        toast.success(`공부 블록 ${data.created}개를 배치했어요 (자리가 부족해 일부만 들어갔어요)`);
+      } else {
+        toast.success(`공부 블록 ${data.created}개를 배치했어요`);
+      }
+      onExamChange(null);
+    } catch {
+      toast.error('공부 일정을 배치하지 못했어요');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <Dialog open={!!exam} onOpenChange={(open) => { if (!open) onExamChange(null); }}>
@@ -65,21 +96,14 @@ export default function StudyBlockDialog({
             </div>
             <button
               type="button"
-              onClick={() => {
-                onExamChange(null);
-                void runAiCommand(
-                  'study-blocks',
-                  `${exam.title} 시험(${exam.exam_date}) 공부 일정을 다시 배치해줘. 이 시험을 위해 기존에 배치된 미완료 공부 블록이 있으면 모두 삭제하고, 남은 기간 동안 하루 ${studyHoursPerDay}시간씩 빈 시간에 새로 배치해줘. 기존 일정과 충돌하지 않는 시간대에 두고, 시험일에 가까울수록 더 집중되게 해줘.`,
-                  '공부 일정을 새로 배치했습니다',
-                );
-              }}
-              disabled={aiAction !== null}
+              onClick={() => void generate(exam.id)}
+              disabled={busy}
               className="w-full rounded-lg bg-blue-600 py-3 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
             >
-              {aiAction === 'study-blocks' ? '배치 중...' : '공부 일정 배치하기'}
+              {isGenerating ? '배치 중...' : '공부 일정 배치하기'}
             </button>
             <p className="text-center text-[11px] font-bold text-slate-400">
-              이미 배치한 공부 일정은 자동으로 지우고 새로 만듭니다.
+              시험 전날까지 빈 시간에 30분 단위로 넣어요. 아직 안 한 자동 배치 블록은 지우고 새로 만듭니다.
             </p>
             <button
               type="button"
@@ -88,7 +112,7 @@ export default function StudyBlockDialog({
                 onExamChange(null);
                 onDeleteExam(fullExam);
               }}
-              disabled={aiAction !== null}
+              disabled={busy}
               className="w-full rounded-lg border border-red-200 py-2.5 text-sm font-black text-red-600 transition hover:bg-red-50 disabled:opacity-50"
             >
               시험 삭제

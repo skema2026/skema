@@ -208,6 +208,16 @@ export function DashboardHeader({
 
         <button
           type="button"
+          onClick={onReschedule}
+          disabled={isRegenerating}
+          title="못 한 공부·과제 블록을 시험 전날까지 빈 시간에 다시 배치"
+          className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100 disabled:opacity-50"
+        >
+          <MaterialIcon icon="edit_calendar" size={16} color="#2563eb" />
+          <span className="hide-mobile">{isRegenerating ? '계산 중...' : '다시 짜기'}</span>
+        </button>
+        <button
+          type="button"
           onClick={onUploadTimetable}
           title="시간표 업로드"
           className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100"
