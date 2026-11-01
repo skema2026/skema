@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.schedule.free_slots import SLOT_MINUTES, fmt, kst_now, load_free_slots, merge_slots
+from app.schedule.free_slots import SLOT_MINUTES, by_preference, fmt, kst_now, load_free_slots, merge_slots
 from app.schedule.models import DayOfWeek, ExamSchedule, INT_TO_DAY, Schedule
 
 STUDY_COLOR = "#059669"
@@ -86,7 +86,8 @@ def plan_study_blocks(
         placed = 0
         count = 0
         for d in chosen:
-            take = free.get(d, [])[:per_day]
+            # 저녁 → 오후 → 오전 순으로 하루 목표만큼 (11/2 결정: 저녁 우선)
+            take = by_preference(free.get(d, []))[:per_day]
             for s in take:
                 free[d].remove(s)
             for s, e in merge_slots(take):

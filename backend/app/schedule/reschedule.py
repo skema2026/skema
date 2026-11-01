@@ -3,6 +3,7 @@
 1. 대상: 시작 시간이 지났는데 완료 안 된 공부·과제 블록
 2. 수업·시험·개인 일정은 움직이지 않음
 3. 지금 이후 빈 시간을 30분 칸으로 채움. 수면 시간 제외, 여유 시간 없음
+   같은 날 안에서는 저녁 → 오후 → 오전 순 (11/2 결정, free_slots.by_preference)
 4. 블록 길이 30분 단위
 5. 시험·마감이 가까운 블록부터
 6. 오늘부터 시험 전날까지. 안 들어가면 "자리가 부족해요"
@@ -23,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.core.time_utils import time_to_minutes
 from app.schedule.free_slots import (
     SLOT_MINUTES,
+    by_preference,
     ceil_to_slot,
     fmt,
     kst_now,
@@ -70,12 +72,15 @@ def block_minutes(start: str, end: str) -> int:
 
 
 def _take_slots(free: dict[date, list[int]], deadline: date, need: int, split: bool) -> list[tuple[date, int]] | None:
-    """deadline까지의 빈 칸에서 need개를 앞에서부터 고른다. 모자라면 None."""
+    """deadline까지의 빈 칸에서 need개를 고른다. 모자라면 None.
+
+    가까운 날부터, 같은 날 안에서는 저녁 → 오후 → 오전 순(by_preference)으로 고른다.
+    """
     days = sorted(d for d in free if d <= deadline)
     if split:
         picked: list[tuple[date, int]] = []
         for d in days:
-            for s in free[d]:
+            for s in by_preference(free[d]):
                 picked.append((d, s))
                 if len(picked) == need:
                     return picked

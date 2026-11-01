@@ -51,3 +51,15 @@ def test_load_free_slots_uses_classes_exams_and_now(db, user):
     tue = free[TODAY + timedelta(days=1)]
     assert t("09:00") not in tue and t("10:30") not in tue and t("11:00") in tue
     assert t("07:00") in tue  # 다음 날은 기상 시각부터
+
+
+def test_by_preference_evening_then_afternoon_then_morning_then_late_night():
+    from app.schedule.free_slots import by_preference
+
+    starts = [t("00:30"), t("07:00"), t("09:30"), t("14:00"), t("18:30"), t("19:00"), t("22:30")]
+    assert by_preference(starts) == [
+        t("19:00"), t("22:30"),  # 저녁 (이른 칸부터)
+        t("14:00"), t("18:30"),  # 오후
+        t("07:00"), t("09:30"),  # 오전
+        t("00:30"),              # 자정 넘은 새벽은 맨 뒤
+    ]

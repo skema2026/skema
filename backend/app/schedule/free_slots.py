@@ -107,6 +107,31 @@ def free_slot_starts(
     return sorted(starts)
 
 
+# 공부 블록을 넣을 때 칸을 고르는 순서 (11/2 결정: 저녁 우선).
+# 빈 칸을 아침부터 채우면 수업 없는 날은 기상 직후(07:00)부터 공부가 잡혀서,
+# 대학생이 실제로 공부하는 저녁 → 오후 → 오전 → 자정 넘은 새벽 순으로 고른다.
+# 같은 구간 안에서는 이른 칸부터라서 저녁 블록은 19:00부터 이어 붙는다.
+PREFERENCE_BANDS: list[tuple[int, int]] = [
+    (19 * 60, DAY_MINUTES),  # 저녁 19:00~24:00
+    (13 * 60, 19 * 60),      # 오후 13:00~19:00
+    (5 * 60, 13 * 60),       # 오전 05:00~13:00
+    (0, 5 * 60),             # 자정 넘은 새벽 00:00~05:00 (늦게 자는 사람만 해당)
+]
+
+
+def preference_rank(minute: int) -> tuple[int, int]:
+    """칸을 고를 때의 우선순위 키. 작을수록 먼저 고른다."""
+    for rank, (start, end) in enumerate(PREFERENCE_BANDS):
+        if start <= minute < end:
+            return (rank, minute)
+    return (len(PREFERENCE_BANDS), minute)
+
+
+def by_preference(starts: list[int]) -> list[int]:
+    """빈 칸 시작 시각들을 저녁 → 오후 → 오전 → 새벽 순으로 정렬한다."""
+    return sorted(starts, key=preference_rank)
+
+
 def merge_slots(starts: list[int]) -> list[Interval]:
     """붙어 있는 30분 칸을 한 덩어리로 묶는다. [600, 630, 720] → [(600, 660), (720, 750)]"""
     segments: list[Interval] = []
