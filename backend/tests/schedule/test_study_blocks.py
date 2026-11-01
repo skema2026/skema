@@ -97,3 +97,21 @@ def test_unknown_exam_404(db, user):
     with pytest.raises(HTTPException) as e:
         study_blocks.generate(db, user.id, [999], 14, 3, 120, now=NOW)
     assert e.value.status_code == 404
+
+
+def test_study_blocks_prefer_evening_on_free_day():
+    """수업 없는 날 하루 2시간 → 07:00이 아니라 19:00~21:00."""
+    d = TODAY + timedelta(days=1)
+    free = {d: [t("07:00") + 30 * k for k in range(32)]}  # 07:00~22:30 전부 빔
+    blocks, _ = plan_study_blocks([ExamIn(1, "자료구조", TODAY + timedelta(days=2))], free, TODAY, 1, 7, 120)
+    assert [(b["date"], b["start_time"], b["end_time"]) for b in blocks] == [(d.isoformat(), "19:00", "21:00")]
+
+
+def test_study_blocks_after_evening_class_use_late_evening_then_afternoon():
+    """저녁 수업(19:00~21:00)이 있으면 21:00 이후 → 모자라면 오후."""
+    d = TODAY + timedelta(days=1)
+    evening_free = [t("21:00"), t("21:30"), t("22:00"), t("22:30")]
+    afternoon_free = [t("13:00") + 30 * k for k in range(12)]  # 13:00~18:30
+    free = {d: afternoon_free + evening_free}
+    blocks, _ = plan_study_blocks([ExamIn(1, "운영체제", TODAY + timedelta(days=2))], free, TODAY, 1, 7, 180)
+    assert [(b["start_time"], b["end_time"]) for b in blocks] == [("13:00", "14:00"), ("21:00", "23:00")]
