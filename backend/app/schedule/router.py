@@ -1,12 +1,9 @@
-from datetime import date
-
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.core.security import get_current_user, get_db
 from app.schedule import repository, reschedule, service, study_blocks
-from app.schedule.models import Schedule
 from app.studylog.streak import record_check_in
 from app.schedule.schemas import (
     EventCreate, EventResponse, EventUpdate,
@@ -69,53 +66,6 @@ def delete_schedule(
     current_user: User = Depends(get_current_user),
 ):
     service.delete_schedule(db, schedule_id, current_user.id)
-
-
-@router.post("/schedules/collect-incomplete", status_code=status.HTTP_200_OK, deprecated=True)
-def collect_incomplete_to_today(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """미완료된 과거 날짜 일정을 오늘 날짜로 이동하고, 오늘 일정 중 미완료된 것을 목록으로 반환.
-
-    deprecated: POST /reschedule/preview → /reschedule/apply 로 대체 (#11).
-    프론트가 새 API로 바뀌면 지운다.
-    """
-    today = str(date.today())
-
-    past_incomplete = (
-        db.query(Schedule)
-        .filter(
-            Schedule.user_id == current_user.id,
-            Schedule.is_completed == False,
-            Schedule.date.isnot(None),
-            Schedule.date < today,
-        )
-        .all()
-    )
-
-    moved = 0
-    for s in past_incomplete:
-        s.date = today
-        moved += 1
-
-    if moved:
-        db.commit()
-
-    today_incomplete = (
-        db.query(Schedule)
-        .filter(
-            Schedule.user_id == current_user.id,
-            Schedule.is_completed == False,
-            Schedule.date == today,
-        )
-        .all()
-    )
-
-    return {
-        "moved": moved,
-        "today_tasks": [{"id": s.id, "title": s.course_name} for s in today_incomplete],
-    }
 
 
 # ── 다시 짜기 (#11) ───────────────────────────────────────────────────────────

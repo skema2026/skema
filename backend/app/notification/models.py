@@ -28,7 +28,7 @@ class LikeNotificationQueue(Base):
     id             = Column(Integer, primary_key=True, autoincrement=True)
     target_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     liker_name     = Column(String(100), nullable=False)
-    content_type   = Column(String(10), nullable=False)   # 'post' | 'log'
+    content_type   = Column(String(10), nullable=False)   # 'log' (예전 'post'는 커뮤니티 제거로 안 씀)
     content_id     = Column(Integer, nullable=False)
     queued_at      = Column(DateTime, nullable=False, default=datetime.utcnow)
 

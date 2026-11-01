@@ -54,7 +54,7 @@ SKEMA는 대학생의 시간표 관리 문제를 AI로 해결하는 웹 애플�
 - 이메일·비밀번호 회원가입 / 로그인
 - 카카오·Google·Naver OAuth 소셜 로그인
 - 온보딩 (사용자 유형, 수면 시간, 에타 시간표 파싱)
-- 타 사용자 프로필 조회 (스트릭·기록·게시글)
+- 타 사용자 프로필 조회 (스트릭·기록)
 
 ---
 
@@ -181,7 +181,7 @@ npm run dev
 | 013 | study_log photo_path nullable |
 | 014 | study_groups, study_group_members, study_log group_id |
 | 015 | study_groups description |
-| 016 | posts, post_likes (커뮤니티 — 현재 미노출) |
+| 016 | posts, post_likes (커뮤니티 — 11/2 코드에서 제거, DB 테이블만 남아 있음) |
 | 017 | like_notification_queue (좋아요 배치 알림) |
 | 018 | study_logs is_public 복구 |
 
