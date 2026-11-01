@@ -167,7 +167,6 @@ def get_user_public_profile(
     """타 사용자의 공개 프로필 반환.
 
     - 기본 정보 (username, 가입일)
-    - 커뮤니티 게시글 목록 (최신 10개)
     - 글로벌 공개 기록 목록 (최신 10개, 그룹 기록 제외)
     - 현재/최장 스트릭
     """
@@ -177,8 +176,6 @@ def get_user_public_profile(
     target = db.query(User).filter(User.id == user_id, User.is_active == True).first()  # noqa: E712
     if not target:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-
-    posts = []
 
     logs = (
         db.query(StudyLog)
@@ -195,16 +192,6 @@ def get_user_public_profile(
         "username": target.username,
         "joined_at": target.created_at.isoformat() if hasattr(target, "created_at") and target.created_at else None,
         "streak": streak,
-        "posts": [
-            {
-                "id": p.id,
-                "content": p.content,
-                "image_url": f"/uploads/posts/{__import__('os').path.basename(p.image_url)}" if p.image_url else None,
-                "likes_count": len(p.likes),
-                "created_at": p.created_at.isoformat(),
-            }
-            for p in posts
-        ],
         "logs": [
             {
                 "id": l.id,
