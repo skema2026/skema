@@ -6,7 +6,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libglib2.0-0 \
     libgl1 \
+    tesseract-ocr \
+    curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# 시간표 글자 인식 모델 (운영 Dockerfile과 같은 tessdata_best 4.1.0)
+# 블록을 4개씩 병렬로 읽으므로 Tesseract 내부 스레드는 1개로 (CPU 과부하 방지)
+ENV ETA_TESSDATA_DIR=/opt/tessdata \
+    OMP_THREAD_LIMIT=1
+RUN mkdir -p /opt/tessdata \
+    && curl -fsSL -o /opt/tessdata/kor.traineddata https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/4.1.0/kor.traineddata \
+    && curl -fsSL -o /opt/tessdata/eng.traineddata https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/4.1.0/eng.traineddata
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

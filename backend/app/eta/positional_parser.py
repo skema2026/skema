@@ -32,6 +32,23 @@ def _load_image(image_bytes: bytes) -> np.ndarray:
     return img
 
 
+DARK_MEAN_THRESHOLD = 110
+
+
+def _to_light_gray(img: np.ndarray) -> np.ndarray:
+    """격자 선 찾기용 흑백 이미지. 다크 모드 캡처면 밝게 뒤집는다.
+
+    에브리타임 다크 모드는 검은 바탕(#111)에 어두운 회색 선(#2a)이라, 흰 바탕·연회색 선을
+    가정한 선 찾기가 전부 실패했다(11/4 확인: 모든 수업이 1시간 일찍 잡힘).
+    뒤집으면 바탕 #ee, 선 #d5가 되어 라이트 모드와 같은 기준으로 찾을 수 있다.
+    블록 색 판별(채도)은 원본 컬러로 하므로 여기에 영향받지 않는다.
+    """
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    if float(gray.mean()) < DARK_MEAN_THRESHOLD:
+        gray = 255 - gray
+    return gray
+
+
 def _cluster_line_positions(positions: list[int], min_gap: int = 5) -> list[tuple[int, int]]:
     """연속된 픽셀 위치들을 클러스터(start, end)로 묶는다."""
     if not positions:
@@ -115,9 +132,20 @@ def _detect_gutter_x(v_proj: np.ndarray, w: int) -> int:
     # 에브리타임 격자는 보통 시간 거터 오른쪽 경계가 전체 폭의 10~18%에 있다.
     # 일부 캡처에는 왼쪽 외곽선이 없어서 첫 번째 강한 세로선이 곧 gutter이고,
     # 일부 캡처에는 x≈0 외곽선이 먼저 잡혀 두 번째 선이 gutter다.
+    #
+    # 11/4: 예전에는 "첫 선이 폭의 6% 안이면 외곽선"으로 봤는데, 시간칸이 좁은
+    # 안드로이드형 캡처(시간칸 오른쪽 선이 4% 위치)에서 진짜 시간칸 선을 건너뛰고
+    # 월/화 경계를 시간칸으로 잡았다. 그래서 위치 대신 '폭'으로 판단한다:
+    # 첫 선~둘째 선 사이가 요일 칸보다 훨씬 좁으면(시간 숫자 칸) 첫 선은 외곽선이다.
     centers = [((c[0] + c[1]) / 2, c) for c in clusters]
-    if len(centers) >= 2 and centers[0][0] <= w * 0.06:
-        # 왼쪽 외곽선이 먼저 잡힌 케이스.
+    full_clusters = _cluster_line_positions(
+        [x for x, val in enumerate(v_proj) if val >= thresh]
+    )
+    full_centers = [(a + b) / 2 for a, b in full_clusters]
+    day_gaps = np.diff(full_centers[1:]) if len(full_centers) >= 3 else np.array([])
+    day_w = float(np.median(day_gaps)) if day_gaps.size else (w * 0.85 / 5)
+    if len(centers) >= 2 and centers[0][0] <= w * 0.06 and (centers[1][0] - centers[0][0]) < 0.6 * day_w:
+        # 왼쪽 외곽선이 먼저 잡히고, 그 오른쪽이 좁은 시간 숫자 칸인 케이스.
         gutter_cluster = centers[1][1]
     else:
         # 왼쪽 외곽선이 없으면 첫 번째 강한 선이 시간칸/월요일 경계다.
@@ -233,8 +261,11 @@ def _detect_time_lines_from_gutter(gray: np.ndarray, gutter_x: int) -> list[int]
     if roi.size == 0:
         return []
 
-    # 흰 배경/검은 시간 텍스트를 제외하고 연한 회색 그리드 선만 집계한다.
-    lineish = (roi < 245) & (roi > 180)
+    # 배경/진한 시간 텍스트를 제외하고 배경보다 조금 어두운 그리드 선만 집계한다.
+    # 예전에는 '흰 배경(255)'을 가정해 180~245로 고정했는데, 다크 모드를 뒤집으면 배경이
+    # 235쯤이라 배경 전체가 선으로 잡혔다(11/4). 그래서 이 이미지의 배경 밝기 기준으로 잡는다.
+    bg = float(np.median(roi))
+    lineish = (roi < bg - 12) & (roi > bg - 90)
     scores = lineish.mean(axis=1)
     ys = [int(y) for y, val in enumerate(scores) if val >= 0.55]
     clusters = _cluster_line_positions(ys, min_gap=2)
@@ -281,7 +312,7 @@ def detect_grid(image_bytes: bytes) -> GridModel:
     img = _load_image(image_bytes)
     h, w = img.shape[:2]
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = _to_light_gray(img)
     thr = cv2.adaptiveThreshold(
         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 31, 7
     )
@@ -569,6 +600,45 @@ def _merge_blocks(raw: list[DetectedBlock], step: float) -> list[DetectedBlock]:
     return merged
 
 
+def _row_occupancy(hsv: np.ndarray, y: int, sx0: int, sx1: int) -> float:
+    row = hsv[y, sx0:sx1]
+    if row.size == 0:
+        return 0.0
+    return float(np.mean((row[:, 1] >= 9) & (row[:, 2] >= 120)))
+
+
+def _refine_block_edges(
+    hsv: np.ndarray,
+    sx0: int,
+    sx1: int,
+    by0: int,
+    by1: int,
+    pps: float,
+    *,
+    refine_top: bool,
+    refine_bottom: bool,
+) -> tuple[int, int]:
+    """30분 칸 단위로 찾은 블록의 위/아래 경계를 실제 색 경계(픽셀)로 다듬는다.
+
+    칸 경계 ±0.6칸 안에서 '색이 칠해진 줄'이 시작/끝나는 y를 찾는다. 못 찾으면 원래 값.
+    """
+    h = hsv.shape[0]
+    win = max(3, int(pps * 0.6))
+    if refine_top:
+        lo, hi = max(0, by0 - win), min(h - 1, by0 + win)
+        for y in range(lo, hi):
+            if all(_row_occupancy(hsv, yy, sx0, sx1) >= 0.5 for yy in range(y, min(h, y + 3))):
+                by0 = y
+                break
+    if refine_bottom:
+        lo, hi = max(0, by1 - win), min(h - 1, by1 + win)
+        for y in range(hi, lo, -1):
+            if all(_row_occupancy(hsv, yy, sx0, sx1) >= 0.5 for yy in range(max(0, y - 2), y + 1)):
+                by1 = y + 1
+                break
+    return by0, by1
+
+
 def detect_blocks(image_bytes: bytes, grid: GridModel) -> list[DetectedBlock]:
     """
     색상/텍스트 영역을 기반으로 수업 블록을 감지한다.
@@ -649,6 +719,15 @@ def detect_blocks(image_bytes: bytes, grid: GridModel) -> list[DetectedBlock]:
                     if run_end - run_start >= 1:
                         by0 = int(grid.grid_origin_y + run_start * grid.pixels_per_slot)
                         by1 = int(grid.grid_origin_y + run_end * grid.pixels_per_slot)
+                        # 배경과 맞닿은 위/아래 경계는 픽셀 단위로 다시 찾는다
+                        # (에타 50분 수업 18:50이 30분 칸에 맞춰 18:30/19:00으로 나오던 문제).
+                        # 다른 색 블록과 바로 붙어 있는 경계는 칸 경계를 그대로 쓴다.
+                        top_open = run_start == 0 or not occupied[run_start - 1]
+                        bottom_open = not is_occ
+                        by0, by1 = _refine_block_edges(
+                            hsv, x0 + 8, x1 - 8, by0, by1, grid.pixels_per_slot,
+                            refine_top=top_open, refine_bottom=bottom_open,
+                        )
                         bx0, bx1 = x0 + 1, x1 - 1
                         slot_blocks.append(DetectedBlock(
                             bbox=(bx0, by0, bx1, by1),
@@ -801,6 +880,17 @@ def _px_to_slot(y: int, grid: GridModel) -> int:
     return _snap_to_row(y, grid.row_bounds)
 
 
+TIME_ROUND_MINUTES = 5
+
+
+def _px_to_time(y: int, grid: GridModel) -> str:
+    """y 픽셀 → "HH:MM" (9:00 기준, 5분 단위 반올림)."""
+    minutes = 9 * 60 + (y - grid.grid_origin_y) / grid.pixels_per_slot * 30
+    minutes = int(round(minutes / TIME_ROUND_MINUTES) * TIME_ROUND_MINUTES)
+    minutes = max(0, min(23 * 60 + 55, minutes))
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
 def _height_to_slots(top_y: int, bottom_y: int, grid: GridModel) -> int:
     """block_height / pixels_per_slot → slot 수 (최소 1)."""
     if grid.pixels_per_slot > 0:
@@ -812,12 +902,22 @@ def infer_weekday_time(block: DetectedBlock, grid: GridModel) -> tuple[int, str,
     raw_col_idx = _column_for_x(block.center_x, grid.column_bounds)
     day_idx = max(0, min(6, raw_col_idx - 1))
 
-    start_slot    = _px_to_slot(block.top_y, grid)
-    duration_slots = _height_to_slots(block.top_y, block.bottom_y, grid)
-    end_slot      = start_slot + duration_slots
-
-    start_time = slot_to_time(start_slot)
-    end_time   = slot_to_time(end_slot)
+    if grid.pixels_per_slot > 0:
+        # 11/4: 30분 칸이 아니라 실제 픽셀 위치로 계산하고 5분 단위로 반올림한다.
+        # (에타는 50분 수업이 많아 16:00~18:50 같은 시간이 흔함)
+        start_time = _px_to_time(block.top_y, grid)
+        end_time = _px_to_time(block.bottom_y, grid)
+        start_slot = _px_to_slot(block.top_y, grid)
+        duration_slots = _height_to_slots(block.top_y, block.bottom_y, grid)
+        end_slot = start_slot + duration_slots
+        if end_time <= start_time:
+            end_time = slot_to_time(end_slot)
+    else:
+        start_slot    = _px_to_slot(block.top_y, grid)
+        duration_slots = _height_to_slots(block.top_y, block.bottom_y, grid)
+        end_slot      = start_slot + duration_slots
+        start_time = slot_to_time(start_slot)
+        end_time   = slot_to_time(end_slot)
 
     logger.debug(
         "infer_weekday_time: dow=%d top_y=%d→slot%d(%s) h=%dpx→%dslots end_slot%d(%s)",
