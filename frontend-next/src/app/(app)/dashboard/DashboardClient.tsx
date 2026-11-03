@@ -1,73 +1,76 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { getWeekStart } from '@/components/timetable/Timetable';
-import DayView from './_components/calendar/DayView';
-import WeekView from './_components/calendar/WeekView';
-import MonthView from './_components/calendar/MonthView';
-import UpcomingExams from './_components/DashboardSidebar/UpcomingExams';
-import AiActions from './_components/DashboardSidebar/AiActions';
-import FreeTimeDialog from './_components/dialogs/FreeTimeDialog';
-import StudyBlockDialog from './_components/dialogs/StudyBlockDialog';
-import DeleteExamDialog from './_components/dialogs/DeleteExamDialog';
-import RescheduleDialog from './_components/dialogs/RescheduleDialog';
-import IssueDialog, { type IssueItem } from './_components/dialogs/IssueDialog';
-import StudyLogModal from './_components/StudyLogModal';
-import { ClassForm } from '@/components/class-form/ClassForm';
-import { useSchedules, useToggleComplete } from '@/hooks/useSchedules';
-import { useExams } from '@/hooks/useExams';
-import { useProfile } from '@/hooks/useProfile';
-import { useAuthStore } from '@/store/authStore';
-import { useUIStore } from '@/store/uiStore';
-import { api } from '@/lib/api';
-import { recurringDayToIndex } from '@/lib/recurringDay';
-import { scheduleVisibleIn } from '@/lib/scheduleViewScope';
-import { getDisplayColor } from '@/lib/scheduleColor';
-import { useNotificationPrefs } from '@/hooks/usePushNotifications';
-import { useStreak } from '@/hooks/useStudyLogs';
-import { useMyGroups } from '@/hooks/useGroups';
-import { minutesToTime, timeToMinutes } from '@/lib/utils';
-import MaterialIcon from '@/components/common/MaterialIcon';
-import { ExamSchedule, ReschedulePreview, Schedule, UserProfile } from '@/types';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { getWeekStart } from "@/components/timetable/Timetable";
+import DayView from "./_components/calendar/DayView";
+import WeekView from "./_components/calendar/WeekView";
+import MonthView from "./_components/calendar/MonthView";
+import UpcomingExams from "./_components/DashboardSidebar/UpcomingExams";
+import AiActions from "./_components/DashboardSidebar/AiActions";
+import FreeTimeDialog from "./_components/dialogs/FreeTimeDialog";
+import StudyBlockDialog from "./_components/dialogs/StudyBlockDialog";
+import DeleteExamDialog from "./_components/dialogs/DeleteExamDialog";
+import RescheduleDialog from "./_components/dialogs/RescheduleDialog";
+import IssueDialog, { type IssueItem } from "./_components/dialogs/IssueDialog";
+import StudyLogModal from "./_components/StudyLogModal";
+import { ClassForm } from "@/components/class-form/ClassForm";
+import { useSchedules, useToggleComplete } from "@/hooks/useSchedules";
+import { useExams } from "@/hooks/useExams";
+import { useProfile } from "@/hooks/useProfile";
+import { useAuthStore } from "@/store/authStore";
+import { useUIStore } from "@/store/uiStore";
+import { api } from "@/lib/api";
+import { recurringDayToIndex } from "@/lib/recurringDay";
+import { scheduleVisibleIn } from "@/lib/scheduleViewScope";
+import { getDisplayColor } from "@/lib/scheduleColor";
+import { useNotificationPrefs } from "@/hooks/usePushNotifications";
+import { useMyGroups } from "@/hooks/useGroups";
+import { minutesToTime, timeToMinutes } from "@/lib/utils";
+import MaterialIcon from "@/components/common/MaterialIcon";
+import {
+  ExamSchedule,
+  ReschedulePreview,
+  Schedule,
+  UserProfile,
+} from "@/types";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   DashboardHeader,
   DashboardStyles,
   NotificationBanner,
   ShareDialog,
-} from './_components/DashboardChrome';
-import { EtaReimportModal } from './_components/EtaReimportModal';
-import { FloatingAIChat } from './_components/FloatingAIChat';
+} from "./_components/DashboardChrome";
+import { EtaReimportModal } from "./_components/EtaReimportModal";
+import { FloatingAIChat } from "./_components/FloatingAIChat";
 
 interface Props {
   initialSchedules: Schedule[];
   initialProfile: UserProfile | null;
 }
 
-type TimetableView = 'day' | 'week' | 'month';
+type TimetableView = "day" | "week" | "month";
 
 const VIEW_LABELS: { key: TimetableView; label: string }[] = [
-  { key: 'day', label: '하루' },
-  { key: 'week', label: '주간' },
-  { key: 'month', label: '월간' },
+  { key: "day", label: "하루" },
+  { key: "week", label: "주간" },
+  { key: "month", label: "월간" },
 ];
 
-
 const toLocalDateString = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
-const LONG_DATE_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
-  month: 'long',
-  day: 'numeric',
-  weekday: 'long',
+const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  month: "long",
+  day: "numeric",
+  weekday: "long",
 });
 
 const getLocalDow = (date: Date) => {
@@ -77,23 +80,26 @@ const getLocalDow = (date: Date) => {
 
 const formatLongDate = (date: Date) => LONG_DATE_FORMATTER.format(date);
 
-const DEFAULT_WAKE_TIME = '07:00';
+const DEFAULT_WAKE_TIME = "07:00";
 const DAY_END_MINUTES = 24 * 60;
-
 
 const getWakeStartMinutes = (wakeTime?: string) => {
   const minutes = timeToMinutes(wakeTime || DEFAULT_WAKE_TIME);
-  if (minutes < 0 || minutes >= DAY_END_MINUTES) return timeToMinutes(DEFAULT_WAKE_TIME);
+  if (minutes < 0 || minutes >= DAY_END_MINUTES)
+    return timeToMinutes(DEFAULT_WAKE_TIME);
   return minutes;
 };
 
-const compareByWakeTime = (wakeMinutes: number) => (a: Schedule, b: Schedule) => {
-  const aMinutes = timeToMinutes(a.start_time);
-  const bMinutes = timeToMinutes(b.start_time);
-  const aOrder = aMinutes >= wakeMinutes ? aMinutes : aMinutes + DAY_END_MINUTES;
-  const bOrder = bMinutes >= wakeMinutes ? bMinutes : bMinutes + DAY_END_MINUTES;
-  return aOrder - bOrder;
-};
+const compareByWakeTime =
+  (wakeMinutes: number) => (a: Schedule, b: Schedule) => {
+    const aMinutes = timeToMinutes(a.start_time);
+    const bMinutes = timeToMinutes(b.start_time);
+    const aOrder =
+      aMinutes >= wakeMinutes ? aMinutes : aMinutes + DAY_END_MINUTES;
+    const bOrder =
+      bMinutes >= wakeMinutes ? bMinutes : bMinutes + DAY_END_MINUTES;
+    return aOrder - bOrder;
+  };
 
 const findFreeWindows = (
   schedules: Schedule[],
@@ -160,62 +166,169 @@ const formatMinutesDuration = (minutes: number) => {
   return `${remain}분`;
 };
 
-export default function DashboardClient({ initialSchedules, initialProfile }: Props) {
+export default function DashboardClient({
+  initialSchedules,
+  initialProfile,
+}: Props) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const { openClassForm, isShareModalOpen, openShareModal, closeShareModal } = useUIStore();
+  const { openClassForm, isShareModalOpen, openShareModal, closeShareModal } =
+    useUIStore();
   const { data: schedules = [] } = useSchedules(initialSchedules);
   const { data: exams = [] } = useExams();
   const toggleComplete = useToggleComplete();
   const { data: profile } = useProfile(initialProfile ?? undefined);
   const { prefs: notifPrefs } = useNotificationPrefs();
-  const { data: streak } = useStreak();
 
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [isEtaReimportOpen, setIsEtaReimportOpen] = useState(false);
   const [notification, setNotification] = useState<Schedule | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [reschedulePreview, setReschedulePreview] = useState<ReschedulePreview | null>(null);
+  const [reschedulePreview, setReschedulePreview] =
+    useState<ReschedulePreview | null>(null);
   const [aiAction, setAiAction] = useState<string | null>(null);
-  const [aiReview, setAiReview] = useState<{ title: string; reply: string } | null>(null);
+  const [aiReview, setAiReview] = useState<{
+    title: string;
+    reply: string;
+  } | null>(null);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
-  const [timetableView, setTimetableView] = useState<TimetableView>('day');
-  const [dayOffset, setDayOffset] = useState(0);
+  const [timetableView, setTimetableView] = useState<TimetableView>(() => {
+    if (typeof window === "undefined") return "week";
+
+    const viewParam = new URLSearchParams(window.location.search).get("view");
+    if (viewParam === "day" || viewParam === "week" || viewParam === "month") {
+      return viewParam;
+    }
+    return "week";
+  });
+  const [dayOffset, setDayOffset] = useState(() => {
+    if (typeof window === "undefined") return 0;
+
+    const dateParam = new URLSearchParams(window.location.search).get("date");
+    if (!dateParam || !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) return 0;
+
+    const [year, month, day] = dateParam.split("-").map(Number);
+    const target = new Date(year, month - 1, day);
+
+    if (toLocalDateString(target) !== dateParam) return 0;
+
+    const today = new Date();
+    const base = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+
+    return Math.round((target.getTime() - base.getTime()) / 86400000);
+  });
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
+  const syncStateFromUrl = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    const viewParam = url.searchParams.get("view");
+    const nextView: TimetableView =
+      viewParam === "day" || viewParam === "week" || viewParam === "month"
+        ? viewParam
+        : "week";
+    setTimetableView(nextView);
+
+    const dateParam = url.searchParams.get("date");
+    if (!dateParam || !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      setDayOffset(0);
+      setWeekOffset(0);
+      setMonthOffset(0);
+      return;
+    }
+
+    const [year, month, day] = dateParam.split("-").map(Number);
+    const target = new Date(year, month - 1, day);
+    if (toLocalDateString(target) !== dateParam) {
+      setDayOffset(0);
+      setWeekOffset(0);
+      setMonthOffset(0);
+      return;
+    }
+
+    const today = new Date();
+    const todayDate = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+    setDayOffset(
+      Math.round((target.getTime() - todayDate.getTime()) / 86400000),
+    );
+
+    const todayWeekStart = getWeekStart(todayDate);
+    const targetWeekStart = getWeekStart(target);
+    setWeekOffset(
+      Math.round(
+        (targetWeekStart.getTime() - todayWeekStart.getTime()) /
+          (7 * 86400000),
+      ),
+    );
+
+    const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const targetMonth = new Date(target.getFullYear(), target.getMonth(), 1);
+    setMonthOffset(
+      (targetMonth.getFullYear() * 12 + targetMonth.getMonth()) -
+        (currentMonth.getFullYear() * 12 + currentMonth.getMonth()),
+    );
+  }, []);
+
+  useEffect(() => {
+    syncStateFromUrl();
+    const handlePopState = () => syncStateFromUrl();
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [syncStateFromUrl]);
+
   const [weekScrollDate, setWeekScrollDate] = useState<string | null>(null);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
-  const [examForStudyBlocks, setExamForStudyBlocks] = useState<{ id: number; title: string; exam_date: string } | null>(null);
+  const [examForStudyBlocks, setExamForStudyBlocks] = useState<{
+    id: number;
+    title: string;
+    exam_date: string;
+  } | null>(null);
   const [examToDelete, setExamToDelete] = useState<ExamSchedule | null>(null);
   const [isFreeTimeDialogOpen, setIsFreeTimeDialogOpen] = useState(false);
   const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
-  const [certSchedule, setCertSchedule] = useState<{ id: number; title: string } | null>(null);
+  const [certSchedule, setCertSchedule] = useState<{
+    id: number;
+    title: string;
+  } | null>(null);
   const { data: myGroups = [] } = useMyGroups();
-  const etaScheduleCount = schedules.filter((s) => s.schedule_source === 'eta_import').length;
+  const etaScheduleCount = schedules.filter(
+    (s) => s.schedule_source === "eta_import",
+  ).length;
   const queryClient = useQueryClient();
   const timetableRef = useRef<HTMLDivElement | null>(null);
 
   // 온보딩 미완료 시 온보딩 페이지로 이동 (SSR에서 처리 안된 경우 fallback)
   useEffect(() => {
     if (profile && !profile.onboarding_completed) {
-      router.replace('/onboarding');
+      router.replace("/onboarding");
     }
   }, [profile, router]);
 
   // Notification system (서버 prefs 기반 인앱 배너)
   const checkNotifications = useCallback(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     if (!notifPrefs.reminder_start || !schedules.length) return;
     const notifMinutes = notifPrefs.reminder_minutes ?? 30;
     const now = new Date();
     const todayDow = now.getDay() === 0 ? 6 : now.getDay() - 1;
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const upcoming = schedules.find((s) => {
       if (s.is_completed) return false;
-      if (!scheduleVisibleIn(s, 'day')) return false;
-      const matchDay = s.date ? s.date === todayStr : recurringDayToIndex(s.recurring_day) === todayDow;
+      if (!scheduleVisibleIn(s, "day")) return false;
+      const matchDay = s.date
+        ? s.date === todayStr
+        : recurringDayToIndex(s.recurring_day) === todayDow;
       if (!matchDay) return false;
       const startMin = timeToMinutes(s.start_time);
       const diff = startMin - nowMin;
@@ -236,73 +349,98 @@ export default function DashboardClient({ initialSchedules, initialProfile }: Pr
   // 시험 전날 알림
   useEffect(() => {
     if (!exams.length) return;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
 
-    const examsTomorrow = exams.filter(e => e.exam_date === tomorrowStr);
+    const examsTomorrow = exams.filter((e) => e.exam_date === tomorrowStr);
     if (!examsTomorrow.length) return;
 
     const warnKey = `skema_exam_warn_${tomorrowStr}`;
     if (localStorage.getItem(warnKey)) return;
-    localStorage.setItem(warnKey, '1');
+    localStorage.setItem(warnKey, "1");
 
-    examsTomorrow.forEach(exam => {
-      toast.warning(
-        `내일 "${exam.title}" 시험이 있습니다`,
-        { duration: 15000 },
-      );
+    examsTomorrow.forEach((exam) => {
+      toast.warning(`내일 "${exam.title}" 시험이 있습니다`, {
+        duration: 15000,
+      });
     });
   }, [exams]);
 
   // 오늘 할 일
   const now = new Date();
   const todayDow = now.getDay() === 0 ? 6 : now.getDay() - 1;
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const weekStart = getWeekStart(new Date(now.getFullYear(), now.getMonth(), now.getDate() + weekOffset * 7));
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const weekStart = getWeekStart(
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + weekOffset * 7),
+  );
   const wakeStartTime = profile?.sleep_end || DEFAULT_WAKE_TIME;
   const wakeStartMinutes = getWakeStartMinutes(wakeStartTime);
   const nowMin = now.getHours() * 60 + now.getMinutes();
   // 서버의 get_today_schedules와 동일한 중복 제거:
   // 반복 일정 + 오늘 날짜 일정을 합치되, 같은 title+start_time의 dated 인스턴스가 있으면 반복 일정은 제외
-  const todaySpecific = schedules.filter((s) => scheduleVisibleIn(s, 'day') && s.date === todayStr);
-  const todayRecurring = schedules.filter((s) => (
-    scheduleVisibleIn(s, 'day') && !s.date && recurringDayToIndex(s.recurring_day) === todayDow
-  ));
-  const todaySpecificKeys = new Set(todaySpecific.map((s) => `${s.title}|${s.start_time}`));
+  const todaySpecific = schedules.filter(
+    (s) => scheduleVisibleIn(s, "day") && s.date === todayStr,
+  );
+  const todayRecurring = schedules.filter(
+    (s) =>
+      scheduleVisibleIn(s, "day") &&
+      !s.date &&
+      recurringDayToIndex(s.recurring_day) === todayDow,
+  );
+  const todaySpecificKeys = new Set(
+    todaySpecific.map((s) => `${s.title}|${s.start_time}`),
+  );
   const todaySchedules = [
     ...todaySpecific,
-    ...todayRecurring.filter((s) => !todaySpecificKeys.has(`${s.title}|${s.start_time}`)),
+    ...todayRecurring.filter(
+      (s) => !todaySpecificKeys.has(`${s.title}|${s.start_time}`),
+    ),
   ].sort(compareByWakeTime(wakeStartMinutes));
 
+  useEffect(() => {
+    if (!timetableRef.current || todaySchedules.length === 0) return;
 
-useEffect(() => {
-  if (!timetableRef.current || todaySchedules.length === 0) return;
+    const firstSchedule = todaySchedules[0];
 
-  const firstSchedule = todaySchedules[0];
+    const startMinutes = timeToMinutes(firstSchedule.start_time);
 
-  const startMinutes = timeToMinutes(firstSchedule.start_time);
+    const hourHeight = 64;
 
-  const hourHeight = 64;
+    const scrollPosition = (startMinutes / 60) * hourHeight;
 
-  const scrollPosition = (startMinutes / 60) * hourHeight;
+    timetableRef.current.scrollTop = Math.max(scrollPosition - 120, 0);
+  }, [todaySchedules]);
 
-  timetableRef.current.scrollTop = Math.max(scrollPosition - 120, 0);
-}, [todaySchedules]);
-  
-  const dayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
-  const monthDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  const dayDate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + dayOffset,
+  );
+  const monthDate = new Date(
+    now.getFullYear(),
+    now.getMonth() + monthOffset,
+    1,
+  );
   const monthLabel = `${monthDate.getFullYear()}년 ${monthDate.getMonth() + 1}월`;
 
-  const getSchedulesForDate = (date: Date, target: TimetableView = 'day') => {
+  const getSchedulesForDate = (date: Date, target: TimetableView = "day") => {
     const dateStr = toLocalDateString(date);
     const dow = getLocalDow(date);
     const isVisibleForTarget = (schedule: Schedule) =>
-      scheduleVisibleIn(schedule, target) || (target === 'week' && schedule.schedule_type === 'study');
-    const dated = schedules.filter((s) => isVisibleForTarget(s) && s.date === dateStr);
-    const recurring = schedules.filter((s) => (
-      isVisibleForTarget(s) && !s.date && recurringDayToIndex(s.recurring_day) === dow
-    ));
+      scheduleVisibleIn(schedule, target) ||
+      (target === "week" && schedule.schedule_type === "study");
+    const dated = schedules.filter(
+      (s) => isVisibleForTarget(s) && s.date === dateStr,
+    );
+    const recurring = schedules.filter(
+      (s) =>
+        isVisibleForTarget(s) &&
+        !s.date &&
+        recurringDayToIndex(s.recurring_day) === dow,
+    );
     const datedKeys = new Set(dated.map((s) => `${s.title}|${s.start_time}`));
 
     return [
@@ -312,7 +450,10 @@ useEffect(() => {
   };
 
   const daySchedules = getSchedulesForDate(dayDate);
-  const weekSchedules = schedules.filter((schedule) => scheduleVisibleIn(schedule, 'week') || schedule.schedule_type === 'study');
+  const weekSchedules = schedules.filter(
+    (schedule) =>
+      scheduleVisibleIn(schedule, "week") || schedule.schedule_type === "study",
+  );
   const weekAgendaDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(weekStart);
     date.setDate(weekStart.getDate() + index);
@@ -320,24 +461,33 @@ useEffect(() => {
     return {
       date,
       dateStr,
-      schedules: getSchedulesForDate(date, 'week'),
+      schedules: getSchedulesForDate(date, "week"),
       exams: exams.filter((exam) => exam.exam_date === dateStr),
     };
   });
-  const dayExams = exams.filter((exam) => exam.exam_date === toLocalDateString(dayDate));
-  const dayFreeWindows = findFreeWindows(daySchedules, wakeStartMinutes).slice(0, 4);
+  const dayExams = exams.filter(
+    (exam) => exam.exam_date === toLocalDateString(dayDate),
+  );
+  const dayFreeWindows = findFreeWindows(daySchedules, wakeStartMinutes).slice(
+    0,
+    4,
+  );
   const dayConflictSchedules = getOverlappingSchedules(daySchedules);
   const isSelectedDayToday = toLocalDateString(dayDate) === todayStr;
-  const selectedDayPrimarySchedule = (
-    isSelectedDayToday
-      ? daySchedules.find((s) => !s.is_completed && timeToMinutes(s.start_time) >= nowMin)
-      : daySchedules.find((s) => !s.is_completed)
-  ) ?? daySchedules[0] ?? null;
+  const selectedDayPrimarySchedule =
+    (isSelectedDayToday
+      ? daySchedules.find(
+          (s) => !s.is_completed && timeToMinutes(s.start_time) >= nowMin,
+        )
+      : daySchedules.find((s) => !s.is_completed)) ??
+    daySchedules[0] ??
+    null;
 
   // 오늘 수행률
   const todayTotal = todaySchedules.length;
-  const todayDone  = todaySchedules.filter((s) => s.is_completed).length;
-  const todayPct   = todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : null;
+  const todayDone = todaySchedules.filter((s) => s.is_completed).length;
+  const todayPct =
+    todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : null;
 
   const remainingToday = todaySchedules.filter((s) => !s.is_completed);
   const todayFreeWindows = findFreeWindows(todaySchedules, wakeStartMinutes);
@@ -345,13 +495,14 @@ useEffect(() => {
     (sum, window) => sum + Math.max(0, window.end - window.start),
     0,
   );
-  const overdueSchedules = todaySchedules.filter((schedule) => (
-    !schedule.is_completed && timeToMinutes(schedule.end_time) < nowMin
-  ));
+  const overdueSchedules = todaySchedules.filter(
+    (schedule) =>
+      !schedule.is_completed && timeToMinutes(schedule.end_time) < nowMin,
+  );
   const todayConflictSchedules = getOverlappingSchedules(todaySchedules);
   const upcomingExams = exams
     .filter((e) => {
-      const [y, m, d] = e.exam_date.split('-').map(Number);
+      const [y, m, d] = e.exam_date.split("-").map(Number);
       const examDate = new Date(y, m - 1, d);
       examDate.setHours(23, 59, 59, 999);
       return examDate >= now;
@@ -365,83 +516,112 @@ useEffect(() => {
   const sidebarOneTimeEvents: typeof schedules = [];
 
   const getDaysUntil = (date: string) =>
-    Math.ceil((new Date(`${date}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) / 86400000);
-  const formatDday = (days: number) => (days <= 0 ? 'D-day' : `D-${days}`);
+    Math.ceil(
+      (new Date(`${date}T00:00:00`).getTime() -
+        new Date(`${todayStr}T00:00:00`).getTime()) /
+        86400000,
+    );
+  const formatDday = (days: number) => (days <= 0 ? "D-day" : `D-${days}`);
   const todayLabel = formatLongDate(now);
   const weekEndDate = new Date(weekStart);
   weekEndDate.setDate(weekStart.getDate() + 6);
   const weekLabel = `${weekStart.getMonth() + 1}.${weekStart.getDate()} - ${weekEndDate.getMonth() + 1}.${weekEndDate.getDate()}`;
   const currentViewLabel =
-    timetableView === 'day' ? formatLongDate(dayDate) :
-    timetableView === 'week' ? weekLabel :
-    monthLabel;
+    timetableView === "day"
+      ? formatLongDate(dayDate)
+      : timetableView === "week"
+        ? weekLabel
+        : monthLabel;
   // 에타 시간표 업로드는 대학생 전용 기능 → 비대학생에겐 "시간표 인식 필요" 안내를 띄우지 않는다
-  const needsTimetableUpload = profile?.is_college_student === true && (schedules.length === 0 || etaScheduleCount === 0);
-  const examNeedsAttention = upcomingExam ? getDaysUntil(upcomingExam.exam_date) <= 7 : false;
+  const needsTimetableUpload =
+    profile?.is_college_student === true &&
+    (schedules.length === 0 || etaScheduleCount === 0);
+  const examNeedsAttention = upcomingExam
+    ? getDaysUntil(upcomingExam.exam_date) <= 7
+    : false;
   const issueItems: IssueItem[] = [
     ...(todayConflictSchedules.length
-      ? [{
-          key: 'conflicts',
-          label: '겹친 일정',
-          value: `${todayConflictSchedules.length}개`,
-          detail: todayConflictSchedules.map(({ schedule }) => schedule.title).join(', '),
-          tone: 'red',
-        }]
+      ? [
+          {
+            key: "conflicts",
+            label: "겹친 일정",
+            value: `${todayConflictSchedules.length}개`,
+            detail: todayConflictSchedules
+              .map(({ schedule }) => schedule.title)
+              .join(", "),
+            tone: "red",
+          },
+        ]
       : []),
     ...(overdueSchedules.length
-      ? [{
-          key: 'overdue',
-          label: '지나간 미완료',
-          value: `${overdueSchedules.length}개`,
-          detail: overdueSchedules.map((schedule) => schedule.title).slice(0, 2).join(', '),
-          tone: 'amber',
-        }]
+      ? [
+          {
+            key: "overdue",
+            label: "지나간 미완료",
+            value: `${overdueSchedules.length}개`,
+            detail: overdueSchedules
+              .map((schedule) => schedule.title)
+              .slice(0, 2)
+              .join(", "),
+            tone: "amber",
+          },
+        ]
       : []),
     ...(needsTimetableUpload
-      ? [{
-          key: 'eta',
-          label: '시간표 인식',
-          value: '필요',
-          detail: '이미지를 올리면 수업 시간표를 빠르게 채울 수 있습니다',
-          tone: 'blue',
-        }]
+      ? [
+          {
+            key: "eta",
+            label: "시간표 인식",
+            value: "필요",
+            detail: "이미지를 올리면 수업 시간표를 빠르게 채울 수 있습니다",
+            tone: "blue",
+          },
+        ]
       : []),
     ...(examNeedsAttention
-      ? [{
-          key: 'exam',
-          label: '시험 준비',
-          value: formatDday(getDaysUntil(upcomingExam!.exam_date)),
-          detail: `${upcomingExam!.title} 준비 시간을 빈 시간에 배치해보세요`,
-          tone: 'blue',
-        }]
+      ? [
+          {
+            key: "exam",
+            label: "시험 준비",
+            value: formatDday(getDaysUntil(upcomingExam!.exam_date)),
+            detail: `${upcomingExam!.title} 준비 시간을 빈 시간에 배치해보세요`,
+            tone: "blue",
+          },
+        ]
       : []),
   ];
   const issueCount = issueItems.length;
   /** AI 액션 후 관련 모든 쿼리 무효화 */
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    queryClient.invalidateQueries({ queryKey: ['exams'] });
+    queryClient.invalidateQueries({ queryKey: ["schedules"] });
+    queryClient.invalidateQueries({ queryKey: ["exams"] });
   };
 
-  const runAiCommand = async (action: string, message: string, successMessage: string) => {
+  const runAiCommand = async (
+    action: string,
+    message: string,
+    successMessage: string,
+  ) => {
     setAiAction(action);
-    if (action === 'reschedule') setIsRegenerating(true);
+    if (action === "reschedule") setIsRegenerating(true);
     try {
-      const { data } = await api.post<{ reply: string }>('/ai/chat', {
+      const { data } = await api.post<{ reply: string }>("/ai/chat", {
         message,
         messages: [],
       });
       invalidateAll();
-      toast.success(data.reply.trim() ? successMessage : 'AI 작업이 완료되었습니다');
+      toast.success(
+        data.reply.trim() ? successMessage : "AI 작업이 완료되었습니다",
+      );
       setAiReview({
         title: successMessage,
-        reply: data.reply.trim() || 'AI 작업이 완료되었습니다.',
+        reply: data.reply.trim() || "AI 작업이 완료되었습니다.",
       });
     } catch {
-      toast.error('AI 작업 중 오류가 발생했습니다');
+      toast.error("AI 작업 중 오류가 발생했습니다");
     } finally {
       setAiAction(null);
-      if (action === 'reschedule') setIsRegenerating(false);
+      if (action === "reschedule") setIsRegenerating(false);
     }
   };
 
@@ -449,14 +629,14 @@ useEffect(() => {
   const handleReschedule = async () => {
     setIsRegenerating(true);
     try {
-      const { data } = await api.post<ReschedulePreview>('/reschedule/preview');
+      const { data } = await api.post<ReschedulePreview>("/reschedule/preview");
       if (data.summary.target === 0) {
-        toast.success('다시 짤 일정이 없어요');
+        toast.success("다시 짤 일정이 없어요");
         return;
       }
       setReschedulePreview(data);
     } catch {
-      toast.error('다시 짜기 미리보기를 불러오지 못했어요');
+      toast.error("다시 짜기 미리보기를 불러오지 못했어요");
     } finally {
       setIsRegenerating(false);
     }
@@ -465,8 +645,8 @@ useEffect(() => {
   const handleLogout = () => {
     logout();
     queryClient.clear();
-    toast.success('로그아웃 되었습니다');
-    window.location.replace('/login');
+    toast.success("로그아웃 되었습니다");
+    window.location.replace("/login");
   };
 
   const handleShare = async () => {
@@ -474,52 +654,105 @@ useEffect(() => {
     if (shareToken) return;
     setIsGeneratingShare(true);
     try {
-      const { data } = await api.post<{ token: string }>('/share-tokens', {});
+      const { data } = await api.post<{ token: string }>("/share-tokens", {});
       setShareToken(data.token);
     } catch {
-      toast.error('공유 링크 생성 중 오류가 발생했습니다');
+      toast.error("공유 링크 생성 중 오류가 발생했습니다");
     } finally {
       setIsGeneratingShare(false);
     }
   };
 
   const shareUrl = shareToken
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${shareToken}`
-    : '';
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/${shareToken}`
+    : "";
 
   const copyShareUrl = () => {
     if (shareUrl) {
       navigator.clipboard.writeText(shareUrl);
-      toast.success('링크가 복사되었습니다');
+      toast.success("링크가 복사되었습니다");
     }
   };
 
-  const moveCalendar = (direction: -1 | 1) => {
-    if (timetableView === 'day') setDayOffset((offset) => offset + direction);
-    if (timetableView === 'week') setWeekOffset((offset) => offset + direction);
-    if (timetableView === 'month') setMonthOffset((offset) => offset + direction);
+  const syncUrlState = (
+    date: Date,
+    view: TimetableView,
+    method: "pushState" | "replaceState" = "replaceState",
+  ) => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("date", toLocalDateString(date));
+    url.searchParams.set("view", view);
+
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    window.history[method]({}, "", nextUrl);
   };
 
-  const showDayViewForDate = (date: Date) => {
+  const openDayViewForDate = (date: Date) => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const diff = Math.round((date.getTime() - today.getTime()) / 86400000);
     setDayOffset(diff);
-    setTimetableView('day');
+    setTimetableView("day");
+    syncUrlState(date, "day");
+  };
+
+  const moveCalendar = (direction: -1 | 1) => {
+    if (timetableView === "day") {
+      const nextOffset = dayOffset + direction;
+      setDayOffset(nextOffset);
+      const nextDate = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + nextOffset,
+      );
+      syncUrlState(nextDate, "day");
+    }
+    if (timetableView === "week") {
+      setWeekOffset((offset) => offset + direction);
+      const nextDate = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + dayOffset + direction * 7,
+      );
+      syncUrlState(nextDate, "week");
+    }
+    if (timetableView === "month") {
+      setMonthOffset((offset) => offset + direction);
+      const nextDate = new Date(
+        now.getFullYear(),
+        now.getMonth() + monthOffset + direction,
+        now.getDate(),
+      );
+      syncUrlState(nextDate, "month");
+    }
+  };
+
+  const showDayViewForDate = (date: Date) => {
+    openDayViewForDate(date);
   };
 
   const showWeekViewForDate = (date: Date) => {
-    const todayWeekStart = getWeekStart(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+    const todayWeekStart = getWeekStart(
+      new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+    );
     const targetWeekStart = getWeekStart(date);
-    const diffWeeks = Math.round((targetWeekStart.getTime() - todayWeekStart.getTime()) / (7 * 86400000));
+    const diffWeeks = Math.round(
+      (targetWeekStart.getTime() - todayWeekStart.getTime()) / (7 * 86400000),
+    );
     setWeekOffset(diffWeeks);
     setWeekScrollDate(toLocalDateString(date));
-    setTimetableView('week');
+    setTimetableView("week");
+    syncUrlState(date, "week");
   };
 
   const resetCalendar = () => {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     setDayOffset(0);
     setWeekOffset(0);
     setMonthOffset(0);
+    setTimetableView("day");
+    syncUrlState(today, "day");
   };
 
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
@@ -535,17 +768,19 @@ useEffect(() => {
     return {
       date,
       dateStr,
-      schedules: getSchedulesForDate(date, 'month'),
+      schedules: getSchedulesForDate(date, "month"),
       exams: exams.filter((exam) => exam.exam_date === dateStr),
     };
   });
   const currentViewScheduleCount =
-    timetableView === 'day' ? daySchedules.length :
-    timetableView === 'week' ? weekSchedules.length :
-    monthDays.reduce((count, date) => {
-      if (date.getMonth() !== monthDate.getMonth()) return count;
-      return count + getSchedulesForDate(date, 'month').length;
-    }, 0);
+    timetableView === "day"
+      ? daySchedules.length
+      : timetableView === "week"
+        ? weekSchedules.length
+        : monthDays.reduce((count, date) => {
+            if (date.getMonth() !== monthDate.getMonth()) return count;
+            return count + getSchedulesForDate(date, "month").length;
+          }, 0);
 
   return (
     <>
@@ -554,6 +789,15 @@ useEffect(() => {
         <NotificationBanner
           notification={notification}
           onOpen={(schedule) => {
+            const scheduleDate = schedule.date
+              ? new Date(
+                  Number(schedule.date.slice(0, 4)),
+                  Number(schedule.date.slice(5, 7)) - 1,
+                  Number(schedule.date.slice(8, 10)),
+                )
+              : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            openDayViewForDate(scheduleDate);
             openClassForm(schedule);
             setNotification(null);
           }}
@@ -566,12 +810,12 @@ useEffect(() => {
           todayDone={todayDone}
           todayTotal={todayTotal}
           onShare={handleShare}
-          onOpenProfile={() => router.push('/profile')}
-          onOpenAdminUsers={() => router.push('/admin/users')}
-          onOpenAdminLogs={() => router.push('/admin/login-logs')}
+          onOpenProfile={() => router.push("/profile")}
+          onOpenAdminUsers={() => router.push("/admin/users")}
+          onOpenAdminLogs={() => router.push("/admin/login-logs")}
           onLogout={handleLogout}
           onAddSchedule={() => openClassForm()}
-          onOpenSetlog={() => router.push('/log')}
+          onOpenSetlog={() => router.push("/log")}
           onReschedule={handleReschedule}
           onUploadTimetable={() => setIsEtaReimportOpen(true)}
           isRegenerating={isRegenerating}
@@ -583,12 +827,15 @@ useEffect(() => {
               <div className="flex min-w-0 flex-col rounded-2xl border border-blue-100 bg-sky-50 p-4 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs font-black text-blue-600">{todayLabel}</p>
+                    <p className="text-xs font-black text-blue-600">
+                      {todayLabel}
+                    </p>
                     <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
                       내 시간표
                     </h1>
                     <p className="mt-1 text-sm font-bold text-slate-500">
-                      {currentViewLabel} · 표시 {currentViewScheduleCount}개 일정 · 에타 {etaScheduleCount}개
+                      {currentViewLabel} · 표시 {currentViewScheduleCount}개
+                      일정 · 에타 {etaScheduleCount}개
                     </p>
                   </div>
 
@@ -597,11 +844,19 @@ useEffect(() => {
                       {VIEW_LABELS.map(({ key, label }) => (
                         <button
                           key={key}
-                          onClick={() => setTimetableView(key)}
+                          onClick={() => {
+                            setTimetableView(key);
+                            const baseDate = new Date(
+                              now.getFullYear(),
+                              now.getMonth(),
+                              now.getDate() + dayOffset,
+                            );
+                            syncUrlState(baseDate, key);
+                          }}
                           className={`rounded-md px-3 py-1.5 text-xs font-black transition ${
                             timetableView === key
-                              ? 'bg-blue-600 text-white shadow-sm'
-                              : 'text-slate-600 hover:bg-white'
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-slate-600 hover:bg-white"
                           }`}
                         >
                           {label}
@@ -613,7 +868,11 @@ useEffect(() => {
                       onClick={() => moveCalendar(-1)}
                       aria-label="이전"
                     >
-                      <MaterialIcon icon="chevron_left" size={18} color="#2563eb" />
+                      <MaterialIcon
+                        icon="chevron_left"
+                        size={18}
+                        color="#2563eb"
+                      />
                     </button>
                     <button
                       className="rounded-lg border border-blue-100 px-4 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-50"
@@ -626,13 +885,17 @@ useEffect(() => {
                       onClick={() => moveCalendar(1)}
                       aria-label="다음"
                     >
-                      <MaterialIcon icon="chevron_right" size={18} color="#2563eb" />
+                      <MaterialIcon
+                        icon="chevron_right"
+                        size={18}
+                        color="#2563eb"
+                      />
                     </button>
                   </div>
                 </div>
 
                 <div className="mt-4 flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-sky-50 sm:mt-5 sm:min-h-[calc(100vh-170px)]">
-                  {timetableView === 'week' && (
+                  {timetableView === "week" && (
                     <WeekView
                       days={weekAgendaDays}
                       todayStr={todayStr}
@@ -648,16 +911,13 @@ useEffect(() => {
                           exam_date: exam.exam_date,
                         })
                       }
-                      onScrollToDate={(date) =>
-                        setWeekScrollDate(toLocalDateString(date))
-                      }
                       onShowDayView={showDayViewForDate}
                       scrollToDateStr={weekScrollDate}
                       onScrollConsumed={() => setWeekScrollDate(null)}
                     />
                   )}
 
-                  {timetableView === 'day' && (
+                  {timetableView === "day" && (
                     <DayView
                       dayDate={dayDate}
                       daySchedules={daySchedules}
@@ -695,9 +955,11 @@ useEffect(() => {
                       issueItems={issueItems}
                       toggleComplete={toggleComplete}
                       setCertSchedule={setCertSchedule}
+                      onReschedule={handleReschedule}
+                      isRegenerating={isRegenerating}
                     />
                   )}
-                  {timetableView === 'month' && (
+                  {timetableView === "month" && (
                     <MonthView
                       days={monthAgendaDays}
                       monthDate={monthDate}
@@ -735,9 +997,7 @@ useEffect(() => {
                   aiAction={aiAction}
                 />
               </aside>
-
             </section>
-
           </div>
         </main>
       </div>
@@ -753,8 +1013,12 @@ useEffect(() => {
                   <MaterialIcon icon="auto_awesome" size={21} color="#fff" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-blue-600">AI 변경 결과</p>
-                  <h2 className="mt-1 text-xl font-black text-slate-950">{aiReview.title}</h2>
+                  <p className="text-xs font-black text-blue-600">
+                    AI 변경 결과
+                  </p>
+                  <h2 className="mt-1 text-xl font-black text-slate-950">
+                    {aiReview.title}
+                  </h2>
                 </div>
               </div>
               <button
@@ -772,7 +1036,8 @@ useEffect(() => {
                 {aiReview.reply}
               </div>
               <p className="mt-3 text-xs font-bold text-slate-500">
-                반영된 내용이 맞는지 시간표에서 확인하고, 더 수정할 부분은 AI에게 이어서 요청하세요.
+                반영된 내용이 맞는지 시간표에서 확인하고, 더 수정할 부분은
+                AI에게 이어서 요청하세요.
               </p>
             </div>
 
@@ -800,16 +1065,26 @@ useEffect(() => {
         </div>
       )}
 
-      <Dialog open={isRemainingDialogOpen} onOpenChange={setIsRemainingDialogOpen}>
+      <Dialog
+        open={isRemainingDialogOpen}
+        onOpenChange={setIsRemainingDialogOpen}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>오늘 남은 일정</DialogTitle>
           </DialogHeader>
           <div className="py-2 space-y-2">
             {remainingToday.map((s) => (
-              <div key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-                <span className="truncate text-sm font-black text-slate-950 mr-2">{s.title}</span>
-                <span className="shrink-0 text-xs font-bold text-slate-400">{s.start_time}–{s.end_time}</span>
+              <div
+                key={s.id}
+                className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2"
+              >
+                <span className="truncate text-sm font-black text-slate-950 mr-2">
+                  {s.title}
+                </span>
+                <span className="shrink-0 text-xs font-bold text-slate-400">
+                  {s.start_time}–{s.end_time}
+                </span>
               </div>
             ))}
           </div>
@@ -842,10 +1117,7 @@ useEffect(() => {
         exams={exams}
         onDeleteExam={setExamToDelete}
       />
-      <DeleteExamDialog
-        exam={examToDelete}
-        onExamChange={setExamToDelete}
-      />
+      <DeleteExamDialog exam={examToDelete} onExamChange={setExamToDelete} />
       <IssueDialog
         open={isIssueDialogOpen}
         onOpenChange={setIsIssueDialogOpen}
