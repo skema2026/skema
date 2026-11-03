@@ -17,6 +17,9 @@ requests>=2.31.0
 opencv-python-headless>=4.9.0.80
 numpy>=1.26.0
 
+# 시간표 블록 글자 인식 (서버 Tesseract 호출, Dockerfile에서 tesseract-ocr 설치)
+pytesseract>=0.3.10
+
 # Scheduler (알림 주기 실행)
 apscheduler>=3.10.0
 pdfplumber>=0.10.0
