@@ -188,3 +188,30 @@ def test_apply_conflict_when_block_completed(db, user):
 def test_no_targets(db, user):
     result = reschedule.preview(db, user.id, now=NOW)
     assert result["moves"] == [] and result["summary"]["target"] == 0 and result["warning"] is None
+
+
+# ── 저녁 우선 (11/2 결정) ─────────────────────────────────────────────────────
+
+def test_free_day_prefers_evening_over_morning():
+    """수업 없는 날: 아침 7시가 아니라 저녁 19시부터 넣는다."""
+    free = {TODAY: [t("07:00") + 30 * k for k in range(32)]}  # 07:00~22:30 전부 빔
+    moves, _ = plan_moves([_target(1, TODAY + timedelta(days=2))], free, TODAY)
+    assert moves[0]["to"] == [{"date": TODAY.isoformat(), "start_time": "19:00", "end_time": "20:00"}]
+
+
+def test_sooner_day_still_comes_before_later_evening():
+    """가까운 날이 먼저: 오늘 오후 자리가 있으면 내일 저녁보다 오늘 오후."""
+    d2 = TODAY + timedelta(days=1)
+    free = {TODAY: [t("15:00"), t("15:30")], d2: [t("19:00"), t("19:30")]}
+    moves, _ = plan_moves([_target(1, d2)], free, TODAY)
+    assert moves[0]["to"] == [{"date": TODAY.isoformat(), "start_time": "15:00", "end_time": "16:00"}]
+
+
+def test_evening_full_spills_to_afternoon_same_day():
+    free = {TODAY: [t("10:00"), t("16:00"), t("16:30"), t("22:30")]}
+    moves, _ = plan_moves([_target(1, TODAY, minutes=90)], free, TODAY)
+    # 저녁 22:30 한 칸 + 오후 16:00, 16:30 → 시간순으로 묶어서 돌려줌
+    assert moves[0]["to"] == [
+        {"date": TODAY.isoformat(), "start_time": "16:00", "end_time": "17:00"},
+        {"date": TODAY.isoformat(), "start_time": "22:30", "end_time": "23:00"},
+    ]
