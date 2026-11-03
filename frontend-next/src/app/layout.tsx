@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
-import { Manrope, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "@/components/providers/Providers";
 import { Toaster } from "@/components/ui/sonner";
 
-const manrope = Manrope({
+// 폰트 파일을 프로젝트 안(src/app/fonts)에 두고 쓴다.
+// next/font/google은 빌드할 때마다 Google에서 폰트를 받아 오는데, 그게 끊기면 Vercel 빌드가
+// 통째로 실패해서(10/31, 11/4) 바꿨다. 화면은 같다. 파일 출처: @fontsource-variable 5.3.0 (SIL OFL 1.1)
+const manrope = localFont({
+  src: "./fonts/Manrope-latin-wght.woff2",
   variable: "--font-manrope",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: "200 800",
   display: "swap",
   preload: false,
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: "./fonts/Inter-latin-wght.woff2",
   variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: "100 900",
   display: "swap",
   preload: false,
 });
