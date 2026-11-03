@@ -28,7 +28,6 @@ type MobileWeekAgendaProps = {
   todayStr: string;
   onScheduleClick: (schedule: Schedule) => void;
   onExamClick: (exam: ExamSchedule) => void;
-  onScrollToDate: (date: Date) => void;
   onShowDayView: (date: Date) => void;
   scrollToDateStr: string | null;
   onScrollConsumed: () => void;
@@ -39,7 +38,6 @@ function MobileWeekAgenda({
   todayStr,
   onScheduleClick,
   onExamClick,
-  onScrollToDate,
   onShowDayView,
   scrollToDateStr,
   onScrollConsumed,
@@ -85,7 +83,7 @@ function MobileWeekAgenda({
             <button
               key={day.dateStr}
               type="button"
-              onClick={() => onScrollToDate(day.date)}
+              onClick={() => onShowDayView(day.date)}
               className={`min-w-0 rounded-xl border px-1 py-2 text-center transition ${
                 isToday
                   ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
@@ -270,37 +268,47 @@ export interface WeekViewProps {
   scrollToDateStr: string | null;
   onScheduleClick: (schedule: Schedule) => void;
   onExamClick: (exam: ExamSchedule) => void;
-  onScrollToDate: (date: Date) => void;
   onShowDayView: (date: Date) => void;
   onScrollConsumed: () => void;
 }
 
-export default function WeekView(props: WeekViewProps) {
+export default function WeekView({
+  timetableRef,
+  days,
+  todayStr,
+  weekStart,
+  schedules,
+  exams,
+  scrollToDateStr,
+  onScheduleClick,
+  onExamClick,
+  onShowDayView,
+  onScrollConsumed,
+}: WeekViewProps) {
   return (
     <>
       <div className="sm:hidden">
         <MobileWeekAgenda
-          days={props.days}
-          todayStr={props.todayStr}
-          onScheduleClick={props.onScheduleClick}
-          onExamClick={props.onExamClick}
-          onScrollToDate={props.onScrollToDate}
-          onShowDayView={props.onShowDayView}
-          scrollToDateStr={props.scrollToDateStr}
-          onScrollConsumed={props.onScrollConsumed}
+          days={days}
+          todayStr={todayStr}
+          onScheduleClick={onScheduleClick}
+          onExamClick={onExamClick}
+          onShowDayView={onShowDayView}
+          scrollToDateStr={scrollToDateStr}
+          onScrollConsumed={onScrollConsumed}
         />
       </div>
 
       <div
-        ref={props.timetableRef}
+        ref={timetableRef}
         className="hidden max-h-[calc(100vh-220px)] overflow-y-auto sm:block"
       >
         <Timetable
-          schedules={props.schedules}
-          exams={props.exams}
-          weekStart={props.weekStart}
+          schedules={schedules}
+          exams={exams}
+          weekStart={weekStart}
           startTime="00:00"
-          onDayClick={props.onShowDayView}
+          onDayClick={onShowDayView}
         />
       </div>
     </>
