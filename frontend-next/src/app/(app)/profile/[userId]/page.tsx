@@ -6,14 +6,11 @@ import { api } from '@/lib/api';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { isVideoUrl, mediaUrl } from '@/lib/media';
 
-const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? '/proxy';
-
 type PublicProfile = {
   user_id: number;
   username: string;
   joined_at: string | null;
   streak: { current_streak: number; longest_streak: number; today_checked: boolean };
-  posts: { id: number; content: string; image_url: string | null; likes_count: number; created_at: string }[];
   logs:  { id: number; caption: string | null; photo_url: string | null; created_at: string }[];
 };
 
@@ -138,32 +135,7 @@ export default function PublicProfilePage() {
                 </div>
               )}
 
-              {/* 최근 게시글 */}
-              {data.posts.length > 0 && (
-                <div className="mb-4">
-                  <p className="mb-2 text-[11px] font-black text-slate-400">최근 게시글</p>
-                  <div className="space-y-2">
-                    {data.posts.map(post => (
-                      <div key={post.id} className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
-                        {post.image_url && (
-                          <div className="w-full bg-slate-100" style={{ aspectRatio: '16/9' }}>
-                            <img src={`${BACKEND}${post.image_url}`} alt="게시글" className="h-full w-full object-cover" />
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between px-4 py-3">
-                          <p className="flex-1 text-sm font-bold text-slate-950 line-clamp-2">{post.content}</p>
-                          <div className="ml-3 flex shrink-0 items-center gap-1 text-[11px] font-black text-slate-400">
-                            <MaterialIcon icon="thumb_up" size={12} color="#94a3b8" />
-                            {post.likes_count}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {data.logs.length === 0 && data.posts.length === 0 && (
+              {data.logs.length === 0 && (
                 <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-sm">
                   <p className="text-sm font-black text-slate-500">아직 공개된 활동이 없어요</p>
                 </div>

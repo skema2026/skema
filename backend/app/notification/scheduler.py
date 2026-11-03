@@ -389,10 +389,11 @@ def job_flush_like_queue():
                 continue
             unique_names = list(dict.fromkeys(names))   # 순서 유지 dedup
             if len(unique_names) == 1:
-                body = f"{unique_names[0]}님이 {'기록' if content_type == 'log' else '게시글'}에 좋아요를 눌렀어요"
+                body = f"{unique_names[0]}님이 기록에 좋아요를 눌렀어요"
             else:
                 body = f"{', '.join(unique_names[:3])}{'님 외 여러 명' if len(unique_names) > 3 else '님'}이 좋아요를 눌렀어요"
-            url = "/log" if content_type == "log" else "/feed"
+            # 커뮤니티 게시글(/feed)은 #4에서 제거됨 → 좋아요는 스터디 기록(log)만 남음
+            url = "/log"
             send_push_to_user(db, target_user_id, title="좋아요", body=body, url=url, ntype="log_like")
 
         for row in rows:
