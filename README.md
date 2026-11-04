@@ -13,7 +13,7 @@
 
 SKEMA는 대학생의 시간표 관리 문제를 AI로 해결하는 웹 애플리케이션입니다.
 
-시간표 이미지를 올리면 AI가 자동으로 일정을 파싱하고, 등록된 일정을 바탕으로 AI와 대화하며 학습 계획을 세울 수 있습니다. 스터디 그룹 기능으로 함께 공부하는 친구들과 기록을 공유하고, 웹 푸시 알림으로 놓치는 일정 없이 하루를 관리합니다.
+시간표 이미지를 올리면 우리가 만든 인식기(OpenCV 격자 분석 + Tesseract OCR + 자체 보정)가 요일·시간·과목명을 읽어 일정으로 만들고, 등록된 일정을 바탕으로 AI와 대화하며 학습 계획을 세울 수 있습니다. 스터디 그룹 기능으로 함께 공부하는 친구들과 기록을 공유하고, 웹 푸시 알림으로 놓치는 일정 없이 하루를 관리합니다.
 
 ---
 
@@ -67,7 +67,8 @@ SKEMA는 대학생의 시간표 관리 문제를 AI로 해결하는 웹 애플�
 | 프레임워크 | FastAPI |
 | ORM | SQLAlchemy + Alembic |
 | DB | MySQL 8.0 |
-| AI | OpenAI GPT-4.1 |
+| 시간표 인식 | OpenCV(위치) + Tesseract OCR(글자) + 자체 보정 규칙, 외부 AI API 없음 |
+| AI | OpenAI GPT-4.1 (선택, 시간표 인식에는 기본 미사용) |
 | 인증 | JWT (python-jose) + OAuth2 |
 | 알림 | Web Push (pywebpush, VAPID) + APScheduler |
 | 스토리지 | 로컬 볼륨 (/app/uploads) |
@@ -101,7 +102,7 @@ skema/
 │   │   ├── auth/          # 회원가입·로그인·프로필·OAuth
 │   │   ├── ai_chat/       # AI 채팅 어시스턴트
 │   │   ├── schedule/      # 일정 CRUD
-│   │   ├── eta/           # 에타 시간표 OCR 파싱
+│   │   ├── eta/           # 에타 시간표 인식 (positional_parser: 위치, block_ocr: 글자)
 │   │   ├── notification/  # 웹 푸시·스케줄러
 │   │   ├── share/         # 시간표 공유 링크
 │   │   └── studylog/      # 기록·그룹·스트릭
