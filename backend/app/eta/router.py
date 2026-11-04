@@ -17,8 +17,10 @@ import cv2
 import numpy as np
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.auth.models import User
+from app.core.config import settings
 from app.core.security import get_current_user, get_db
 from app.core.llm import (
     LLMEmptyResponseError,
@@ -30,6 +32,7 @@ from app.schedule.service import stage_schedule_record
 
 from app.core.time_utils import DAY_NAMES as KR_DAYS
 
+from . import block_ocr
 from .location_utils import normalize_location
 from .positional_parser import parse_image_positional
 from .positional_types import NAME_TO_DOW
@@ -181,7 +184,8 @@ def _is_valid_subject_name(subject: str) -> bool:
 def _valid_time_range(start: str, end: str) -> bool:
     sm = _time_to_minutes(start)
     em = _time_to_minutes(end)
-    return 9 * 60 <= sm < em <= 22 * 60
+    # 11/4: 9~22시 → 5~24시. 아침 운동·밤 알바 같은 개인 일정도 받는다 (23:59 = 하루 끝)
+    return 5 * 60 <= sm < em <= 24 * 60
 
 
 def _filter_entries(entries: list[ParsedEntry], *, allow_empty_subject: bool = False) -> list[ParsedEntry]:
@@ -404,6 +408,44 @@ def _enrich_positional_with_block_text(
             enriched.append(base)
             continue
         enriched.append(text)
+    return _dedup_entries(enriched)
+
+
+def _enrich_positional_with_ocr(
+    image_bytes: bytes,
+    positional_items: Sequence[tuple[ParsedEntry, tuple[int, int, int, int]]],
+) -> list[ParsedEntry]:
+    """블록 글자를 서버 Tesseract(block_ocr)로 읽는다. 외부 API 호출 없음."""
+    texts = block_ocr.read_blocks(image_bytes, [bbox for _entry, bbox in positional_items])
+    enriched: list[ParsedEntry] = []
+    for (base, _bbox), text in zip(positional_items, texts):
+        subject, location = _split_location_from_subject(text.subject, text.location)
+        location = normalize_location(location) if location else ""
+        enriched.append(
+            ParsedEntry(
+                subject_name=subject,
+                day_of_week=base.day_of_week,
+                start_time=base.start_time,
+                end_time=base.end_time,
+                location=location or base.location or None,
+                raw_text=f"{subject} {location}".strip() or base.raw_text,
+                source="eta_positional_ocr",
+                requires_review=text.requires_review,
+            )
+        )
+
+    # 선택: Tesseract가 못 읽은 블록만 OpenAI로 다시 읽는다 (기본 꺼짐, 호출 최소화)
+    if settings.ETA_OPENAI_FALLBACK and settings.OPENAI_API_KEY:
+        weak = [i for i, e in enumerate(enriched) if e.requires_review]
+        if weak:
+            try:
+                retry = _parse_block_text_via_llm(image_bytes, [positional_items[i] for i in weak])
+                for n, i in enumerate(weak, start=1):
+                    if n in retry and retry[n].subject_name:
+                        enriched[i] = retry[n]
+                logger.info("ETA OCR: OpenAI fallback for %d/%d blocks", len(weak), len(enriched))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"ETA OCR: OpenAI fallback failed: {exc}")
     return _dedup_entries(enriched)
 
 
@@ -671,9 +713,10 @@ async def parse_eta_image(
     """
     이미지 기반 시간표 파싱.
 
-    - 1순위: 위치 기반 색상 블록 파서로 요일/시간 확정
-    - 2순위: OpenAI Vision은 crop된 블록 내부 텍스트만 보조 추출
-    - 3순위: 위치 파서 실패 시에만 기존 전체 이미지 LLM fallback
+    - 1순위: 위치 기반 색상 블록 파서(OpenCV)로 요일/시간 확정
+    - 2순위: 블록 안 글자는 서버 Tesseract + 우리 보정(block_ocr)으로 읽음 (11/4 결정)
+      ETA_TEXT_ENGINE=openai 로 바꾸면 예전처럼 OpenAI Vision이 블록 글자를 읽는다
+    - 3순위: 위치 파서 실패 시에만 기존 전체 이미지 LLM fallback (OpenAI 키 있을 때만 동작)
     """
     image_bytes, content_type = await _read_image_file(file)
 
@@ -684,17 +727,34 @@ async def parse_eta_image(
         logger.warning(f"ETA parse: positional parser failed (user={current_user.id}): {exc}", exc_info=True)
 
     if positional_items:
-        try:
-            entries = _enrich_positional_with_block_text(image_bytes, positional_items)
-            logger.info(
-                "ETA algorithm-first parse: geometry=%d returned=%d user=%s",
-                len(positional_items), len(entries), current_user.id,
-            )
-            return entries
-        except (LLMRateLimitedError, LLMProviderUnavailableError, LLMEmptyResponseError) as exc:
-            logger.warning(f"ETA parse: block text LLM unavailable: {exc}")
-        except Exception as exc:
-            logger.warning(f"ETA parse: block text LLM failed (user={current_user.id}): {exc}", exc_info=True)
+        engine = (settings.ETA_TEXT_ENGINE or "ocr").lower()
+        if engine == "ocr":
+            if block_ocr.available():
+                try:
+                    # 블록마다 Tesseract를 돌려 수 초 걸리므로 이벤트 루프를 막지 않게 스레드에서 실행
+                    entries = await run_in_threadpool(_enrich_positional_with_ocr, image_bytes, positional_items)
+                    logger.info(
+                        "ETA own parse (opencv+tesseract): geometry=%d returned=%d review=%d user=%s",
+                        len(positional_items), len(entries),
+                        sum(1 for e in entries if e.requires_review), current_user.id,
+                    )
+                    return entries
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(f"ETA parse: block OCR failed (user={current_user.id}): {exc}", exc_info=True)
+            else:
+                logger.warning("ETA parse: tesseract(kor) not installed, returning geometry only")
+        elif engine == "openai":
+            try:
+                entries = _enrich_positional_with_block_text(image_bytes, positional_items)
+                logger.info(
+                    "ETA algorithm-first parse: geometry=%d returned=%d user=%s",
+                    len(positional_items), len(entries), current_user.id,
+                )
+                return entries
+            except (LLMRateLimitedError, LLMProviderUnavailableError, LLMEmptyResponseError) as exc:
+                logger.warning(f"ETA parse: block text LLM unavailable: {exc}")
+            except Exception as exc:
+                logger.warning(f"ETA parse: block text LLM failed (user={current_user.id}): {exc}", exc_info=True)
 
         geometry_entries = [entry for entry, _bbox in positional_items]
         logger.info(

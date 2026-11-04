@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     # ── AI ────────────────────────────────────────────────────────────────────
     OPENAI_API_KEY: str = ""
 
+    # ── 시간표 인식 (11/4 결정: 기본은 우리 파서 + Tesseract, OpenAI 꺼짐) ─────────
+    # ocr    : 블록 글자를 서버 Tesseract로 읽는다 (기본)
+    # openai : 예전 방식. 블록 글자를 OpenAI Vision으로 읽는다
+    # none   : 글자는 안 읽고 요일·시간만 돌려준다
+    ETA_TEXT_ENGINE: str = "ocr"
+    # True면 Tesseract가 못 읽은 블록(확인 필요)만 OpenAI로 다시 읽는다. 키가 있어야 동작.
+    ETA_OPENAI_FALLBACK: bool = False
+
     # ── OAuth ─────────────────────────────────────────────────────────────────
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
