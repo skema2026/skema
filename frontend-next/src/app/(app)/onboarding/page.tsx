@@ -8,6 +8,7 @@ import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 import { normalizeTimeString } from '@/lib/utils';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { ScheduleKindToggle, toEtaKind, type EtaScheduleKind } from '@/components/timetable/ScheduleKindToggle';
 import type { RecurringDay, StudyBlocksGenerateResult } from '@/types';
 
 type Phase = 'college-check' | 'eta-upload' | 'eta-review' | 'external-exam' | 'personal-schedule' | 'type-select' | 'sleep' | 'chat' | 'generating' | 'done';
@@ -22,6 +23,7 @@ interface EtaEntry {
   location?: string;     // 강의실
   raw_text?: string;
   source: string;
+  schedule_type: EtaScheduleKind;  // 수업 / 개인 (알바·스터디 등)
 }
 
 interface ExternalExam {
@@ -413,7 +415,7 @@ export default function OnboardingPage() {
       const res = await api.post('/eta/parse-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      const v1 = Array.isArray(res.data) ? res.data as Array<{ subject_name: string; day_of_week: number; start_time: string; end_time: string; location?: string | null; raw_text?: string; source?: string; requires_review?: boolean; }> : [];
+      const v1 = Array.isArray(res.data) ? res.data as Array<{ subject_name: string; day_of_week: number; start_time: string; end_time: string; location?: string | null; raw_text?: string; source?: string; requires_review?: boolean; schedule_type?: string; }> : [];
       const dayKo = ['월요일','화요일','수요일','목요일','금요일','토요일','일요일'];
       const entries: EtaEntry[] = v1.map((e, i) => ({
         _id: `eta-${Date.now()}-${i}`,
@@ -424,6 +426,7 @@ export default function OnboardingPage() {
         location: e.location || '',
         raw_text: e.raw_text || `${dayKo[e.day_of_week] ?? ''} ${e.start_time}~${e.end_time}`,
         source: e.source || 'eta_image',
+        schedule_type: toEtaKind(e.schedule_type),
       }));
       setEtaEntries(entries);
       if (entries.length === 0) {
@@ -842,8 +845,8 @@ export default function OnboardingPage() {
       try {
         if (isReturningUser) await api.delete('/eta/schedules');
         await api.post('/eta/save-schedules', {
-          entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source }) => ({
-            subject_name, day_of_week, start_time, end_time, location: location ?? '', source,
+          entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source, schedule_type }) => ({
+            subject_name, day_of_week, start_time, end_time, location: location ?? '', source, schedule_type,
           })),
         });
         toast.success(`${valid.length}개 과목을 시간표에 등록했습니다 ✅`);
@@ -913,12 +916,13 @@ export default function OnboardingPage() {
           <div className="rounded-2xl overflow-hidden mb-4" style={{ background: '#fff', border: '1px solid #ebeef1', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
             {/* Table header */}
             <div className="hidden gap-2 px-4 py-2.5 text-xs font-bold sm:grid" style={{
-              gridTemplateColumns: '2fr 80px 90px 90px 1fr 36px',
+              gridTemplateColumns: '2fr 96px 80px 90px 90px 1fr 36px',
               borderBottom: '1px solid #f1f4f7',
               background: '#fafbfc',
               color: '#3f4b61',
             }}>
               <span>과목명</span>
+              <span>종류</span>
               <span>요일</span>
               <span>시작</span>
               <span>종료</span>
@@ -937,7 +941,7 @@ export default function OnboardingPage() {
                 <div
                   className="hidden gap-2 px-4 py-2.5 items-center sm:grid"
                   style={{
-                    gridTemplateColumns: '2fr 80px 90px 90px 1fr 36px',
+                    gridTemplateColumns: '2fr 96px 80px 90px 90px 1fr 36px',
                     borderBottom: idx < etaEntries.length - 1 ? '1px solid #f1f4f7' : 'none',
                   }}
                 >
@@ -951,6 +955,11 @@ export default function OnboardingPage() {
                     style={{ borderColor: entry.subject_name ? '#ebeef1' : '#fca5a5', background: '#fafbfc' }}
                     onFocus={(e) => e.target.style.borderColor = '#2563eb'}
                     onBlur={(e) => e.target.style.borderColor = entry.subject_name ? '#ebeef1' : '#fca5a5'}
+                  />
+                  {/* 종류: 수업 / 개인 */}
+                  <ScheduleKindToggle
+                    value={entry.schedule_type}
+                    onChange={(v) => updateEntry(entry._id, 'schedule_type', v)}
                   />
                   {/* 요일 */}
                   <select
@@ -1030,6 +1039,15 @@ export default function OnboardingPage() {
                       onBlur={(e) => e.target.style.borderColor = entry.subject_name ? '#ebeef1' : '#fca5a5'}
                     />
                   </label>
+
+                  <div className="mb-3">
+                    <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>종류</span>
+                    <ScheduleKindToggle
+                      size="md"
+                      value={entry.schedule_type}
+                      onChange={(v) => updateEntry(entry._id, 'schedule_type', v)}
+                    />
+                  </div>
 
                   <div className="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
                     <label className="block min-w-0">

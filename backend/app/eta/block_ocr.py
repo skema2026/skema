@@ -312,6 +312,20 @@ def fix_personal_word(subject: str) -> str:
     return subject
 
 
+def suggest_schedule_type(subject: str, location: str | None) -> str:
+    """확인 화면에서 먼저 골라 둘 일정 종류. 사용자가 바꿀 수 있다.
+
+    강의실이 없고 이름에 개인 일정 단어(알바, 스터디, 회의 …)가 들어 있으면 'personal'.
+    강의실 없는 온라인 수업("성공취업과직무분석")도 있어서 강의실만으로는 정하지 않는다.
+    """
+    if (location or "").strip():
+        return "class"
+    name = re.sub(r"\s+", "", subject or "")
+    if any(word in name for word in PERSONAL_WORDS):
+        return "personal"
+    return "class"
+
+
 def correct_subject(subject: str) -> str:
     return fix_personal_word(fix_course_words(tidy(fix_latin(subject))))
 
