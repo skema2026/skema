@@ -184,7 +184,8 @@ def _is_valid_subject_name(subject: str) -> bool:
 def _valid_time_range(start: str, end: str) -> bool:
     sm = _time_to_minutes(start)
     em = _time_to_minutes(end)
-    return 9 * 60 <= sm < em <= 22 * 60
+    # 11/4: 9~22시 → 5~24시. 아침 운동·밤 알바 같은 개인 일정도 받는다 (23:59 = 하루 끝)
+    return 5 * 60 <= sm < em <= 24 * 60
 
 
 def _filter_entries(entries: list[ParsedEntry], *, allow_empty_subject: bool = False) -> list[ParsedEntry]:

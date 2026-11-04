@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 
 import numpy as np
 import cv2  # opencv-python-headless
@@ -274,30 +275,122 @@ def _detect_time_lines_from_gutter(gray: np.ndarray, gutter_x: int) -> list[int]
     if len(centers) < 4:
         return []
 
-    # 하단 카드 테두리 등 시간축 간격에서 벗어난 선 제거.
-    if len(centers) >= 3:
-        diffs = np.diff(centers)
-        hour_px = float(np.median(diffs[: min(len(diffs), 8)]))
-
-        # 맨 위 앱/카드/요일 헤더 테두리가 시간선보다 먼저 잡힐 수 있다.
-        # 시간선은 이후 간격이 거의 일정하므로, "다음 선과 1시간 간격"을
-        # 이루는 첫 번째 y를 9:00 라인으로 채택한다.
-        start_idx = 0
-        for idx, gap in enumerate(diffs):
-            if 0.65 * hour_px <= gap <= 1.35 * hour_px:
-                start_idx = idx
-                break
-        centers = centers[start_idx:]
-
-        clean = [centers[0]]
-        for y in centers[1:]:
-            gap = y - clean[-1]
-            if 0.55 * hour_px <= gap <= 1.45 * hour_px:
-                clean.append(y)
-        centers = clean
-
+    # 11/4: 같은 간격(1시간)으로 가장 길게 이어지는 선들을 시간선으로 고른다.
+    # 예전에는 '처음 8개 간격의 중앙값'을 1시간으로 봤는데, 시간칸 위에 학기 탭 밑줄·
+    # 글자 조각이 여러 줄 잡힌 캡처(새 9장 중 4장)에서 1시간을 20px로 잘못 잡아
+    # 블록이 30분짜리 수십 개로 쪼개졌다.
+    centers = _best_hour_chain(centers)
     logger.debug("_detect_time_lines_from_gutter: centers=%s", centers)
     return centers
+
+
+def _detect_table_top(v_lines: np.ndarray, sep_centers: list[int]) -> int | None:
+    """요일 세로 구분선이 시작하는 y (= 시간표 표의 맨 위). 못 찾으면 None."""
+    tops: list[int] = []
+    h = v_lines.shape[0]
+    for x in sep_centers:
+        col = v_lines[:, max(0, x - 3):x + 4].max(axis=1) > 0
+        run = 0
+        for y in range(h):
+            run = run + 1 if col[y] else 0
+            if run >= 30:
+                tops.append(y - run + 1)
+                break
+    if len(tops) < 2:
+        return None
+    return int(np.median(tops))
+
+
+def _best_hour_chain(centers: list[int]) -> list[int]:
+    """같은 간격으로 늘어선 선 중 가장 긴 줄(1시간 간격 시간선)을 고른다.
+
+    블록에 가려지지 않는 시간칸 안의 선이라 중간에 빠지는 일은 드물지만,
+    한 줄 건너뛴 것(2시간 간격)까지는 같은 줄로 본다.
+    """
+    if len(centers) < 3:
+        return list(centers)
+    best: list[int] = []
+    gaps = sorted({int(d) for d in np.diff(centers) if d >= 20})
+    for g in gaps:
+        tol = max(3.0, g * 0.05)
+        for i in range(len(centers)):
+            chain = [centers[i]]
+            for c in centers[i + 1:]:
+                gap = c - chain[-1]
+                k = int(round(gap / g))
+                if k in (1, 2) and abs(gap - k * g) <= tol * k:
+                    chain.append(c)
+                elif gap > 2 * g + 2 * tol:
+                    break
+            if len(chain) > len(best):
+                best = chain
+    return best
+
+
+def _fit_hour_lines(lines: list[int]) -> tuple[float, float]:
+    """시간선들 → (첫 시간선 y, 1시간 픽셀). 직선 맞춤이라 선 하나가 1~2px 틀려도 영향이 작다."""
+    g0 = float(np.median(np.diff(lines)))
+    idx = [int(round((y - lines[0]) / g0)) for y in lines]
+    slope, intercept = np.polyfit(idx, lines, 1)
+    return float(intercept), float(slope)
+
+
+def _ocr_hour_label(gray: np.ndarray, x1: int, y0: int, y1: int) -> int | None:
+    """시간칸 숫자(9, 10, 1 …) 하나를 읽는다. Tesseract가 없으면 None."""
+    try:
+        from . import block_ocr
+        if not block_ocr.available():
+            return None
+        import pytesseract
+    except Exception:  # noqa: BLE001
+        return None
+    crop = gray[max(0, y0):max(0, y1), 0:max(1, x1)]
+    if crop.size == 0:
+        return None
+    # 글자 부분만 잘라낸다 (선·여백이 섞이면 '9'를 못 읽거나 '11'을 '1'로 읽었다)
+    ink = crop < (float(np.median(crop)) - 60)
+    ys, xs = np.nonzero(ink)
+    if ys.size < 8:
+        return None
+    crop = crop[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    big = cv2.resize(crop, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)
+    _, binary = cv2.threshold(big, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    binary = cv2.copyMakeBorder(binary, 30, 30, 30, 30, cv2.BORDER_CONSTANT, value=255)
+    for psm in (7, 8, 10):
+        try:
+            text = pytesseract.image_to_string(
+                binary, config=block_ocr._config(psm) + " -c tessedit_char_whitelist=0123456789"
+            )
+        except Exception:  # noqa: BLE001
+            return None
+        digits = "".join(ch for ch in text if ch.isdigit())
+        if digits and len(digits) <= 2 and 1 <= int(digits) <= 12:
+            return int(digits)
+    return None
+
+
+def _start_hour_from_labels(gray: np.ndarray, gutter_x: int, lines: list[int], hour_px: float) -> int | None:
+    """맨 위 시간선이 몇 시인지 시간칸 숫자로 정한다 (11/4).
+
+    에타는 9시 전 일정(아침 운동 등)이 있으면 시간표가 7시·8시부터 시작한다.
+    예전에는 맨 위를 무조건 9시로 봐서 그런 캡처는 전체 시간이 밀렸다.
+    숫자는 12시간제(9, 10, 11, 12, 1, 2 …)라서 줄 순서로 오전/오후를 정한다.
+    처음 몇 줄을 읽어 다수결로 시작 시각을 고른다.
+    """
+    votes: dict[int, int] = {}
+    y0 = lines[0]
+    for y in lines[:5]:
+        k = int(round((y - y0) / hour_px))  # 맨 위 선에서 몇 시간 아래인지 (빠진 선 고려)
+        n = _ocr_hour_label(gray, gutter_x - 2, int(y + 2), int(y + hour_px * 0.45))
+        if n is None:
+            continue
+        for h24 in {n % 12, n % 12 + 12}:
+            start = h24 - k
+            if 5 <= start <= 12:
+                votes[start] = votes.get(start, 0) + 1
+    if not votes:
+        return None
+    return max(votes.items(), key=lambda kv: (kv[1], kv[0] == 9))[0]
 
 
 def detect_grid(image_bytes: bytes) -> GridModel:
@@ -376,19 +469,28 @@ def detect_grid(image_bytes: bytes) -> GridModel:
     )
 
     gutter_time_lines = _detect_time_lines_from_gutter(gray, gutter_x)
+    # 표 위쪽(학기 탭 밑줄 등)에서 잡힌 선은 버린다. 표는 요일 세로선이 시작하는 곳부터다.
+    table_top = _detect_table_top(v_lines, sep_centers)
+    if table_top is not None:
+        gutter_time_lines = [y for y in gutter_time_lines if y >= table_top - 4]
     if len(gutter_time_lines) >= 4:
-        hour_diffs = np.diff(gutter_time_lines)
-        hour_px = float(np.median(hour_diffs))
+        first_line_f, hour_px = _fit_hour_lines(gutter_time_lines)
         pixels_per_slot = hour_px / 2.0
+        first_line = int(round(first_line_f))
 
-        # gutter에서 10:00부터 잡히는 캡처가 있다. header_bottom과 첫
-        # 시간선 간격을 슬롯 단위로 역산해 09:00 origin을 복구한다.
-        first_line = int(gutter_time_lines[0])
-        if pixels_per_slot > 0:
-            skipped_slots = max(0, int((first_line - header_bottom) / pixels_per_slot + 0.5))
+        start_hour = _start_hour_from_labels(gray, gutter_x, gutter_time_lines, hour_px)
+        if start_hour is not None:
+            # grid_origin_y는 언제나 '9:00 선' 위치. 7시 시작이면 맨 위 선보다 2시간 아래.
+            grid_origin_y = int(round(first_line_f + (9 - start_hour) * hour_px))
+            skipped_slots = -1
         else:
-            skipped_slots = 0
-        grid_origin_y = int(first_line - skipped_slots * pixels_per_slot)
+            # 숫자를 못 읽으면(Tesseract 없음) 맨 위를 9시로 본다. 표 맨 위(요일 줄 위)와
+            # 첫 시간선 사이가 1시간 넘게 벌어져 있으면 9:00 선을 못 찾은 것이라 그만큼 올린다.
+            ref_top = table_top if table_top is not None else header_bottom
+            skipped_hours = max(0, int((first_line - ref_top) / hour_px + 0.3)) if table_top is not None else \
+                max(0, int((first_line - header_bottom) / pixels_per_slot + 0.5)) // 2
+            skipped_slots = skipped_hours * 2
+            grid_origin_y = int(first_line - skipped_hours * hour_px)
 
         last_y = int(gutter_time_lines[-1] + pixels_per_slot)
         slot_count = max(1, int((last_y - grid_origin_y) / pixels_per_slot + 0.5))
@@ -396,10 +498,11 @@ def detect_grid(image_bytes: bytes) -> GridModel:
             int(grid_origin_y + idx * pixels_per_slot)
             for idx in range(slot_count + 1)
         ]
-        header_bottom = grid_origin_y
+        # header_bottom = 표의 맨 위 시간선 (블록은 이 아래에서만 찾는다)
+        header_bottom = min(first_line, grid_origin_y)
         logger.debug(
-            "detect_grid: using gutter time lines origin=%d pps=%.2f rows=%d skipped_slots=%d",
-            grid_origin_y, pixels_per_slot, len(row_bounds), skipped_slots,
+            "detect_grid: gutter lines origin=%d pps=%.2f start_hour=%s skipped_slots=%d",
+            grid_origin_y, pixels_per_slot, start_hour, skipped_slots,
         )
         return GridModel(
             column_bounds=column_bounds,
@@ -639,6 +742,92 @@ def _refine_block_edges(
     return by0, by1
 
 
+def _detect_blocks_by_rows(hsv: np.ndarray, grid: GridModel, top_y: int) -> list[DetectedBlock]:
+    """요일 칸마다 '색이 칠해진 줄'을 위에서 아래로 훑어 블록을 찾는다 (11/4).
+
+    칸 안쪽(양옆 10px 뺀 부분)이 칠해진 정도와 블록 양옆 여백 띠의 색으로 블록 줄을 가린다.
+    - 흰 글자가 많은 줄은 글자가 닿지 않는 블록 양옆 여백 띠로 블록 줄임을 확인한다
+    - 위아래로 붙은 두 블록 사이의 흰 틈(1~3px)은 줄 전체가 하얘서 경계가 픽셀 단위로 정확하다
+      (예전 30분 칸 방식은 18:00~19:45 다음 20:00 블록을 한 덩어리로 보거나,
+       글자가 많은 칸의 색이 달라 보여 긴 블록을 30분씩 쪼갰다)
+    - 옆 칸 블록 가장자리가 비치는 것은 양옆 10px를 빼서 피한다
+    - 틈 없이 붙은 다른 색 블록은 색이 바뀌는 곳에서 나눈다
+    """
+    h = hsv.shape[0]
+    pps = grid.pixels_per_slot
+    out: list[DetectedBlock] = []
+    for day_idx in range(min(7, len(grid.column_bounds) - 1)):
+        x0, x1 = grid.column_bounds[day_idx + 1]
+        if x1 - x0 < 30:
+            continue
+        def _painted(region: np.ndarray) -> np.ndarray:
+            return (region[:, :, 1] >= 9) & (region[:, :, 2] >= 120)
+
+        inner = hsv[:, x0 + 10:x1 - 10]
+        paint = _painted(inner)
+        occ = paint.mean(axis=1)
+        # 블록 왼쪽·오른쪽 여백 띠(글자가 거의 안 오는 몇 px). 글자는 왼쪽 정렬이라
+        # 한쪽 여백에 걸릴 수는 있어도 양쪽을 동시에 가리지는 않는다.
+        side_on = (_painted(hsv[:, x0 + 3:x0 + 7]).mean(axis=1) >= 0.75) | (
+            _painted(hsv[:, x1 - 7:x1 - 3]).mean(axis=1) >= 0.75
+        )
+        # 블록 줄 = 안쪽이 충분히 칠해졌거나(25%+), 여백 띠가 칠해지고 안쪽도 조금은 칠해진 줄
+        # (굵은 흰 글자 줄). 여백 띠만 칠해지고 안쪽이 하얀 줄은 옆 칸 블록 가장자리가 비친 것.
+        row_on = (occ >= 0.25) | (side_on & (occ >= 0.05))
+        row_on[:max(0, top_y)] = False
+        # 줄마다 '블록 바탕색'(흰 글자·번짐을 뺀 진한 픽셀들의 색)을 구한다
+        sat_all = inner[:, :, 1].astype(float)
+        p90 = np.percentile(sat_all, 90, axis=1)
+        bg_hue = np.zeros(h)
+        bg_val = np.zeros(h)
+        for yy in np.nonzero(row_on)[0]:
+            sel = sat_all[yy] >= max(9.0, 0.7 * p90[yy])
+            if sel.any():
+                bg_hue[yy] = float(np.median(inner[yy, sel, 0]))
+                bg_val[yy] = float(np.median(inner[yy, sel, 2]))
+
+        def _differs(a0: int, a1: int, b0: int, b1: int) -> bool:
+            """두 줄 묶음의 바탕색이 다른 수업이라고 볼 만큼 다른지."""
+            sa, sb = np.median(p90[a0:a1]), np.median(p90[b0:b1])
+            ha, hb = np.median(bg_hue[a0:a1]), np.median(bg_hue[b0:b1])
+            va, vb = np.median(bg_val[a0:a1]), np.median(bg_val[b0:b1])
+            dh = min(abs(ha - hb), 180 - abs(ha - hb))
+            return (dh >= 8 and min(sa, sb) >= 20) or abs(sa - sb) >= max(8.0, 0.25 * max(sa, sb)) or abs(va - vb) >= 15
+
+        y = 0
+        while y < h:
+            if not row_on[y]:
+                y += 1
+                continue
+            start = y
+            while y < h and row_on[y]:
+                y += 1
+            end = y
+            # 한 덩어리 안에서 바탕색이 바뀌는 곳(위아래로 붙은 다른 수업)에서 나눈다.
+            # 위·아래 5줄씩 비교하고, 바뀐 뒤로도 계속 그 색이어야 경계로 본다(글자 줄 오판 방지).
+            cuts = [start]
+            margin = max(6, int(pps * 0.4))  # 블록 맨 위·아래 가장자리 번짐은 경계로 보지 않는다
+            yy = start + margin
+            while yy < end - margin:
+                if _differs(yy - 6, yy - 1, yy + 1, yy + 6) and _differs(cuts[-1], yy - 1, yy + 1, min(end, yy + int(pps * 0.4) + 1)):
+                    cuts.append(yy)
+                    yy += max(6, int(pps * 0.4))
+                    continue
+                yy += 1
+            cuts.append(end)
+            for c0, c1 in zip(cuts, cuts[1:]):
+                if pps > 0 and c1 - c0 >= pps * 0.4:
+                    bx0, bx1 = x0 + 1, x1 - 1
+                    out.append(DetectedBlock(
+                        bbox=(bx0, c0, bx1, c1),
+                        center_x=(bx0 + bx1) // 2,
+                        top_y=c0,
+                        bottom_y=c1,
+                        ocr_text="",
+                    ))
+    return out
+
+
 def detect_blocks(image_bytes: bytes, grid: GridModel) -> list[DetectedBlock]:
     """
     색상/텍스트 영역을 기반으로 수업 블록을 감지한다.
@@ -663,9 +852,17 @@ def detect_blocks(image_bytes: bytes, grid: GridModel) -> list[DetectedBlock]:
     # 연속 슬롯을 하나의 수업 블록으로 본다.
     if grid.pixels_per_slot > 0 and len(grid.column_bounds) >= 2:
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        row_blocks = _detect_blocks_by_rows(hsv, grid, min(header_y, grid.grid_origin_y) - 2)
+        if row_blocks:
+            logger.debug("detect_blocks: row-scan blocks=%d", len(row_blocks))
+            return row_blocks
         slot_blocks: list[DetectedBlock] = []
-        max_slots = int((h - grid.grid_origin_y) / grid.pixels_per_slot)
-        max_slots = max(1, min(max_slots, 26))
+        # 11/4: 9:00~22:00(26칸) 고정이던 것을 표 맨 위(7시 시작 등)부터 이미지 끝(최대 24시)까지로.
+        # 알바·회의처럼 22시 넘어 끝나는 개인 일정이 잘리던 문제.
+        first_slot = int(round((min(header_y, grid.grid_origin_y) - grid.grid_origin_y) / grid.pixels_per_slot))
+        first_slot = max(first_slot, -8)  # 05:00보다 위는 보지 않는다
+        last_slot = min(int((h - grid.grid_origin_y) / grid.pixels_per_slot), 30)  # 24:00
+        slot_ids = list(range(first_slot, max(first_slot + 1, last_slot)))
 
         for day_idx in range(min(7, len(grid.column_bounds) - 1)):
             x0, x1 = grid.column_bounds[day_idx + 1]
@@ -675,7 +872,7 @@ def detect_blocks(image_bytes: bytes, grid: GridModel) -> list[DetectedBlock]:
             occupied: list[bool] = []
             ratios: list[float] = []
             colors: list[np.ndarray | None] = []
-            for slot in range(max_slots):
+            for slot in slot_ids:
                 y0 = int(grid.grid_origin_y + slot * grid.pixels_per_slot) + 5
                 y1 = int(grid.grid_origin_y + (slot + 1) * grid.pixels_per_slot) - 5
                 sx0, sx1 = x0 + 8, x1 - 8
@@ -717,8 +914,8 @@ def detect_blocks(image_bytes: bytes, grid: GridModel) -> list[DetectedBlock]:
                 elif (not is_occ or color_changed) and run_start is not None:
                     run_end = idx
                     if run_end - run_start >= 1:
-                        by0 = int(grid.grid_origin_y + run_start * grid.pixels_per_slot)
-                        by1 = int(grid.grid_origin_y + run_end * grid.pixels_per_slot)
+                        by0 = int(grid.grid_origin_y + slot_ids[run_start] * grid.pixels_per_slot)
+                        by1 = int(grid.grid_origin_y + (slot_ids[run_end - 1] + 1) * grid.pixels_per_slot)
                         # 배경과 맞닿은 위/아래 경계는 픽셀 단위로 다시 찾는다
                         # (에타 50분 수업 18:50이 30분 칸에 맞춰 18:30/19:00으로 나오던 문제).
                         # 다른 색 블록과 바로 붙어 있는 경계는 칸 경계를 그대로 쓴다.
@@ -887,7 +1084,7 @@ def _px_to_time(y: int, grid: GridModel) -> str:
     """y 픽셀 → "HH:MM" (9:00 기준, 5분 단위 반올림)."""
     minutes = 9 * 60 + (y - grid.grid_origin_y) / grid.pixels_per_slot * 30
     minutes = int(round(minutes / TIME_ROUND_MINUTES) * TIME_ROUND_MINUTES)
-    minutes = max(0, min(23 * 60 + 55, minutes))
+    minutes = max(0, min(23 * 60 + 59, minutes))  # 24:00 끝은 23:59로 (스키마가 24:00을 못 받음)
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
@@ -947,8 +1144,8 @@ def normalize_blocks(blocks: list[DetectedBlock], grid: GridModel) -> list[Norma
         if t2m(start) >= t2m(end):
             logger.debug("normalize_blocks: invalid range %s-%s, skipping block", start, end)
             continue
-        # 시간 범위 sanity check (9:00~22:00 내)
-        if t2m(start) < 9 * 60 or t2m(end) > 22 * 60:
+        # 시간 범위 sanity check. 11/4: 9:00~22:00 → 05:00~24:00 (아침 운동·밤 알바 같은 개인 일정)
+        if t2m(start) < 5 * 60 or t2m(end) > 24 * 60:
             logger.debug("normalize_blocks: out-of-range %s-%s, skipping block", start, end)
             continue
 
