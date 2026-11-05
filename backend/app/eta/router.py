@@ -431,6 +431,7 @@ def _enrich_positional_with_ocr(
                 raw_text=f"{subject} {location}".strip() or base.raw_text,
                 source="eta_positional_ocr",
                 requires_review=text.requires_review,
+                schedule_type=block_ocr.suggest_schedule_type(subject, location),
             )
         )
 
@@ -847,8 +848,9 @@ def save_eta_schedules(
             "start_time": entry.start_time,
             "end_time": entry.end_time,
             "location": normalize_location(entry.location),
-            "color": "#1a4db2",
-            "schedule_type": "class",
+            # 11/4: 확인 화면에서 고른 종류 (수업/개인). 화면 색은 프론트가 종류별로 정한다
+            "color": "#ec4899" if entry.schedule_type == "personal" else "#1a4db2",
+            "schedule_type": entry.schedule_type,
             "schedule_source": "eta_import",
             "priority": 0,
             "is_completed": False,
