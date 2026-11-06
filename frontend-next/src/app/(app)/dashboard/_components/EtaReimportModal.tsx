@@ -170,7 +170,7 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
                   className="h-4 w-4 flex-shrink-0 animate-spin rounded-full border-2 border-t-transparent"
                   style={{ borderColor: '#c3d0ff', borderTopColor: 'transparent' }}
                 />
-                <p className="text-sm font-semibold text-blue-700">AI가 시간표를 분석하고 있습니다...</p>
+                <p className="text-sm font-semibold text-blue-700">시간표를 읽고 있어요...</p>
               </div>
             )}
 

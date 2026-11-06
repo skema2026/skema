@@ -131,6 +131,7 @@ const ICONS: Record<string, LucideIcon> = {
   quiz: GraduationCap,
   radio_button_unchecked: Circle,
   refresh: RotateCcw,
+  autorenew: RefreshCw,
   schedule: CalendarDays,
   school: GraduationCap,
   send: Send,

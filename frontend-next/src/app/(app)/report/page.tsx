@@ -274,7 +274,7 @@ export default function ReportPage() {
                     const bestDay = days.filter((d) => d.pct !== null).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))[0];
                     if (bestDay && (bestDay.pct ?? 0) >= 80) insights.push(`${bestDay.label}요일 수행률이 ${bestDay.pct}%로 가장 높아요 🎉`);
                     if (overallPct !== null && overallPct >= 80) insights.push('이번 주 전체 수행률이 80% 이상입니다. 훌륭해요! 🏆');
-                    else if (overallPct !== null && overallPct < 40 && allTotal > 0) insights.push('미완료 일정이 많아요. AI 채팅으로 일정을 재배치해볼까요?');
+                    else if (overallPct !== null && overallPct < 40 && allTotal > 0) insights.push('미완료 일정이 많아요. 하루 타임라인의 \'다시 짜기\'로 빈 시간에 옮겨 볼까요?');
                     const zeroDays = days.filter((d) => d.total > 0 && d.done === 0);
                     if (zeroDays.length > 0) insights.push(`${zeroDays.map((d) => d.label).join('·')}요일 일정을 하나도 완료하지 못했어요.`);
                     if (insights.length === 0) insights.push('일정을 완료 표시하면 여기에 인사이트가 나타납니다.');
