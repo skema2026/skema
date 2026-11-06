@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
+import { ScheduleKindToggle, toEtaKind, type EtaScheduleKind } from '@/components/timetable/ScheduleKindToggle';
 
 interface ParsedEntry {
   subject_name: string;
@@ -20,6 +21,7 @@ interface ParsedEntry {
   end_time: string;
   location: string;
   source?: string;
+  schedule_type: EtaScheduleKind;  // 수업 / 개인 (알바·스터디 등)
 }
 
 const DAY_KO = ['월', '화', '수', '목', '금', '토', '일'];
@@ -72,8 +74,9 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
         end_time: string;
         location?: string;
         source?: string;
+        schedule_type?: string;
       }>;
-      setEntries(parsed.map((e) => ({ ...e, location: e.location ?? '' })));
+      setEntries(parsed.map((e) => ({ ...e, location: e.location ?? '', schedule_type: toEtaKind(e.schedule_type) })));
       if (parsed.length === 0) toast('시간표를 인식하지 못했습니다. 다른 이미지로 시도해 주세요.');
     } catch {
       toast.error('이미지 분석에 실패했습니다.');
@@ -102,13 +105,14 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
       );
       if (valid.length > 0) {
         await api.post('/eta/save-schedules', {
-          entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source }) => ({
+          entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source, schedule_type }) => ({
             subject_name,
             day_of_week,
             start_time,
             end_time,
             location,
             source: source ?? 'eta_image',
+            schedule_type,
           })),
         });
       }
@@ -172,7 +176,9 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
 
             {entries.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-xs font-bold text-slate-500">{entries.length}개 과목 인식됨</p>
+                <p className="text-xs font-bold text-slate-500">
+                  {entries.length}개 인식됨 · 알바·스터디 같은 개인 일정은 &lsquo;개인&rsquo;으로 골라 주세요
+                </p>
                 <div className="overflow-hidden rounded-lg border">
                   {entries.map((e, i) => (
                     <div
@@ -183,6 +189,14 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
                       <span className="w-4 text-center font-bold text-blue-700">{DAY_KO[e.day_of_week]}</span>
                       <span className="flex-1 truncate font-medium">{e.subject_name}</span>
                       <span className="text-xs text-slate-400">{e.start_time}–{e.end_time}</span>
+                      <div className="w-24 shrink-0">
+                        <ScheduleKindToggle
+                          value={e.schedule_type}
+                          onChange={(v) =>
+                            setEntries((prev) => prev.map((x, j) => (j === i ? { ...x, schedule_type: v } : x)))
+                          }
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
