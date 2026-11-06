@@ -394,6 +394,15 @@ export default function LandingPage() {
           </Link>
         </div>
       </section>
+
+      <footer className="bg-white px-4 py-6 text-xs text-slate-500 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
+          <span>© 2026 SKEMA · 단국대학교 졸업작품</span>
+          <Link href="/privacy" className="font-bold text-slate-600 hover:text-[#2563eb]">
+            개인정보처리방침
+          </Link>
+        </div>
+      </footer>
     </main>
   );
 }
