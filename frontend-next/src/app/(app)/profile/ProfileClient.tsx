@@ -218,13 +218,13 @@ export default function ProfileClient() {
           <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50">
-                <MaterialIcon icon="smart_toy" size={22} color="#2563eb" />
+                <MaterialIcon icon="schedule" size={22} color="#2563eb" />
               </div>
               <div>
-                <p className="text-sm font-black text-blue-600">AI 개인화 기준</p>
+                <p className="text-sm font-black text-blue-600">개인화 기준</p>
                 <h2 className="mt-1 text-xl font-black text-slate-950">시간표가 이 설정을 기준으로 정리됩니다</h2>
                 <p className="mt-2 text-sm font-bold leading-6 text-slate-500">
-                  기상 시간은 일간·주간·월간 시간표의 시작 기준이고, 목표와 신분은 AI가 빈 시간을 추천할 때 참고합니다.
+                  기상 시간은 일간·주간·월간 시간표의 시작 기준이고, 수면 시간에는 공부 블록과 다시 짜기가 일정을 넣지 않습니다.
                 </p>
               </div>
             </div>
@@ -336,7 +336,7 @@ export default function ProfileClient() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-black text-blue-600">시간표 개인화</p>
-                <h2 className="text-2xl font-black text-slate-950">AI가 참고할 생활 기준</h2>
+                <h2 className="text-2xl font-black text-slate-950">시간표가 참고할 생활 기준</h2>
               </div>
               <div className="rounded-full bg-blue-50 px-4 py-2 text-sm font-black text-blue-600">
                 시간표 시작 {profileForm.sleep_end}
@@ -453,12 +453,12 @@ export default function ProfileClient() {
             </div>
 
             <div className="mt-5 space-y-2">
-              <Label htmlFor="goal-tasks" className="font-black text-slate-900">AI에게 알려둘 목표</Label>
+              <Label htmlFor="goal-tasks" className="font-black text-slate-900">나의 목표 메모</Label>
               <Textarea
                 id="goal-tasks"
                 value={profileForm.goal_tasks}
                 onChange={(event) => updateProfileDraft({ goal_tasks: event.target.value })}
-                placeholder="예: 오전에는 집중 과목, 시험 전 주에는 복습 시간을 먼저 잡아줘"
+                placeholder="예: 이번 학기 목표, 시험 전 주에는 복습 먼저"
                 className="min-h-28 rounded-xl border-blue-100 bg-slate-50 p-4 text-base font-bold leading-7"
               />
             </div>

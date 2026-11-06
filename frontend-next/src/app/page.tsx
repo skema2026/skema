@@ -170,17 +170,17 @@ export default function LandingPage() {
           <div className="max-w-2xl">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-3 py-1.5 text-xs font-extrabold text-blue-600 shadow-sm">
               <MaterialIcon icon="auto_awesome" size={15} color="#2563eb" filled />
-              AI 기반 스마트 시간표
+              대학생을 위한 스마트 시간표
             </div>
 
             <h1 className="text-5xl font-black leading-[1.08] tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
               SKEMA
               <br />
               <span className="bg-gradient-to-r from-blue-700 to-sky-500 bg-clip-text text-transparent">
-                AI가 설계하는 
+                밀려도
                 <br />
-                나만의 
-                <br/>
+                다시 짜 주는
+                <br />
                 스마트 시간표
               </span>
             </h1>
@@ -188,7 +188,7 @@ export default function LandingPage() {
             <p className="mt-7 max-w-xl text-base font-medium leading-8 text-slate-600 sm:text-lg">
               수업, 시험, 공부, 개인 일정을 한 화면에서 정리하고
               <br />
-              AI로 빈 시간을 재배치합니다.
+              못 한 공부는 ‘다시 짜기’로 빈 시간에 다시 배치합니다.
             </p>
 
             <p className="mt-4 text-sm font-semibold text-slate-500">
@@ -345,8 +345,8 @@ export default function LandingPage() {
             <div className="rounded-lg border border-[#d8e2ef] bg-white p-4 shadow-sm">
               <p className="mb-3 text-sm font-extrabold text-slate-950">빠른 실행</p>
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-800">
-                <p className="text-xs font-bold">AI 채팅</p>
-                <p className="mt-1 text-sm font-semibold">말로 일정 추가·수정</p>
+                <p className="text-xs font-bold">다시 짜기</p>
+                <p className="mt-1 text-sm font-semibold">밀린 공부를 빈 시간에 다시 배치</p>
               </div>
               <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-800">
                 <p className="text-xs font-bold">시간표 업로드</p>
@@ -363,7 +363,7 @@ export default function LandingPage() {
           <h2 className="skema-headline mb-10 text-3xl font-extrabold text-slate-950 sm:text-4xl">실사용 흐름에 맞춘 기능</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {[
-              ['자연어 일정 관리', 'AI 채팅으로 일정을 추가하고 미완료 일정을 재배치합니다.', 'chat'],
+              ['다시 짜기', '못 한 공부 블록을 시험 전날까지 남은 빈 시간에 다시 배치합니다.', 'autorenew'],
               ['시간표 이미지 인식', '캡처한 시간표를 업로드하면 수업 정보를 자동으로 정리합니다.', 'upload_file'],
               ['일간·주간·월간 보기', '기상시간을 기준으로 하루, 주간, 월간 흐름을 빠르게 확인합니다.', 'calendar_month'],
               ['공유 시간표', '읽기 전용 링크로 주간 시간표를 빠르게 공유합니다.', 'ios_share'],
