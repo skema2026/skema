@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Schedule } from "@/types";
 import MaterialIcon from "@/components/common/MaterialIcon";
 
@@ -16,34 +16,15 @@ type DayTimelineProps = {
 const getScheduleStyle = (type?: string | null) => {
   switch (type) {
     case "class":
-      return {
-        icon: "school",
-        background: "#EFF6FF",
-      };
-
+      return { icon: "school", background: "#EFF6FF" };
     case "study":
-      return {
-        icon: "menu_book",
-        background: "#F0FDF4",
-      };
-
+      return { icon: "menu_book", background: "#F0FDF4" };
     case "exam":
-      return {
-        icon: "assignment",
-        background: "#FFFBEB",
-      };
-
+      return { icon: "assignment", background: "#FFFBEB" };
     case "personal":
-      return {
-        icon: "event",
-        background: "#FAF5FF",
-      };
-
+      return { icon: "event", background: "#FAF5FF" };
     default:
-      return {
-        icon: "event_note",
-        background: "#F8FAFC",
-      };
+      return { icon: "event_note", background: "#F8FAFC" };
   }
 };
 
@@ -73,178 +54,161 @@ export default function DayTimeline({
     const updateNow = () => setNow(new Date());
     updateNow();
 
-    const interval = setInterval(updateNow, 60_000);
-    return () => clearInterval(interval);
+    const interval = window.setInterval(updateNow, 60_000);
+    return () => window.clearInterval(interval);
   }, [isToday]);
 
   const totalHeight = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
-
   const nowMinutes = now ? now.getHours() * 60 + now.getMinutes() : null;
-
   const currentTop =
     nowMinutes !== null ? (nowMinutes - START_HOUR * 60) * MINUTE_HEIGHT : null;
 
+  const sortedSchedules = useMemo(
+    () => [...schedules].sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time)),
+    [schedules],
+  );
+
   return (
-    <div className="overflow-hidden rounded-xl border border-blue-100 bg-white">
-      <div className="border-b border-blue-100 px-4 py-3">
-        <h3 className="text-base font-black text-slate-900">하루 타임라인</h3>
-        <p className="mt-1 text-xs text-slate-500">
-          30분 단위로 일정을 확인할 수 있어요.
-        </p>
-      </div>
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+      <div className="relative ml-14 mr-2" style={{ height: totalHeight }}>
+        {Array.from({ length: 49 }, (_, index) => {
+          const minutes = index * 30;
+          const hour = Math.floor(minutes / 60);
+          const minute = minutes % 60;
+          const isHour = minute === 0;
 
-      <div className="max-h-[650px] overflow-y-auto">
-        <div className="relative ml-16 mr-4" style={{ height: totalHeight }}>
-          {Array.from({ length: 49 }, (_, index) => {
-            const minutes = index * 30;
-            const hour = Math.floor(minutes / 60);
-            const minute = minutes % 60;
-            const isHour = minute === 0;
-
-            return (
-              <div
-                key={minutes}
-                className={`absolute left-0 right-0 border-t ${
-                  isHour ? "border-slate-200" : "border-dashed border-slate-100"
-                }`}
-                style={{ top: minutes * MINUTE_HEIGHT }}
-              >
-                <span className="absolute -left-14 -top-2.5 w-12 text-right text-[11px] font-semibold text-slate-400">
-                  {`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`}
-                </span>
-              </div>
-            );
-          })}
-
-          {freeWindows.map((window) => {
-            const top = window.start * MINUTE_HEIGHT;
-            const height = Math.max((window.end - window.start) * MINUTE_HEIGHT, 18);
-
-            return (
-              <div
-                key={`free-${window.start}-${window.end}`}
-                className="absolute left-2 right-2 z-10 overflow-hidden rounded-lg border border-dashed border-blue-200/80 bg-blue-50/60"
-                style={{
-                  top,
-                  height,
-                  backgroundImage:
-                    "linear-gradient(90deg, rgba(191,219,254,0.15) 0%, rgba(147,197,253,0.28) 40%, rgba(191,219,254,0.14) 100%)",
-                  borderColor: "rgba(147, 197, 253, 0.5)",
-                  boxShadow: "inset 0 0 0 1px rgba(147, 197, 253, 0.2)",
-                }}
-              />
-            );
-          })}
-
-          {schedules.map((schedule) => {
-            const start = toMinutes(schedule.start_time);
-            const end = toMinutes(schedule.end_time);
-
-            if (
-              !Number.isFinite(start) ||
-              !Number.isFinite(end) ||
-              end <= start
-            ) {
-              return null;
-            }
-
-            const top = start * MINUTE_HEIGHT;
-            const height = (end - start) * MINUTE_HEIGHT;
-            const color = getDisplayColor(schedule);
-            const scheduleStyle = getScheduleStyle(schedule.schedule_type);
-
-            return (
-              <div
-                key={schedule.id}
-                className={`absolute left-2 right-2 z-20 overflow-hidden rounded-lg border p-2 shadow-sm ${
-                  schedule.is_completed ? "opacity-60" : ""
-                }`}
-                style={{
-                  top,
-                  height,
-                  borderLeftWidth: 4,
-                  borderLeftColor: color,
-                  backgroundColor: scheduleStyle.background,
-                }}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onScheduleClick(schedule)}
-                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-bold text-slate-900"
-                    title={schedule.title}
-                  >
-                    <MaterialIcon
-                      icon={scheduleStyle.icon}
-                      size={15}
-                      color={color}
-                    />
-                    <span
-                      className={`truncate ${
-                        schedule.is_completed ? "text-slate-400 line-through" : ""
-                      }`}
-                    >
-                      {schedule.title}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onToggleComplete(schedule)}
-                    aria-label={`${schedule.title} 완료 여부`}
-                    aria-pressed={Boolean(schedule.is_completed)}
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
-                      schedule.is_completed
-                        ? "border-emerald-400 bg-emerald-400"
-                        : "border-slate-300 bg-white hover:border-blue-400"
-                    }`}
-                  >
-                    {schedule.is_completed && (
-                      <svg
-                        className="h-3 w-3 text-white"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                      >
-                        <path
-                          d="M2 6l3 3 5-5"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-
-                {height >= 55 && (
-                  <p
-                    className={`mt-1 text-[11px] ${
-                      schedule.is_completed ? "text-slate-400 line-through" : "text-slate-500"
-                    }`}
-                  >
-                    {schedule.start_time} – {schedule.end_time}
-                  </p>
-                )}
-
-                {schedule.location && height >= 70 && (
-                  <p className="mt-1 truncate text-[10px] text-slate-500">
-                    {schedule.location}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-
-          {isToday && currentTop !== null && (
+          return (
             <div
-              className="pointer-events-none absolute left-0 right-0 z-30 border-t-2 border-red-500"
-              style={{ top: currentTop }}
+              key={minutes}
+              className={`absolute left-0 right-0 border-t ${
+                isHour ? "border-slate-200" : "border-dashed border-slate-200/80"
+              }`}
+              style={{ top: minutes * MINUTE_HEIGHT }}
             >
-              <span className="absolute -left-2 -top-1.5 h-3 w-3 rounded-full bg-red-500" />
+              <span className="absolute -left-13 -top-2 w-10 text-right text-[10px] font-bold text-slate-400">
+                {`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`}
+              </span>
             </div>
-          )}
-        </div>
+          );
+        })}
+
+        {freeWindows.map((window) => {
+          const top = window.start * MINUTE_HEIGHT;
+          const height = Math.max((window.end - window.start) * MINUTE_HEIGHT, 18);
+
+          return (
+            <div
+              key={`free-${window.start}-${window.end}`}
+              className="absolute left-2 right-2 z-10 overflow-hidden rounded-xl border border-dashed border-blue-200 bg-blue-50/80"
+              style={{
+                top,
+                height,
+                backgroundImage:
+                  "linear-gradient(90deg, rgba(191,219,254,0.18) 0%, rgba(147,197,253,0.24) 35%, rgba(191,219,254,0.12) 100%)",
+              }}
+            />
+          );
+        })}
+
+        {sortedSchedules.map((schedule) => {
+          const start = toMinutes(schedule.start_time);
+          const end = toMinutes(schedule.end_time);
+
+          if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+            return null;
+          }
+
+          const top = start * MINUTE_HEIGHT;
+          const height = (end - start) * MINUTE_HEIGHT;
+          const color = getDisplayColor(schedule);
+          const scheduleStyle = getScheduleStyle(schedule.schedule_type);
+
+          return (
+            <div
+              key={schedule.id}
+              data-schedule-id={schedule.id}
+              className={`absolute left-2 right-2 z-20 overflow-hidden rounded-xl border p-2 transition ${
+                schedule.is_completed ? "opacity-70" : ""
+              }`}
+              style={{
+                top,
+                height,
+                borderLeftWidth: 4,
+                borderLeftColor: color,
+                backgroundColor: scheduleStyle.background,
+              }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => onScheduleClick(schedule)}
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[11px] font-black text-slate-900"
+                  title={schedule.title}
+                >
+                  <MaterialIcon icon={scheduleStyle.icon} size={15} color={color} />
+                  <span
+                    className={`truncate ${
+                      schedule.is_completed ? "text-slate-400 line-through" : ""
+                    }`}
+                  >
+                    {schedule.title}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onToggleComplete(schedule)}
+                  aria-label={`${schedule.title} 완료 여부`}
+                  aria-pressed={Boolean(schedule.is_completed)}
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                    schedule.is_completed
+                      ? "border-emerald-400 bg-emerald-400"
+                      : "border-slate-300 bg-white hover:border-blue-400"
+                  }`}
+                >
+                  {schedule.is_completed && (
+                    <svg
+                      className="h-3 w-3 text-white"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                    >
+                      <path
+                        d="M2 6l3 3 5-5"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {height >= 56 && (
+                <p
+                  className={`mt-1 text-[10px] font-semibold ${
+                    schedule.is_completed ? "text-slate-400 line-through" : "text-slate-600"
+                  }`}
+                >
+                  {schedule.start_time} – {schedule.end_time}
+                </p>
+              )}
+
+              {schedule.location && height >= 72 && (
+                <p className="mt-1 truncate text-[9px] text-slate-500">{schedule.location}</p>
+              )}
+            </div>
+          );
+        })}
+
+        {isToday && currentTop !== null && (
+          <div
+            className="pointer-events-none absolute left-0 right-0 z-30 border-t-2 border-red-500"
+            style={{ top: currentTop }}
+          >
+            <span className="absolute -left-2 -top-1.5 h-3 w-3 rounded-full bg-red-500" />
+          </div>
+        )}
       </div>
     </div>
   );
