@@ -111,8 +111,22 @@ def _get_reminder_minutes(db, user_id: int) -> int:
     return 30
 
 
-def _push(db, user_id: int, ntype: str, title: str, body: str, related_id: int | None = None, send_push: bool = True):
-    """알림 1건 저장.
+def day_timeline_url(date_str: str) -> str:
+    """대시보드 하루 타임라인 주소. DashboardClient가 ?view=day&date=YYYY-MM-DD를 읽는다."""
+    return f"/dashboard?view=day&date={date_str}"
+
+
+def _push(
+    db,
+    user_id: int,
+    ntype: str,
+    title: str,
+    body: str,
+    related_id: int | None = None,
+    send_push: bool = True,
+    url: str = "/dashboard",
+):
+    """알림 1건 저장. url은 푸시 알림을 눌렀을 때 열 화면.
     중복 방지 기준:
       - related_id 있음 → (type, related_id, 오늘) — 같은 일정에 하루 1번
       - related_id 없음 → (type, title, 오늘) — 동기부여·리포트 등
@@ -151,7 +165,7 @@ def _push(db, user_id: int, ntype: str, title: str, body: str, related_id: int |
     db.add(notif)
     db.flush()
     if send_push:
-        send_push_to_user(db, user_id, title, body, url="/dashboard", ntype=ntype)
+        send_push_to_user(db, user_id, title, body, url=url, ntype=ntype)
 
 
 def job_weekly_report():
@@ -188,7 +202,7 @@ def job_weekly_report():
                 f"이번주 예정 일정: {this_week_count}건",
             ]
             if undone_count > 0:
-                body_lines.append("미완료 일정을 AI 채팅에서 재배치할 수 있습니다.")
+                body_lines.append("미완료 일정은 하루 타임라인의 '다시 짜기'로 빈 시간에 옮길 수 있어요.")
 
             _push(db, user.id, "weekly_report", "주간 리포트", "\n".join(body_lines))
 
@@ -215,6 +229,14 @@ def job_daily_motivation():
         logger.error("job_daily_motivation failed: %s", e, exc_info=True)
     finally:
         db.close()
+
+
+def incomplete_body(s) -> str:
+    """미완료 알림 본문. 누르면 그날 타임라인이 열리고, 거기서 '다시 짜기'를 누르면 된다."""
+    return (
+        f"[{s.start_time}~{s.end_time}] 일정이 아직 완료되지 않았어요. "
+        "눌러서 오늘 타임라인에서 완료 체크하거나 '다시 짜기'로 옮겨 보세요."
+    )
 
 
 def job_reminders():
@@ -249,13 +271,15 @@ def job_reminders():
                         f"곧 시작: {s.title}",
                         f"{kind[1]}분 후 [{s.start_time}~{s.end_time}] 일정이 시작됩니다.",
                         related_id=s.id,
+                        url=day_timeline_url(today_str),
                     )
                 else:
                     _push(
                         db, user.id, "reminder_incomplete",
                         f"미완료: {s.title}",
-                        f"[{s.start_time}~{s.end_time}] 일정이 아직 완료되지 않았습니다.",
+                        incomplete_body(s),
                         related_id=s.id,
+                        url=day_timeline_url(today_str),
                     )
 
         db.commit()
