@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     default: "SKEMA",
     template: "%s | SKEMA",
   },
-  description: "AI로 관리하는 스마트 시간표와 시험 준비 대시보드",
+  description: "밀려도 다시 짜 주는 대학생 시간표와 시험 준비 대시보드",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/icon-192.png",

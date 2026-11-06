@@ -28,12 +28,6 @@ type DayViewProps = {
     target?: "day" | "week" | "month",
   ) => Schedule[];
   exams: ExamSchedule[];
-  runAiCommand: (
-    action: string,
-    prompt: string,
-    successMessage: string,
-  ) => Promise<void>;
-  aiAction: string | null;
   showWeekViewForDate: (date: Date) => void;
   getDisplayColor: (schedule: Schedule) => string;
   formatDuration: (start: number, end: number) => string;
@@ -43,7 +37,6 @@ type DayViewProps = {
     title: string;
     exam_date: string;
   }) => void;
-  setIsFreeTimeDialogOpen: (open: boolean) => void;
   selectedDayPrimarySchedule: Schedule | null;
   openClassForm: (schedule?: Schedule) => void;
   isSelectedDayToday: boolean;
@@ -305,20 +298,13 @@ export default function DayView({
   dayDate,
   daySchedules,
   dayExams,
-  upcomingExams,
   dayFreeWindows,
   dayConflictSchedules,
-  todayStr,
   now,
-  wakeStartTime,
-  profile,
   getDaysUntil,
   formatLongDate,
   toLocalDateString,
-  minutesToTime,
   timeToMinutes,
-  runAiCommand,
-  aiAction,
   getDisplayColor,
   setExamForStudyBlocks,
   openClassForm,
@@ -381,64 +367,6 @@ export default function DayView({
 
   const todaySummaryText = `${total}개 일정 · 완료 ${completed}개`;
 
-  const handleMorningPlan = async () => {
-    const isToday = toLocalDateString(dayDate) === todayStr;
-    const doneCnt = daySchedules.filter((schedule) => schedule.is_completed).length;
-    const pct = total > 0 ? Math.round((doneCnt / total) * 100) : 0;
-    const fmt = (schedule: Schedule) =>
-      `- [${schedule.is_completed ? "완료" : "미완료"}] ${schedule.start_time}-${schedule.end_time} ${schedule.title} (${schedule.schedule_type ?? "일정"}${schedule.location ? `, ${schedule.location}` : ""})`;
-    const scheduleLines = total > 0 ? daySchedules.map(fmt).join("\n") : "- 일정 없음";
-    const dayExamLines =
-      dayExams.length > 0
-        ? dayExams
-            .map(
-              (exam) =>
-                `- ${exam.title}${exam.exam_time ? ` (${exam.exam_time})` : ""}${exam.location ? ` @${exam.location}` : ""}`,
-            )
-            .join("\n")
-        : "";
-    const upcomingExamLines = upcomingExams
-      .filter((exam) => exam.exam_date !== toLocalDateString(dayDate))
-      .slice(0, 3)
-      .map(
-        (exam) => `- ${exam.title} (${exam.exam_date}, D-${getDaysUntil(exam.exam_date)})`,
-      )
-      .join("\n");
-    const freeTimeLine =
-      dayFreeWindows.length > 0
-        ? dayFreeWindows
-            .map((window) => `${minutesToTime(window.start)}-${minutesToTime(window.end)}`)
-            .join(", ")
-        : "없음";
-    const conflictLine =
-      dayConflictSchedules.length > 0
-        ? dayConflictSchedules.map(({ schedule }) => schedule.title).join(", ")
-        : "없음";
-
-    const header = isToday
-      ? `현재 시각: ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}\n날짜: ${toLocalDateString(dayDate)} (오늘)`
-      : `날짜: ${toLocalDateString(dayDate)}`;
-
-    const prompt = `${header}
-완료율: ${doneCnt}/${total}개 (${pct}%)
-기상/취침: ${wakeStartTime} / ${profile?.sleep_start ?? "23:00"}
-빈 시간대: ${freeTimeLine}
-겹치는 일정: ${conflictLine}
-${dayExamLines ? `\n당일 시험:\n${dayExamLines}` : ""}${upcomingExamLines ? `\n\n다가오는 시험:\n${upcomingExamLines}` : ""}
-
-일정 목록:
-${scheduleLines}
-
-위 데이터를 정확히 참고해서 한국어로 자연스럽게 정리해줘. 정확히 아래 3가지 항목으로 답해줘:
-① ${isToday ? "지금 당장 할 것" : "이 날 가장 중요한 것"} — 미완료 일정 중 우선순위, 시험 D-day 임박 여부 반영
-② 빈 시간 활용 — 위의 "빈 시간대"를 그대로 인용해서 무엇을 하면 좋을지
-③ 주의할 점 — 겹치는 일정, 무리한 일정, 빠뜨리기 쉬운 것 등
-
-각 항목은 1-2문장으로 짧고 구체적으로 작성해줘. 모르는 정보를 추측하지 말고 위 데이터만 참고해.`;
-
-    await runAiCommand("today-plan", prompt, "하루 시간표를 정리했습니다");
-  };
-
   return (
     <div
       data-day-scroll-container="true"
@@ -457,15 +385,6 @@ ${scheduleLines}
             </div>
 
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleMorningPlan}
-                disabled={aiAction !== null}
-                className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                <MaterialIcon icon="smart_toy" size={13} color="#fff" />
-                {aiAction === "today-plan" ? "정리 중..." : "하루 정리"}
-              </button>
               <button
                 type="button"
                 onClick={onReschedule}
