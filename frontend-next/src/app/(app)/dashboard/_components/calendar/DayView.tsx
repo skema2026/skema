@@ -234,7 +234,7 @@ function DailyReport({
         </div>
       </div>
 
-      <div className="bg-slate-50 p-3">
+      <div className={nextExam ? "bg-slate-50 p-3" : "p-3"}>
         {nextExam ? (
           <button
             type="button"
@@ -290,10 +290,12 @@ function DailyReport({
         type="button"
         onClick={onReschedule}
         disabled={isRegenerating}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-3 py-2.5 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
+        className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-700 via-blue-500 to-blue-300 p-[1px] transition-all duration-200 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:opacity-50"
       >
-        <MaterialIcon icon="autorenew" size={16} color="#fff" />
-        {isRegenerating ? "다시 짜는 중..." : "다시 짜기"}
+        <span className="flex w-full items-center justify-center gap-2 rounded-[calc(1rem-1px)] bg-slate-50/90 px-3 py-2.5 text-sm font-black text-blue-600 transition-colors group-hover:bg-blue-50 group-focus-visible:bg-blue-50">
+          <MaterialIcon icon="edit_calendar" size={16} color="#2563eb" />
+          {isRegenerating ? "다시 짜는 중..." : "다시 짜기"}
+        </span>
       </button>
     </div>
   );
