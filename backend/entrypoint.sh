@@ -33,7 +33,18 @@ except Exception as e:
 done
 
 echo "[entrypoint] DB is ready. Running Alembic migrations..."
-alembic upgrade head || (echo "[entrypoint] Migration failed, stamping head..." && alembic stamp head && alembic upgrade head)
+# 11/7: 실패하면 배포를 멈춘다. 예전에는 실패 시 'alembic stamp head'로 실행하지 않은 마이그레이션까지
+# 적용된 것으로 표시해서, 서버는 뜨지만 DB 스키마가 코드와 어긋난 채로 남을 수 있었다.
+# 정말 필요할 때(테이블은 이미 있고 버전 기록만 빠진 DB)만 ALEMBIC_STAMP_ON_FAILURE=1 로 예전 동작을 켠다.
+if ! alembic upgrade head; then
+    if [ "${ALEMBIC_STAMP_ON_FAILURE:-0}" = "1" ]; then
+        echo "[entrypoint] WARNING: migration failed, ALEMBIC_STAMP_ON_FAILURE=1 -> stamping head (schema may not match code)"
+        alembic stamp head
+    else
+        echo "[entrypoint] ERROR: migration failed. Fix the migration or DB, then redeploy."
+        exit 1
+    fi
+fi
 
 echo "[entrypoint] Starting uvicorn..."
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
