@@ -167,7 +167,7 @@ def get_user_public_profile(
     """타 사용자의 공개 프로필 반환.
 
     - 기본 정보 (username, 가입일)
-    - 글로벌 공개 기록 목록 (최신 10개, 그룹 기록 제외)
+    - 공개 기록 목록 (최신 10개, 그룹·비공개 기록 제외)
     - 현재/최장 스트릭
     """
     from app.studylog.models import StudyLog
@@ -179,7 +179,12 @@ def get_user_public_profile(
 
     logs = (
         db.query(StudyLog)
-        .filter(StudyLog.user_id == user_id, StudyLog.group_id == None)  # noqa: E711
+        # 11/7: 그룹 기록과 비공개 기록은 빼고 공개 기록만 보여 준다 (기록은 기본 비공개로 저장됨)
+        .filter(
+            StudyLog.user_id == user_id,
+            StudyLog.group_id == None,  # noqa: E711
+            StudyLog.is_public == True,  # noqa: E712
+        )
         .order_by(StudyLog.created_at.desc())
         .limit(10)
         .all()
