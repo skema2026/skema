@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.notification.models import PushSubscription
+from app.notification.push_hosts import is_allowed_push_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,10 @@ def _send_one(
     url: str,
     ntype: str,
 ) -> bool:
+    # 11/7: 검사 도입 전에 저장된 구독도 있으므로 보내기 직전에도 확인한다 (실패로 세어 정리되게)
+    if not is_allowed_push_endpoint(sub.endpoint):
+        logger.warning("Web Push skipped: endpoint not allowed for subscription %s", sub.id)
+        return False
     try:
         from pywebpush import webpush
 
