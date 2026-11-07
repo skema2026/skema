@@ -9,7 +9,7 @@ from app.auth import repository
 from app.auth.models import User, UserProfile
 from app.auth.schemas import SignupRequest
 from app.core.config import settings
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import create_access_token, hash_password, is_admin_email, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,23 @@ OAUTH_CONFIGS = {
 
 # ── 회원가입 / 로그인 ──────────────────────────────────────────────────────────
 
+def _reject_reserved_admin_email(db: Session, email: str | None, current_user_id: int | None = None) -> None:
+    """관리자 목록(ADMIN_EMAILS)에 있는 이메일은 가입·이메일 변경으로 가져갈 수 없다 (11/7).
+
+    관리자는 이메일 문자열로 판정하는데 이메일 인증이 없어서, 아직 가입되지 않은 관리자 주소로
+    가입하거나 내 이메일을 그 주소로 바꾸면 관리자 권한을 얻을 수 있었다.
+    이미 그 주소를 쓰는 본인 계정의 수정은 막지 않는다.
+    """
+    if not is_admin_email(email):
+        return
+    owner = repository.get_user_by_email(db, email)
+    if owner is not None and owner.id == current_user_id:
+        return
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="사용할 수 없는 이메일입니다.")
+
+
 def signup(db: Session, data: SignupRequest) -> User:
+    _reject_reserved_admin_email(db, data.email)
     if repository.get_user_by_email(db, data.email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용 중인 이메일입니다.")
     if data.username and repository.get_user_by_username(db, data.username):
@@ -153,6 +169,7 @@ def update_profile(db: Session, user_id: int, updates: dict) -> UserProfile:
 def update_user_account(db: Session, user: User, updates: dict) -> User:
     email = updates.get("email")
     if email and email != user.email:
+        _reject_reserved_admin_email(db, email, current_user_id=user.id)
         existing = repository.get_user_by_email(db, email)
         if existing and existing.id != user.id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용 중인 이메일입니다.")
@@ -168,9 +185,18 @@ def update_user_account(db: Session, user: User, updates: dict) -> User:
 
 # ── OAuth (소셜 로그인) ───────────────────────────────────────────────────────
 
+class SocialEmailExists(Exception):
+    """소셜 로그인 이메일이 이미 다른 방식으로 가입된 계정의 이메일과 같다 (자동 연결하지 않음)."""
+
+
 def exchange_oauth_code(
     provider: str, code: str, state: str = ""
-) -> tuple[str, str, str, str | None, str | None]:
+) -> tuple[str, str, str, str | None, str | None, bool]:
+    """반환: (social_id, email, display_name, kakao_access_token, kakao_refresh_token, email_verified)
+
+    email_verified: 공급자가 '이 이메일은 본인 확인됨'이라고 알려 준 경우만 True.
+    네이버는 확인 여부를 주지 않으므로 False로 본다.
+    """
     cfg = OAUTH_CONFIGS[provider]
     client_id = getattr(settings, cfg["client_id_key"])
     client_secret = getattr(settings, cfg["client_secret_key"])
@@ -209,10 +235,12 @@ def exchange_oauth_code(
     kakao_access_token: str | None = None
     kakao_refresh_token: str | None = None
 
+    email_verified = False
     if provider == "google":
         social_id = userinfo.get("id", "")
         email = userinfo.get("email", "")
         display_name = userinfo.get("name", "")
+        email_verified = bool(userinfo.get("verified_email") or userinfo.get("email_verified"))
     elif provider == "naver":
         resp = userinfo.get("response", {})
         social_id = resp.get("id", "")
@@ -222,6 +250,7 @@ def exchange_oauth_code(
         social_id = str(userinfo.get("id", ""))
         kakao_account = userinfo.get("kakao_account", {})
         email = kakao_account.get("email", "")
+        email_verified = bool(kakao_account.get("is_email_verified") and kakao_account.get("is_email_valid", True))
         display_name = userinfo.get("properties", {}).get("nickname", "")
         kakao_access_token = access_token
         kakao_refresh_token = token_data.get("refresh_token")
@@ -231,7 +260,7 @@ def exchange_oauth_code(
     if not social_id:
         raise ValueError("userinfo_failed")
 
-    return social_id, email, display_name, kakao_access_token, kakao_refresh_token
+    return social_id, email, display_name, kakao_access_token, kakao_refresh_token, email_verified
 
 
 def get_or_create_social_user(
@@ -242,6 +271,7 @@ def get_or_create_social_user(
     display_name: str,
     kakao_access_token: str | None = None,
     kakao_refresh_token: str | None = None,
+    email_verified: bool = False,
 ) -> User:
     user = repository.get_user_by_social(db, provider, social_id)
     if user:
@@ -249,13 +279,15 @@ def get_or_create_social_user(
             repository.update_kakao_tokens(db, user, kakao_access_token, kakao_refresh_token)
         return user
 
-    if email:
-        user = repository.get_user_by_email(db, email)
-        if user:
-            user = repository.link_social(db, user, provider, social_id)
-            if kakao_access_token:
-                repository.update_kakao_tokens(db, user, kakao_access_token, kakao_refresh_token)
-            return user
+    # 11/7: 같은 이메일의 기존 계정에 자동으로 연결하지 않는다.
+    # 가입·이메일 변경에 이메일 인증이 없어서, 남의 이메일로 먼저 가입해 두면 그 사람이 나중에
+    # 소셜 로그인할 때 공격자 계정에 연결되어 공격자가 비밀번호로 계속 들어올 수 있었다(계정 선점).
+    if email and repository.get_user_by_email(db, email):
+        raise SocialEmailExists(email)
+
+    # 공급자가 확인하지 않은 이메일이 관리자 주소면 쓰지 않는다 (관리자 권한 탈취 방지)
+    if email and is_admin_email(email) and not email_verified:
+        email = ""
 
     fallback_email = email or f"{provider}_{social_id}@social.skema"
     # display_name을 username 후보로 사용하되 중복이면 소셜 ID 뒤 8자 추가
