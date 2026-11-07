@@ -1,4 +1,6 @@
-# SKEMA 웹앱 배포 가이드
+# SKEMA 웹앱 배포 가이드 (서버 한 대에 직접 띄우기)
+
+> 참고용 문서입니다. 지금 운영은 Railway(백엔드·DB) + Vercel(프론트)로 하고 있으며 [`deploy.md`](deploy.md)에 정리돼 있습니다.
 
 이 구성은 한 대의 서버에서 Docker Compose로 다음 서비스를 실행합니다.
 
