@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useLogin } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 256 262" preserveAspectRatio="xMidYMid">
@@ -84,7 +85,7 @@ export default function LoginPage() {
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };
         if (error?.response?.status === 401) toast.error('아이디 또는 비밀번호가 올바르지 않습니다');
-        else toast.error('로그인 중 오류가 발생했습니다');
+        else toast.error(apiErrorMessage(err, '로그인 중 오류가 발생했습니다'));
       },
     });
   };

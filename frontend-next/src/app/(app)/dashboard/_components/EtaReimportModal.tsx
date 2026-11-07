@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { ScheduleKindToggle, toEtaKind, type EtaScheduleKind } from '@/components/timetable/ScheduleKindToggle';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface ParsedEntry {
   subject_name: string;
@@ -78,8 +79,8 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
       }>;
       setEntries(parsed.map((e) => ({ ...e, location: e.location ?? '', schedule_type: toEtaKind(e.schedule_type) })));
       if (parsed.length === 0) toast('시간표를 인식하지 못했습니다. 다른 이미지로 시도해 주세요.');
-    } catch {
-      toast.error('이미지 분석에 실패했습니다.');
+    } catch (err) {
+      toast.error(apiErrorMessage(err, '이미지 분석에 실패했습니다.'));
     } finally {
       setParsing(false);
     }
