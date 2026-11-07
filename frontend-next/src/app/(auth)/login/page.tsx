@@ -42,10 +42,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    // 소셜 로그인 토큰은 서버 로그에 남지 않도록 #token= (fragment)로 온다. 예전 ?token= 도 받는다.
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const token = hashParams.get('token') ?? params.get('token');
     const error = params.get('error');
     if (error) {
-      toast.error('소셜 로그인에 실패했습니다');
+      toast.error(
+        error === 'oauth_email_exists'
+          ? '이미 이메일로 가입된 계정입니다. 아이디·비밀번호로 로그인해주세요'
+          : '소셜 로그인에 실패했습니다',
+      );
       window.history.replaceState({}, '', '/login');
       return;
     }
