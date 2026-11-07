@@ -1,6 +1,7 @@
 import secrets
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.share import repository
@@ -52,6 +53,16 @@ def get_schedules_by_share_token(db: Session, token_str: str) -> dict:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="유효하지 않거나 만료된 공유 링크입니다.",
         )
-    schedules = db.query(Schedule).filter(Schedule.user_id == share_token.user_id).all()
+    # 11/7: 수업만, 사용자가 지운 일정은 빼고 공개한다.
+    # 예전에는 user_id 로만 걸러서 개인 일정(알바·회의)·공부 블록·삭제한 일정까지 링크로 공개됐다.
+    schedules = (
+        db.query(Schedule)
+        .filter(
+            Schedule.user_id == share_token.user_id,
+            or_(Schedule.schedule_type == "class", Schedule.schedule_type.is_(None)),
+            Schedule.deleted_by_user.isnot(True),
+        )
+        .all()
+    )
     user = db.query(User).filter(User.id == share_token.user_id).first()
     return {"schedules": schedules, "username": user.username if user else None}
