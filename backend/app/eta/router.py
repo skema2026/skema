@@ -21,6 +21,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.auth.models import User
 from app.core.config import settings
+from app.core.rate_limit import eta_parses
 from app.core.security import get_current_user, get_db
 from app.core.llm import (
     LLMEmptyResponseError,
@@ -32,7 +33,7 @@ from app.schedule.service import stage_schedule_record
 
 from app.core.time_utils import DAY_NAMES as KR_DAYS
 
-from . import block_ocr
+from . import block_ocr, image_guard
 from .location_utils import normalize_location
 from .positional_parser import parse_image_positional
 from .positional_types import NAME_TO_DOW
@@ -553,15 +554,24 @@ def _normalize_time(t: str) -> str:
 
 
 async def _read_image_file(file: UploadFile) -> tuple[bytes, str]:
-    """이미지 파일 유효성 검사 후 (bytes, content_type) 반환."""
+    """이미지 파일 유효성 검사 후 (bytes, content_type) 반환.
+
+    11/7: 한도+1 바이트까지만 읽어 큰 파일을 통째로 메모리에 올리지 않고,
+    형식은 브라우저가 보낸 Content-Type 대신 파일 내용으로 정하며,
+    풀기 전에 헤더의 가로·세로로 너무 큰 이미지(압축 폭탄)를 거른다.
+    """
     content_type = file.content_type or ""
     if content_type not in _ALLOWED_TYPES:
         raise HTTPException(status_code=422, detail=f"지원하지 않는 파일 형식: {content_type}")
-    image_bytes = await file.read()
+    image_bytes = await file.read(_MAX_BYTES + 1)
     if len(image_bytes) > _MAX_BYTES:
         raise HTTPException(status_code=413, detail="Image too large (max 20MB)")
     if len(image_bytes) == 0:
         raise HTTPException(status_code=422, detail="Empty file")
+    try:
+        content_type = image_guard.check_image(image_bytes)
+    except image_guard.BadImage as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     return image_bytes, content_type
 
 
@@ -719,6 +729,7 @@ async def parse_eta_image(
       ETA_TEXT_ENGINE=openai 로 바꾸면 예전처럼 OpenAI Vision이 블록 글자를 읽는다
     - 3순위: 위치 파서 실패 시에만 기존 전체 이미지 LLM fallback (OpenAI 키 있을 때만 동작)
     """
+    eta_parses.hit(f"user:{current_user.id}")  # 11/7: Tesseract CPU 보호
     image_bytes, content_type = await _read_image_file(file)
 
     positional_items: list[tuple[ParsedEntry, tuple[int, int, int, int]]] = []
@@ -868,6 +879,7 @@ async def parse_eta_image_v2(
     current_user: User = Depends(get_current_user),
 ):
     """위치 기반 파서 결과를 반환한다."""
+    eta_parses.hit(f"user:{current_user.id}")
     image_bytes, _ = await _read_image_file(file)
     _grid, entries = parse_image_positional(image_bytes)
 

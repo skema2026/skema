@@ -14,6 +14,7 @@ from app.ai_chat.models import (
 from app.ai_chat.service import run_ai_agent
 from app.auth.models import User
 from app.core.config import settings
+from app.core.rate_limit import ai_requests
 from app.core.security import get_current_user, get_db
 
 router = APIRouter(tags=["ai"])
@@ -64,6 +65,7 @@ def chat(
     current_user: User = Depends(get_current_user),
 ):
     """AI 에이전트와 대화. 대화 내용은 ai_chat_logs에 자동 저장."""
+    ai_requests.hit(f"user:{current_user.id}")  # 11/7: OpenAI 비용 보호
     if not settings.OPENAI_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -86,6 +88,7 @@ def readiness_summary(
     current_user: User = Depends(get_current_user),
 ):
     """시험 준비도 AI 진단 피드백 (2문장 이내)."""
+    ai_requests.hit(f"user:{current_user.id}")  # 11/7: OpenAI 비용 보호
     from app.core.llm import call_llm
     prompt = (
         f"시험 준비 상태를 분석해서 2문장 이내로 자연스럽게 한국어로 피드백해줘. "
