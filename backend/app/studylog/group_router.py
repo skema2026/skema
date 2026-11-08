@@ -123,14 +123,18 @@ def search_groups(
     current_user: User = Depends(get_current_user),
 ):
     """이름으로 그룹 검색 (최대 20개). 초대코드 직접 입력도 지원."""
-    q = q.strip()
+    q = q.strip()[:50]
     if not q:
         return []
+    # 11/7: 검색어의 %, _ 는 LIKE 와일드카드가 아니라 글자로 취급한다.
+    # 예전에는 q=% 로 모든 그룹(초대코드 포함)을 한 번에 받을 수 있었다.
+    # 이스케이프 문자는 '/' (역슬래시는 MySQL 문자열 규칙과 겹쳐 DB마다 다르게 해석될 수 있음)
+    escaped = q.replace("/", "//").replace("%", "/%").replace("_", "/_")
     # 이름 부분 일치 OR 초대코드 완전 일치
     groups = (
         db.query(StudyGroup)
         .filter(
-            (StudyGroup.name.ilike(f"%{q}%")) |
+            (StudyGroup.name.ilike(f"%{escaped}%", escape="/")) |
             (StudyGroup.invite_code == q.upper())
         )
         .order_by(StudyGroup.created_at.desc())
