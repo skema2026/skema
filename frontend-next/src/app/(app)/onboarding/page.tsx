@@ -10,6 +10,7 @@ import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { ScheduleKindToggle, toEtaKind, type EtaScheduleKind } from '@/components/timetable/ScheduleKindToggle';
 import type { RecurringDay, StudyBlocksGenerateResult } from '@/types';
+import { apiErrorMessage } from '@/lib/apiError';
 
 type Phase = 'college-check' | 'eta-upload' | 'eta-review' | 'external-exam' | 'personal-schedule' | 'type-select' | 'sleep' | 'chat' | 'generating' | 'done';
 type Message = { role: 'ai' | 'user'; text: string };
@@ -432,8 +433,8 @@ export default function OnboardingPage() {
       if (entries.length === 0) {
         toast('\uc774\ubbf8\uc9c0\uc5d0\uc11c \uc2dc\uac04\ud45c\ub97c \uc77d\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4. \uc9c1\uc811 \ucd94\uac00\ud574 \uc8fc\uc138\uc694.');
       }
-    } catch {
-            toast.error('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'));
       setEtaEntries([]);
     } finally {
       setEtaParsing(false);

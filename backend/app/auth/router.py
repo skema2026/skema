@@ -268,22 +268,33 @@ def oauth_callback(
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
-    if expected_state and not secrets.compare_digest(state, expected_state):
+    # 11/7: state 쿠키가 없을 때도 거절한다. 예전에는 경고만 남기고 통과시켜서,
+    # 공격자 계정의 콜백 링크를 열게 하면 피해자가 공격자 계정으로 로그인되었다(로그인 CSRF).
+    if not expected_state or not secrets.compare_digest(state, expected_state):
+        if not expected_state:
+            logger.warning("oauth_state_%s cookie missing – rejecting callback", provider)
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
-    if not expected_state:
-        logger.warning("oauth_state_%s cookie missing – possible browser cookie issue", provider)
 
     try:
-        social_id, email, display_name, kakao_at, kakao_rt = service.exchange_oauth_code(provider, code, state)
+        social_id, email, display_name, kakao_at, kakao_rt, email_verified = service.exchange_oauth_code(
+            provider, code, state
+        )
         user = service.get_or_create_social_user(
             db, provider, social_id, email, display_name,
             kakao_access_token=kakao_at,
             kakao_refresh_token=kakao_rt,
+            email_verified=email_verified,
         )
         token = create_access_token(user.id)
-        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?token={token}")
+        # 11/7: 토큰을 쿼리(?token=)가 아니라 fragment(#token=)로 넘긴다.
+        # fragment는 서버로 전송되지 않아 Vercel 접근 로그·Referer에 토큰이 남지 않는다.
+        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login#token={token}")
+        response.delete_cookie(key=f"oauth_state_{provider}")
+        return response
+    except service.SocialEmailExists:
+        response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_email_exists")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
     except ValueError:

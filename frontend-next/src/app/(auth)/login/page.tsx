@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useLogin } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 256 262" preserveAspectRatio="xMidYMid">
@@ -42,10 +43,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    // 소셜 로그인 토큰은 서버 로그에 남지 않도록 #token= (fragment)로 온다. 예전 ?token= 도 받는다.
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const token = hashParams.get('token') ?? params.get('token');
     const error = params.get('error');
     if (error) {
-      toast.error('소셜 로그인에 실패했습니다');
+      toast.error(
+        error === 'oauth_email_exists'
+          ? '이미 이메일로 가입된 계정입니다. 아이디·비밀번호로 로그인해주세요'
+          : '소셜 로그인에 실패했습니다',
+      );
       window.history.replaceState({}, '', '/login');
       return;
     }
@@ -78,7 +85,7 @@ export default function LoginPage() {
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };
         if (error?.response?.status === 401) toast.error('아이디 또는 비밀번호가 올바르지 않습니다');
-        else toast.error('로그인 중 오류가 발생했습니다');
+        else toast.error(apiErrorMessage(err, '로그인 중 오류가 발생했습니다'));
       },
     });
   };
