@@ -94,10 +94,17 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _warn_insecure_defaults(self):
         if self.SECRET_KEY == _DEFAULT_SECRET:
+            # 11/7: 운영(https 백엔드)에서 기본 키로 뜨면 누구나 JWT를 만들 수 있다. 시작할 때 막는다.
+            if self.BACKEND_URL.startswith("https://"):
+                raise ValueError(
+                    "SECRET_KEY 가 기본값입니다. 운영(BACKEND_URL=https://…)에서는 SECRET_KEY 환경변수를 반드시 설정하세요."
+                )
             _cfg_logger.critical(
                 "SECRET_KEY is set to the insecure default value. "
                 "Set SECRET_KEY in your .env file before deploying to production."
             )
+        elif len(self.SECRET_KEY) < 32 and self.BACKEND_URL.startswith("https://"):
+            _cfg_logger.warning("SECRET_KEY is shorter than 32 characters. Use a long random value.")
         if "skemapassword" in self.DATABASE_URL:
             _cfg_logger.warning(
                 "DATABASE_URL contains the default password 'skemapassword'. "
