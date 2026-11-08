@@ -1,6 +1,7 @@
 'use client';
 
 import type { MouseEvent } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -165,8 +166,14 @@ export function DashboardHeader({
         >
           <MaterialIcon icon="arrow_back" size={18} color="var(--skema-on-surface-variant)" />
         </button>
-        <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'var(--skema-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <MaterialIcon icon="schedule" size={15} color="#fff" filled />
+        <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <Image
+            src="/icon-192.png"
+            alt="SKEMA 로고"
+            width={28}
+            height={28}
+            style={{ display: 'block', width: '28px', height: '28px', borderRadius: '7px', objectFit: 'contain' }}
+          />
         </div>
         <span className="skema-headline" style={{ fontWeight: 800, fontSize: '18px', color: 'var(--skema-on-surface)', letterSpacing: 0 }}>SKEMA</span>
         {todayPct !== null && (
@@ -211,10 +218,12 @@ export function DashboardHeader({
           onClick={onReschedule}
           disabled={isRegenerating}
           title="못 한 공부·과제 블록을 시험 전날까지 빈 시간에 다시 배치"
-          className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100 disabled:opacity-50"
+          className="group inline-flex items-center rounded-lg p-[1px] bg-gradient-to-r from-sky-200 via-blue-400 to-blue-600 hover:from-sky-300 hover:via-blue-500 hover:to-blue-700 disabled:opacity-50"
         >
-          <MaterialIcon icon="edit_calendar" size={16} color="#2563eb" />
-          <span className="hide-mobile">{isRegenerating ? '계산 중...' : '다시 짜기'}</span>
+          <span className="flex items-center gap-2 rounded-[calc(0.5rem-1px)] bg-white/90 px-5 py-2 text-sm font-bold text-blue-700">
+            <MaterialIcon icon="autorenew" size={16} color="#2563eb" />
+            <span className="hide-mobile">{isRegenerating ? '계산 중...' : '다시 짜기'}</span>
+          </span>
         </button>
         <button
           type="button"
@@ -229,9 +238,9 @@ export function DashboardHeader({
           type="button"
           onClick={onShare}
           title="공유"
-          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: 'var(--skema-on-surface-variant)', cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#F1F3F5', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
         >
-          <MaterialIcon icon="share" size={16} color="var(--skema-on-surface-variant)" />
+          <MaterialIcon icon="share" size={16} color="#475569" />
           <span className="hide-mobile">공유</span>
         </button>
 
