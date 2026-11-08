@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import repository
 from app.auth.models import User, UserProfile
+from app.core.rate_limit import login_failures  # 11/7 로그인 실패 제한
 from app.auth.schemas import SignupRequest
 from app.core.config import settings
 from app.core.security import create_access_token, hash_password, is_admin_email, verify_password
@@ -113,12 +114,16 @@ def login(
 ) -> str:
     identifier = email.strip()
     method = "email" if "@" in identifier else "username"
+    # 11/7: 같은 아이디로 연속해서 틀리면 잠시 막는다 (비밀번호 무차별 대입 방지)
+    limit_key = identifier.lower()
+    login_failures.check(limit_key)
     candidates = repository.get_users_by_username_or_email(db, identifier)
     user = next(
         (c for c in candidates if c.hashed_password and verify_password(password, c.hashed_password)),
         None,
     )
     if not user:
+        login_failures.add(limit_key)
         _record_login_attempt(
             db,
             user_id=candidates[0].id if len(candidates) == 1 else None,
@@ -145,6 +150,7 @@ def login(
             user_agent=user_agent,
         )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="비활성화된 계정입니다.")
+    login_failures.reset(limit_key)
     _record_login_attempt(
         db, user_id=user.id, identifier=identifier, method=method, success=True,
         ip_address=ip_address, user_agent=user_agent,
