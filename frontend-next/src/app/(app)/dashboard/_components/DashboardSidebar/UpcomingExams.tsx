@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import AddExamDialog from './AddExamDialog';
 import { getExamReadiness, type ReadinessLevel } from '@/lib/examReadiness';
 import type { ExamSchedule, Schedule } from '@/types';
 
@@ -66,11 +68,23 @@ export default function UpcomingExams({
   getDaysUntil,
   onExamClick,
 }: UpcomingExamsProps) {
+  const [isAddOpen, setIsAddOpen] = useState(false);
   return (
     <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-      <p className="mb-3 text-[11px] font-black text-slate-400">시험 일정 · 준비도</p>
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-[11px] font-black text-slate-400">시험 일정 · 준비도</p>
+        <button
+          type="button"
+          onClick={() => setIsAddOpen(true)}
+          className="flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-600 transition hover:bg-blue-100"
+        >
+          <MaterialIcon icon="add" size={14} color="#2563eb" />
+          시험 추가
+        </button>
+      </div>
+      <AddExamDialog open={isAddOpen} onOpenChange={setIsAddOpen} onCreated={onExamClick} />
       {exams.length === 0 && events.length === 0 ? (
-        <p className="text-xs font-bold text-slate-400">등록된 일정이 없어요</p>
+        <p className="text-xs font-bold text-slate-400">시험을 추가하면 시험 전날까지 공부 블록을 자동으로 배치해요</p>
       ) : (
         <div className="flex flex-col gap-2">
           {exams.map((exam) => {
