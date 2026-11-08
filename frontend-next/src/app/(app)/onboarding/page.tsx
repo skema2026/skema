@@ -622,7 +622,7 @@ export default function OnboardingPage() {
         setMessages((prev) => [
           ...prev,
           ...confirmMsg,
-          { role: 'ai', text: '\uc54c\uaca0\uc2b5\ub2c8\ub2e4! AI \ub9de\ucda4 \uc2dc\uac04\ud45c\ub97c \uc0dd\uc131\ud558\uace0 \uc788\uc2b5\ub2c8\ub2e4 \ud83d\uddd3\ufe0f' },
+          { role: 'ai', text: '알겠습니다! 맞춤 시간표를 만들고 있어요 🗓️' },
         ]);
         setIsProcessing(false);
         finishOnboarding(newAnswers);
@@ -790,7 +790,7 @@ export default function OnboardingPage() {
           {etaParsing && (
             <div className="rounded-xl p-4 mb-4 flex items-center gap-3" style={{ background: '#eef1ff', border: '1px solid #c3d0ff' }}>
               <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin flex-shrink-0" style={{ borderColor: '#c3d0ff', borderTopColor: 'transparent' }} />
-              <p className="text-sm font-semibold" style={{ color: '#2563eb' }}>AI가 시간표를 분석하고 있습니다...</p>
+              <p className="text-sm font-semibold" style={{ color: '#2563eb' }}>시간표를 읽고 있어요...</p>
             </div>
           )}
 
@@ -881,7 +881,7 @@ export default function OnboardingPage() {
             </button>
             <div className="min-w-0">
               <h2 className="text-lg font-extrabold leading-tight" style={{ color: '#181c1e' }}>시간표 확인 및 수정</h2>
-              <p className="mt-1 text-xs leading-relaxed" style={{ color: '#3f4b61' }}>2단계 / 5단계 · AI 분석 결과를 확인하고 수정해주세요</p>
+              <p className="mt-1 text-xs leading-relaxed" style={{ color: '#3f4b61' }}>2단계 / 5단계 · 읽어 온 결과를 확인하고 수정해주세요</p>
             </div>
           </div>
 
@@ -894,7 +894,7 @@ export default function OnboardingPage() {
           {etaParsing ? (
             <div className="rounded-xl p-3 mb-5 flex items-center gap-2" style={{ background: '#eef1ff', border: '1px solid #c3d0ff' }}>
               <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin flex-shrink-0" style={{ borderColor: '#c3d0ff', borderTopColor: 'transparent' }} />
-              <p className="text-sm font-semibold" style={{ color: '#2563eb' }}>AI가 시간표를 다시 분석하고 있습니다</p>
+              <p className="text-sm font-semibold" style={{ color: '#2563eb' }}>시간표를 다시 읽고 있어요</p>
             </div>
           ) : etaEntries.length > 0 ? (
             <div className="rounded-xl p-3 mb-5 flex items-center gap-2" style={{ background: '#d1fae5', border: '1px solid #6ee7b7' }}>
@@ -1127,7 +1127,7 @@ export default function OnboardingPage() {
                       border: '1px solid #c3d0ff',
                       cursor: etaParsing ? 'not-allowed' : 'pointer',
                     }}
-                    title="같은 이미지로 AI 다시 분석"
+                    title="같은 이미지로 다시 읽기"
                   >
                     {etaParsing ? (
                       <>
@@ -1229,7 +1229,7 @@ export default function OnboardingPage() {
     );
   }
 
-  // AI 시간표 생성 화면
+  // 시간표 생성 화면
   if (phase === 'generating' || phase === 'done') {
     const typeInfo = USER_TYPES.find((t) => t.id === selectedType);
     return (
@@ -1240,14 +1240,14 @@ export default function OnboardingPage() {
               <MaterialIcon icon="check_circle" size={40} color="#fff" filled />
             ) : (
               <>
-                <MaterialIcon icon="smart_toy" size={32} color="#fff" filled />
+                <MaterialIcon icon="autorenew" size={32} color="#fff" filled />
                 <div className="absolute inset-0 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: '#c3d0ff', borderTopColor: 'transparent' }} />
               </>
             )}
           </div>
 
           <h2 className="text-xl font-extrabold mb-2" style={{ color: '#181c1e' }}>
-            {phase === 'done' ? 'SKEMA 완성!' : 'AI 시간표를 만드는 중입니다'}
+            {phase === 'done' ? 'SKEMA 완성!' : '시간표를 만드는 중입니다'}
           </h2>
 
           {isCollegeStudent && etaEntries.length > 0 && phase !== 'done' && (
@@ -1666,7 +1666,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          <p className="text-sm mb-5" style={{ color: '#334155' }}>AI 맞춤 시간표를 만들어드릴게요</p>
+          <p className="text-sm mb-5" style={{ color: '#334155' }}>맞춤 시간표를 만들어드릴게요</p>
 
           {/* Type cards */}
           <div className="grid grid-cols-2 gap-3 mb-6">
@@ -1861,7 +1861,7 @@ export default function OnboardingPage() {
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {msg.role === 'ai' && (
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-1 flex-shrink-0 text-white" style={{ background: '#2563eb' }}>
-                  AI
+                  S
                 </div>
               )}
               <div
@@ -1878,7 +1878,7 @@ export default function OnboardingPage() {
           ))}
           {isProcessing && (
             <div className="flex justify-start">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-1 flex-shrink-0 text-white" style={{ background: '#2563eb' }}>AI</div>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-1 flex-shrink-0 text-white" style={{ background: '#2563eb' }}>S</div>
               <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                 <div className="flex gap-1">
                   {[0, 150, 300].map((d) => (

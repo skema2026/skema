@@ -9,8 +9,6 @@ import DayView from "./_components/calendar/DayView";
 import WeekView from "./_components/calendar/WeekView";
 import MonthView from "./_components/calendar/MonthView";
 import UpcomingExams from "./_components/DashboardSidebar/UpcomingExams";
-import AiActions from "./_components/DashboardSidebar/AiActions";
-import FreeTimeDialog from "./_components/dialogs/FreeTimeDialog";
 import StudyBlockDialog from "./_components/dialogs/StudyBlockDialog";
 import DeleteExamDialog from "./_components/dialogs/DeleteExamDialog";
 import RescheduleDialog from "./_components/dialogs/RescheduleDialog";
@@ -49,7 +47,6 @@ import {
   ShareDialog,
 } from "./_components/DashboardChrome";
 import { EtaReimportModal } from "./_components/EtaReimportModal";
-import { FloatingAIChat } from "./_components/FloatingAIChat";
 
 interface Props {
   initialSchedules: Schedule[];
@@ -187,12 +184,6 @@ export default function DashboardClient({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [reschedulePreview, setReschedulePreview] =
     useState<ReschedulePreview | null>(null);
-  const [aiAction, setAiAction] = useState<string | null>(null);
-  const [aiReview, setAiReview] = useState<{
-    title: string;
-    reply: string;
-  } | null>(null);
-  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [timetableView, setTimetableView] = useState<TimetableView>(() => {
     if (typeof window === "undefined") return "week";
 
@@ -294,7 +285,6 @@ export default function DashboardClient({
     exam_date: string;
   } | null>(null);
   const [examToDelete, setExamToDelete] = useState<ExamSchedule | null>(null);
-  const [isFreeTimeDialogOpen, setIsFreeTimeDialogOpen] = useState(false);
   const [isRemainingDialogOpen, setIsRemainingDialogOpen] = useState(false);
   const [certSchedule, setCertSchedule] = useState<{
     id: number;
@@ -490,11 +480,6 @@ export default function DashboardClient({
     todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : null;
 
   const remainingToday = todaySchedules.filter((s) => !s.is_completed);
-  const todayFreeWindows = findFreeWindows(todaySchedules, wakeStartMinutes);
-  const todayAvailableMinutes = todayFreeWindows.reduce(
-    (sum, window) => sum + Math.max(0, window.end - window.start),
-    0,
-  );
   const overdueSchedules = todaySchedules.filter(
     (schedule) =>
       !schedule.is_completed && timeToMinutes(schedule.end_time) < nowMin,
@@ -591,38 +576,10 @@ export default function DashboardClient({
       : []),
   ];
   const issueCount = issueItems.length;
-  /** AI 액션 후 관련 모든 쿼리 무효화 */
+  /** 일정이 바뀐 뒤 관련 쿼리 무효화 */
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["schedules"] });
     queryClient.invalidateQueries({ queryKey: ["exams"] });
-  };
-
-  const runAiCommand = async (
-    action: string,
-    message: string,
-    successMessage: string,
-  ) => {
-    setAiAction(action);
-    if (action === "reschedule") setIsRegenerating(true);
-    try {
-      const { data } = await api.post<{ reply: string }>("/ai/chat", {
-        message,
-        messages: [],
-      });
-      invalidateAll();
-      toast.success(
-        data.reply.trim() ? successMessage : "AI 작업이 완료되었습니다",
-      );
-      setAiReview({
-        title: successMessage,
-        reply: data.reply.trim() || "AI 작업이 완료되었습니다.",
-      });
-    } catch {
-      toast.error("AI 작업 중 오류가 발생했습니다");
-    } finally {
-      setAiAction(null);
-      if (action === "reschedule") setIsRegenerating(false);
-    }
   };
 
   /** 다시 짜기 (#11): 미리보기를 받아 확인 창을 띄운다. 적용은 RescheduleDialog에서. */
@@ -938,14 +895,11 @@ export default function DashboardClient({
                       timeToMinutes={timeToMinutes}
                       getSchedulesForDate={getSchedulesForDate}
                       exams={exams}
-                      runAiCommand={runAiCommand}
-                      aiAction={aiAction}
                       showWeekViewForDate={showWeekViewForDate}
                       getDisplayColor={getDisplayColor}
                       formatDuration={formatDuration}
                       formatMinutesDuration={formatMinutesDuration}
                       setExamForStudyBlocks={setExamForStudyBlocks}
-                      setIsFreeTimeDialogOpen={setIsFreeTimeDialogOpen}
                       selectedDayPrimarySchedule={selectedDayPrimarySchedule}
                       openClassForm={openClassForm}
                       isSelectedDayToday={isSelectedDayToday}
@@ -986,84 +940,11 @@ export default function DashboardClient({
                     })
                   }
                 />
-                <AiActions
-                  weekStart={weekStart}
-                  weekAgendaDays={weekAgendaDays}
-                  todayStr={todayStr}
-                  upcomingExams={upcomingExams}
-                  getDaysUntil={getDaysUntil}
-                  timeToMinutes={timeToMinutes}
-                  runAiCommand={runAiCommand}
-                  aiAction={aiAction}
-                />
               </aside>
             </section>
           </div>
         </main>
       </div>
-
-      <FloatingAIChat open={isAiChatOpen} onOpenChange={setIsAiChatOpen} />
-
-      {aiReview && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/30 p-4 backdrop-blur-sm">
-          <section className="w-full max-w-lg overflow-hidden rounded-lg border border-blue-100 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-blue-50 p-5">
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-600">
-                  <MaterialIcon icon="auto_awesome" size={21} color="#fff" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-black text-blue-600">
-                    AI 변경 결과
-                  </p>
-                  <h2 className="mt-1 text-xl font-black text-slate-950">
-                    {aiReview.title}
-                  </h2>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAiReview(null)}
-                className="rounded-lg p-2 transition hover:bg-blue-50"
-                aria-label="닫기"
-              >
-                <MaterialIcon icon="close" size={20} color="#0f172a" />
-              </button>
-            </div>
-
-            <div className="max-h-[50vh] overflow-y-auto p-5">
-              <div className="rounded-lg border border-blue-100 bg-[#fbfdff] p-4 text-sm font-bold leading-7 text-slate-700 whitespace-pre-wrap">
-                {aiReview.reply}
-              </div>
-              <p className="mt-3 text-xs font-bold text-slate-500">
-                반영된 내용이 맞는지 시간표에서 확인하고, 더 수정할 부분은
-                AI에게 이어서 요청하세요.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap justify-end gap-2 border-t border-blue-50 p-4">
-              <button
-                type="button"
-                onClick={() => setAiReview(null)}
-                className="rounded-lg border border-blue-100 px-4 py-2.5 text-sm font-black text-slate-600 transition hover:bg-blue-50"
-              >
-                확인
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAiReview(null);
-                  setIsAiChatOpen(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-blue-700"
-              >
-                <MaterialIcon icon="chat" size={16} color="#fff" />
-                AI에게 추가 수정
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
 
       <Dialog
         open={isRemainingDialogOpen}
@@ -1091,17 +972,6 @@ export default function DashboardClient({
         </DialogContent>
       </Dialog>
 
-      <FreeTimeDialog
-        open={isFreeTimeDialogOpen}
-        onOpenChange={setIsFreeTimeDialogOpen}
-        windows={todayFreeWindows}
-        totalAvailableMinutes={todayAvailableMinutes}
-        minutesToTime={minutesToTime}
-        formatDuration={formatDuration}
-        formatMinutesDuration={formatMinutesDuration}
-        aiAction={aiAction}
-        runAiCommand={runAiCommand}
-      />
       <RescheduleDialog
         preview={reschedulePreview}
         onPreviewChange={setReschedulePreview}
@@ -1112,7 +982,6 @@ export default function DashboardClient({
         exam={examForStudyBlocks}
         onExamChange={setExamForStudyBlocks}
         getDaysUntil={getDaysUntil}
-        aiAction={aiAction}
         onGenerated={invalidateAll}
         exams={exams}
         onDeleteExam={setExamToDelete}

@@ -15,7 +15,6 @@ type StudyBlockDialogProps = {
   exam: Pick<ExamSchedule, 'id' | 'title' | 'exam_date'> | null;
   onExamChange: (exam: null) => void;
   getDaysUntil: (date: string) => number;
-  aiAction: string | null;
   onGenerated: () => void;
   exams: ExamSchedule[];
   onDeleteExam: (exam: ExamSchedule | null) => void;
@@ -25,14 +24,13 @@ export default function StudyBlockDialog({
   exam,
   onExamChange,
   getDaysUntil,
-  aiAction,
   onGenerated,
   exams,
   onDeleteExam,
 }: StudyBlockDialogProps) {
   const [studyHoursPerDay, setStudyHoursPerDay] = useState(2);
   const [isGenerating, setIsGenerating] = useState(false);
-  const busy = aiAction !== null || isGenerating;
+  const busy = isGenerating;
 
   /** 시험 전날까지 빈 시간에 30분 단위로 배치 (#12). AI 없이 서버 규칙으로. */
   const generate = async (examId: number) => {
