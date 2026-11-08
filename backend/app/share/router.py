@@ -5,7 +5,7 @@ from app.auth.models import User
 from app.core.config import settings
 from app.core.security import get_current_user, get_db
 from app.share import service
-from app.share.schemas import ShareTokenCreate, ShareTokenResponse
+from app.share.schemas import SharedTimetable, ShareTokenCreate, ShareTokenResponse
 
 router = APIRouter(tags=["share-tokens"])
 
@@ -63,7 +63,7 @@ def delete_token(
 
 # ── 공개 공유 뷰 (인증 불필요) ────────────────────────────────────────────────
 
-@router.get("/share/{token}")
+@router.get("/share/{token}", response_model=SharedTimetable)
 def get_shared_timetable(token: str, db: Session = Depends(get_db)):
     """
     공유 토큰으로 수업 시간표를 공개 조회합니다.
