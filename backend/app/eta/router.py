@@ -831,10 +831,9 @@ def save_eta_schedules(
         if not entry.subject_name.strip():
             skipped_count += 1
             continue
-        if not entry.start_time or not entry.end_time:
-            skipped_count += 1
-            continue
-        if entry.start_time >= entry.end_time:
+        # 11/7: 문자열 비교 대신 파싱 때와 같은 기준(분 단위, 5~24시)으로 본다.
+        # 시간은 SaveSchedulesRequest에서 이미 HH:MM으로 맞춰져 들어온다.
+        if not _valid_time_range(entry.start_time, entry.end_time):
             skipped_count += 1
             continue
         if not (0 <= entry.day_of_week <= 6):
