@@ -776,10 +776,12 @@ async def parse_eta_image(
         logger.warning(f"ETA parse: refined LLM fallback failed (user={current_user.id}): {exc}", exc_info=True)
 
     # 마지막 안전망: 기존 간단 LLM 프롬프트를 유지해 예외 케이스를 흡수한다.
+    # 11/7: 다른 경로와 똑같이 시간 범위·과목명 검사를 거치고, 확인 화면에서 검토하도록 표시한다.
     try:
-        legacy_entries = _parse_via_llm(image_bytes, content_type)
+        legacy_entries = _filter_entries(_parse_via_llm(image_bytes, content_type))
         if legacy_entries:
-            return legacy_entries
+            logger.info("ETA legacy LLM fallback returned=%d user=%s", len(legacy_entries), current_user.id)
+            return [_to_review(e, e.source) for e in legacy_entries]
     except Exception as exc:
         logger.warning(f"ETA parse: legacy LLM fallback failed: {exc}")
 
