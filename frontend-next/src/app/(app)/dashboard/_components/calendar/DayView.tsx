@@ -206,7 +206,7 @@ function DailyReport({
           <p className="text-[10px] font-semibold text-slate-500">{done}/{total}</p>
         </div>
         <div className="rounded-2xl border border-blue-400 bg-slate-100 p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-blue-600">
             여유시간
           </p>
           <p className="mt-2 text-lg font-black text-slate-900">
@@ -286,7 +286,7 @@ function DailyReport({
         className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-700 via-blue-500 to-blue-300 p-[1px] transition-all duration-200 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:opacity-50"
       >
         <span className="flex w-full items-center justify-center gap-2 rounded-[calc(1rem-1px)] bg-slate-50/90 px-3 py-2.5 text-sm font-black text-blue-600 transition-colors group-hover:bg-blue-50 group-focus-visible:bg-blue-50">
-          <MaterialIcon icon="edit_calendar" size={16} color="#2563eb" />
+          <MaterialIcon icon="autorenew" size={16} color="#2563eb" />
           {isRegenerating ? "다시 짜는 중..." : "다시 짜기"}
         </span>
       </button>
@@ -370,16 +370,16 @@ export default function DayView({
   return (
     <div
       data-day-scroll-container="true"
-      className="h-full overflow-y-auto bg-[#f8fbff] px-3 pb-6 pt-3 sm:px-4"
+      className="h-full overflow-y-auto bg-[#f8fbff] px-3 pb-24 pt-2 sm:px-4"
     >
-      <div className="space-y-3">
-        <header className="rounded-2xl border border-slate-200 bg-white p-3">
+      <div className="space-y-2.5">
+        <header className="rounded-xl border border-slate-200/80 bg-white p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-600">
                 {isSelectedDayToday ? "today" : "day"}
               </p>
-              <h2 className="mt-1 text-lg font-black text-slate-900">
+              <h2 className="mt-0.5 text-base font-black text-slate-900">
                 {formatLongDate(dayDate)}
               </h2>
             </div>
@@ -397,24 +397,24 @@ export default function DayView({
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-            <span className="text-sm font-black text-slate-900">{todaySummaryText}</span>
-            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">
+          <div className="mt-2 flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5">
+            <span className="text-[12px] font-black text-slate-900">{todaySummaryText}</span>
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">
               {completionRate}%
             </span>
           </div>
         </header>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-3">
-          <div className="mb-2 flex items-center justify-between">
+        <section className="rounded-xl border border-slate-200/80 bg-white p-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
                 timeline
               </p>
-              <h3 className="text-base font-black text-slate-900">오늘 타임라인</h3>
+              <h3 className="text-sm font-black text-slate-900">오늘 타임라인</h3>
             </div>
-            <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
-              {isSelectedDayToday ? "현재 시간 기준" : "첫 일정부터"}
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-700">
+              {isSelectedDayToday ? "현재 시간" : "첫 일정"}
             </span>
           </div>
 
@@ -433,15 +433,15 @@ export default function DayView({
           />
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-3">
-          <div className="mb-2 flex items-center justify-between">
+        <section className="rounded-xl border border-slate-200/80 bg-white p-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
                 checklist
               </p>
-              <h3 className="text-base font-black text-slate-900">오늘 일정 체크리스트</h3>
+              <h3 className="text-sm font-black text-slate-900">오늘 일정 체크리스트</h3>
             </div>
-            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-600">
               {total}개
             </span>
           </div>
@@ -454,19 +454,19 @@ export default function DayView({
           />
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-3">
+        <section className="rounded-xl border border-slate-200/80 bg-white p-2.5">
           <button
             type="button"
             onClick={() => setShowReport((value) => !value)}
             className="flex w-full items-center justify-between gap-2 text-left"
           >
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
                 report
               </p>
-              <h3 className="text-base font-black text-slate-900">오늘 리포트</h3>
+              <h3 className="text-sm font-black text-slate-900">오늘 리포트</h3>
             </div>
-            <span className="flex items-center gap-1 text-[11px] font-black text-slate-500">
+            <span className="flex items-center gap-1 text-[10px] font-black text-slate-500">
               핵심 수치
               <MaterialIcon
                 icon={showReport ? "expand_less" : "expand_more"}
@@ -495,3 +495,4 @@ export default function DayView({
     </div>
   );
 }
+

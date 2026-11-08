@@ -588,7 +588,14 @@ export default function DashboardClient({
     try {
       const { data } = await api.post<ReschedulePreview>("/reschedule/preview");
       if (data.summary.target === 0) {
-        toast.success("다시 짤 일정이 없어요");
+        toast.info("다시 짤 일정이 없어요", {
+          style: {
+            background: "#EFF6FF",
+            border: "1px solid #BFDBFE",
+            color: "#1D4ED8",
+          },
+          icon: <MaterialIcon icon="info" size={14} color="#1D4ED8" />,
+        });
         return;
       }
       setReschedulePreview(data);
