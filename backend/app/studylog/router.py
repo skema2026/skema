@@ -257,6 +257,9 @@ def toggle_reaction(
         ).first()
         if not is_member:
             raise HTTPException(status_code=403, detail="그룹 멤버만 반응할 수 있습니다.")
+    # 11/7: 그룹 밖 비공개 기록은 본인만 볼 수 있으므로 남은 반응할 수 없다 (없는 기록처럼 404)
+    elif not log.is_public and log.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="로그를 찾을 수 없습니다.")
 
     existing = db.query(StudyLogReaction).filter(
         StudyLogReaction.log_id == log_id,
