@@ -4,6 +4,10 @@ SKEMA는 Next.js 웹앱(Vercel)과 FastAPI 서버(Railway), MySQL로 이루어�
 
 ## 1. 전체 구성
 
+![SKEMA 시스템 구성도](images/system-architecture.png)
+
+포스터용 원본: [SVG](images/system-architecture.svg) · [PDF](images/system-architecture.pdf). 아래는 같은 구성을 글로 고칠 수 있게 Mermaid로 적은 것입니다.
+
 ```mermaid
 flowchart LR
   subgraph Client["사용자 기기"]
@@ -98,6 +102,12 @@ flowchart TD
 ## 3. 인증과 보안
 
 - 이메일·비밀번호(암호화 저장) 또는 카카오·네이버·구글 OAuth → 서버가 JWT 발급, 웹앱이 요청마다 `Authorization: Bearer` 로 보냄
+- 소셜 로그인: state 쿠키가 없거나 다르면 거절. 같은 이메일의 기존 계정에 자동 연결하지 않음(`/login?error=oauth_email_exists`). 토큰은 `/login#token=…`(fragment)으로 넘겨 서버 로그에 남지 않게 함
+- 관리자 주소(`ADMIN_EMAILS`)로는 가입·이메일 변경 불가
+- 요청 횟수 제한(`app/core/rate_limit.py`, 서버 메모리): 같은 아이디 로그인 실패 15분 10회, AI 요청 10분 30회, 시간표 인식 10분 10회. 서버가 1대라서 메모리로 셈 (늘리면 Redis 등으로 옮겨야 함)
+- 시간표 이미지는 파일 내용으로 형식을 판단하고, 풀기 전에 가로·세로(한 변 12000px, 4천만 픽셀)를 검사
+- 웹 푸시 구독 주소는 브라우저 푸시 서비스(FCM·Mozilla·Apple·Windows)만 허용
+- 그룹 밖 기록은 공개로 설정된 것만 다른 사람 프로필에 보임. 공유 링크(`/share/{token}`)는 수업만, 화면에 필요한 칸만 보냄
 - 인증 영상은 비공개 R2 버킷에 두고 1시간짜리 서명 주소로만 재생
 - 시간표 이미지는 인식이 끝나면 저장하지 않음
 - 비밀값은 Railway·Vercel 환경변수에만 두고 저장소에는 `.env.example`(빈 값)만 둠

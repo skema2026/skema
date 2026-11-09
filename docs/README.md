@@ -14,7 +14,8 @@
 
 | 문서 | 내용 |
 | --- | --- |
-| [architecture.md](architecture.md) | 시스템 구성, 시간표 등록·공부 블록 배치·다시 짜기·알림 흐름, 주요 API |
+| [architecture.md](architecture.md) | 시스템 구성, 시간표 등록·공부 블록 배치·다시 짜기·알림 흐름, 인증과 보안, 주요 API |
+| [images/system-architecture](images/system-architecture.png) | 시스템 구성도 (포스터용 [SVG](images/system-architecture.svg) · [PDF](images/system-architecture.pdf)) |
 | [timetable-recognition.md](timetable-recognition.md) | 시간표 인식기(OpenCV + Tesseract) 처리 단계, 보정 규칙, 정확도 |
 | [erd.md](erd.md) | DB 구조 (ERD) |
 | [deploy.md](deploy.md) | 운영 배포 (Railway + Vercel), 환경변수, 소셜 로그인 콜백 |
