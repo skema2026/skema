@@ -12,15 +12,15 @@
 ## 백엔드 (Railway)
 
 - `backend/Dockerfile`로 빌드합니다. 이미지 안에 Tesseract와 한국어·영어 `tessdata_best`(sha256 확인)가 들어갑니다.
-- 컨테이너가 켜질 때 `entrypoint.sh`가 DB 연결을 기다린 뒤 **Alembic 마이그레이션을 자동 실행**하고 서버를 띄웁니다.
-- ⚠️ **Serverless(잠자기) 끄기, Replica 1대.** 알림 예약 작업(APScheduler)이 서버 안에서 돌기 때문에, 잠들면 알림이 멈추고 2대면 알림이 두 번 갑니다.
+- 컨테이너가 켜질 때 `entrypoint.sh`가 DB 연결을 기다린 뒤 **Alembic 마이그레이션을 자동 실행**하고 서버를 띄웁니다. 마이그레이션이 실패하면 배포가 멈춥니다. 테이블은 이미 있고 버전 기록만 빠진 DB처럼 꼭 필요할 때만 `ALEMBIC_STAMP_ON_FAILURE=1`로 넘어갈 수 있습니다.
+- ⚠️ **Serverless(잠자기) 끄기, Replica 1대.** 알림 예약 작업(APScheduler)이 서버 안에서 돌기 때문에, 잠들면 알림이 멈추고 2대면 알림이 두 번 갑니다. 요청 횟수 제한도 서버 메모리에서 세므로 1대 기준입니다.
 
 ### 환경변수 (값은 Railway에만 넣고 저장소·문서·채팅에 적지 않기)
 
 | 변수 | 설명 |
 | --- | --- |
 | `DATABASE_URL` | Railway MySQL 주소 (`mysql+pymysql://…`) |
-| `SECRET_KEY` | JWT 서명 키 (긴 무작위 문자열) |
+| `SECRET_KEY` | JWT 서명 키 (32자 이상 무작위 문자열). **운영(`BACKEND_URL`이 https)에서 비어 있거나 기본값이면 서버가 시작하지 않음** |
 | `FRONTEND_URL`, `CORS_ORIGINS` | `https://skema-dku.vercel.app` |
 | `BACKEND_URL` | 백엔드 공개 주소. 소셜 로그인 콜백 주소를 만들 때 씀 |
 | `KAKAO_*`, `NAVER_*`, `GOOGLE_*` | 소셜 로그인 앱 키 |
