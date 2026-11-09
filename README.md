@@ -12,6 +12,7 @@
 | 📘 결과보고서 | 준비 중 → [`docs/report/`](docs/report/) <!-- TODO: SKEMA_report.pdf --> |
 | 📑 API 문서 | https://backend-production-e565.up.railway.app/docs (Swagger) |
 | 📂 개발 문서 | [`docs/`](docs/README.md) |
+| 🗺️ 로드맵 | [노션 공개 로드맵](https://pyrite-spice-b15.notion.site/3e6529d680e1805bb40df494059293eb) (9/26 방향 결정 → 11/27 전시, 47개 항목·담당·상태) |
 
 ---
 
@@ -174,4 +175,4 @@ skema/
 
 - 작업 하나 = GitHub 이슈 하나, 이슈마다 브랜치 (`feat/…`, `fix/…`, `docs/…`)
 - `main` 직접 push 금지 · PR 필수 · 승인 1명 · Squash 머지 → `main`은 항상 배포 가능한 상태
-- 일정·회의록·결정 기록은 팀 노션에서 관리 (결정 로그: 날짜 · 결정 · 이유)
+- 일정·회의록·결정 기록은 팀 노션에서 관리 (결정 로그: 날짜 · 결정 · 이유). 단계별 일정과 담당은 [공개 로드맵](https://pyrite-spice-b15.notion.site/3e6529d680e1805bb40df494059293eb)에서 볼 수 있습니다
