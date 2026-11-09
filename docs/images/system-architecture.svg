@@ -1,8 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1168" width="1800" height="1168" font-family="'Pretendard','Pretendard Variable','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR','Malgun Gothic',sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1184" width="1800" height="1184" font-family="'Pretendard','Pretendard Variable','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR','Malgun Gothic',sans-serif">
   <title>SKEMA 시스템 구성도</title>
   <!--
     unslop 기준 (11/10): 종이 플래너 톤, 강조색은 파랑 하나(직접 구현한 모듈에만), 굵기 400~600,
     4px 격자, 그림자·검정 띠 없음, 형광펜 밑줄은 '다시 짜기' 한 곳.
+    점선 = 조건부 경로(OpenAI 예비: 위치 파서가 격자를 못 찾은 캡처 + 서버에 키가 있을 때). 막기로 하면 OpenAI 상자와 점선 화살표만 지운다.
     정확도 숫자는 개발용 캡처(규칙 조정에 사용) 기준. 처음 보는 캡처 수치가 나오면 인식기 상자 아래 두 줄만 바꾼다.
     PNG(2배, 3600px)·PDF는 이 SVG를 Pretendard 글꼴이 있는 Chromium으로 렌더링해 만든다. 글꼴이 없으면 글자 폭이 달라질 수 있다.
   -->
@@ -32,7 +33,7 @@
     </style>
   </defs>
 
-  <rect width="1800" height="1168" fill="#fdfbf7"/>
+  <rect width="1800" height="1184" fill="#fdfbf7"/>
 
   <!-- ── 제목 ── -->
   <text x="48" y="92" font-size="40" font-weight="600" fill="#1f1b16" letter-spacing="-0.8">SKEMA 시스템 구성도</text>
@@ -45,7 +46,7 @@
   </g>
 
   <!-- ── 구역 ── -->
-  <rect x="48" y="168" width="300" height="808" rx="16" class="zone"/>
+  <rect x="48" y="168" width="300" height="824" rx="16" class="zone"/>
   <text x="72" y="204" class="zT">사용자 기기</text>
   <text x="72" y="228" class="zS">PC · 휴대폰</text>
 
@@ -53,13 +54,13 @@
   <text x="412" y="204" class="zT">Vercel</text>
   <text x="412" y="228" class="zS">프론트엔드 배포</text>
 
-  <rect x="728" y="168" width="680" height="952" rx="16" class="zone"/>
+  <rect x="728" y="168" width="680" height="968" rx="16" class="zone"/>
   <text x="752" y="204" class="zT">Railway</text>
   <text x="752" y="228" class="zS">백엔드 · DB (Docker, 인스턴스 1대)</text>
 
-  <rect x="1448" y="168" width="304" height="400" rx="16" class="zone"/>
+  <rect x="1448" y="168" width="304" height="560" rx="16" class="zone"/>
   <text x="1472" y="204" class="zT">외부 서비스</text>
-  <text x="1472" y="228" class="zS">로그인 · 영상 저장</text>
+  <text x="1472" y="228" class="zS">로그인 · 영상 저장 · 예비 인식</text>
 
   <!-- ── 사용자 기기 ── -->
   <rect x="72" y="248" width="252" height="136" rx="12" class="box"/>
@@ -67,10 +68,10 @@
   <text x="198" y="330" text-anchor="middle" class="s">PC · 휴대폰 (PWA)</text>
   <text x="198" y="356" text-anchor="middle" class="m">아이폰은 iOS 16.4 이상</text>
 
-  <rect x="72" y="816" width="252" height="136" rx="12" class="box"/>
-  <text x="198" y="864" text-anchor="middle" class="t">서비스워커</text>
-  <text x="198" y="896" text-anchor="middle" class="s">푸시 알림 표시</text>
-  <text x="198" y="922" text-anchor="middle" class="s">누르면 그날 하루 타임라인</text>
+  <rect x="72" y="816" width="252" height="152" rx="12" class="box"/>
+  <text x="198" y="872" text-anchor="middle" class="t">서비스워커</text>
+  <text x="198" y="904" text-anchor="middle" class="s">푸시 알림 표시</text>
+  <text x="198" y="930" text-anchor="middle" class="s">누르면 그날 하루 타임라인</text>
 
   <line x1="198" y1="384" x2="198" y2="816" stroke="#b9b0a3" stroke-width="1.5" stroke-dasharray="4 6"/>
   <rect x="160" y="588" width="76" height="28" rx="6" fill="#f4f0e8"/>
@@ -87,10 +88,10 @@
   <text x="538" y="458" text-anchor="middle" class="m">TanStack Query · Zustand</text>
 
   <!-- ── 브라우저 푸시 서비스 (외부) ── -->
-  <rect x="412" y="816" width="252" height="136" rx="12" class="ext"/>
-  <text x="538" y="864" text-anchor="middle" class="t">브라우저 푸시 서비스</text>
-  <text x="538" y="896" text-anchor="middle" class="s">FCM · APNs · Mozilla</text>
-  <text x="538" y="922" text-anchor="middle" class="s">허용 목록 주소만 사용</text>
+  <rect x="412" y="816" width="252" height="152" rx="12" class="ext"/>
+  <text x="538" y="872" text-anchor="middle" class="t">브라우저 푸시 서비스</text>
+  <text x="538" y="904" text-anchor="middle" class="s">FCM · APNs · Mozilla</text>
+  <text x="538" y="930" text-anchor="middle" class="s">허용 목록 주소만 사용</text>
 
   <!-- ── Railway: API 서버 ── -->
   <rect x="752" y="248" width="632" height="112" rx="12" class="box"/>
@@ -131,26 +132,27 @@
   <text x="1100" y="772" font-size="13" fill="#7b7266">자리가 모자라면 미리보기에서 알려 줌</text>
 
   <!-- 알림 스케줄러 -->
-  <rect x="752" y="816" width="308" height="136" rx="12" class="box"/>
-  <text x="906" y="858" text-anchor="middle" class="t">알림 스케줄러</text>
-  <text x="906" y="884" text-anchor="middle" font-size="15" font-weight="500" fill="#5e554a">APScheduler</text>
-  <text x="906" y="912" text-anchor="middle" class="m">5분마다: 시작 전 · 미완료</text>
-  <text x="906" y="934" text-anchor="middle" class="m">매일: 시험 D-7 · D-3 · D-1 · 당일</text>
+  <rect x="752" y="816" width="308" height="152" rx="12" class="box"/>
+  <text x="906" y="856" text-anchor="middle" class="t">알림 스케줄러</text>
+  <text x="906" y="880" text-anchor="middle" font-size="15" font-weight="500" fill="#5e554a">APScheduler</text>
+  <text x="906" y="910" text-anchor="middle" class="m">5분마다: 시작 전 · 미완료 · 좋아요</text>
+  <text x="906" y="932" text-anchor="middle" class="m">매일: 시험 D-7·D-3·D-1·당일, 응원</text>
+  <text x="906" y="954" text-anchor="middle" class="m">매주 월요일: 주간 리포트</text>
 
   <!-- MySQL -->
   <g transform="translate(1076,816)">
-    <path d="M0.75,20 V116 A153.25,20 0 0 0 307.25,116 V20" fill="#ffffff" stroke="#ddd6ca" stroke-width="1.5"/>
+    <path d="M0.75,20 V132 A153.25,20 0 0 0 307.25,132 V20" fill="#ffffff" stroke="#ddd6ca" stroke-width="1.5"/>
     <ellipse cx="154" cy="20" rx="153.25" ry="20" fill="#f4f0e8" stroke="#ddd6ca" stroke-width="1.5"/>
-    <text x="154" y="74" text-anchor="middle" class="t">MySQL 8</text>
-    <text x="154" y="100" text-anchor="middle" class="s">사용자 · 일정 · 시험 · 기록</text>
-    <text x="154" y="122" text-anchor="middle" class="s">푸시 구독 · 공유 링크</text>
+    <text x="154" y="82" text-anchor="middle" class="t">MySQL 8</text>
+    <text x="154" y="108" text-anchor="middle" class="s">사용자 · 일정 · 시험 · 기록</text>
+    <text x="154" y="130" text-anchor="middle" class="s">푸시 구독 · 공유 링크</text>
   </g>
 
   <!-- 보안 -->
-  <rect x="752" y="984" width="632" height="112" rx="12" class="box"/>
-  <text x="776" y="1020" font-size="17" font-weight="600" fill="#1f1b16">보안</text>
-  <text x="776" y="1050" class="s">JWT 인증 · 소셜 로그인 state 검증 · 로그인·AI·인식 요청 횟수 제한</text>
-  <text x="776" y="1076" class="s">업로드 이미지 사전 검사 · 비공개 기록·공유 범위 제한 · 회귀 테스트</text>
+  <rect x="752" y="1000" width="632" height="112" rx="12" class="box"/>
+  <text x="776" y="1036" font-size="17" font-weight="600" fill="#1f1b16">보안</text>
+  <text x="776" y="1066" class="s">JWT 인증 · 소셜 로그인 state 검증 · 로그인·AI·인식 요청 횟수 제한</text>
+  <text x="776" y="1092" class="s">업로드 이미지 사전 검사 · 비공개 기록·공유 범위 제한 · 회귀 테스트</text>
 
   <!-- ── 외부 서비스 ── -->
   <rect x="1472" y="248" width="256" height="136" rx="12" class="ext"/>
@@ -163,23 +165,29 @@
   <text x="1600" y="490" text-anchor="middle" class="s">스터디 인증 영상 (비공개)</text>
   <text x="1600" y="516" text-anchor="middle" class="m">1시간 서명 주소로 재생</text>
 
+
+  <rect x="1472" y="568" width="256" height="136" rx="12" fill="#fdfbf7" stroke="#b9b0a3" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="1600" y="612" text-anchor="middle" class="t">OpenAI (예비)</text>
+  <text x="1600" y="642" text-anchor="middle" class="s">격자를 못 찾은 캡처만</text>
+  <text x="1600" y="668" text-anchor="middle" class="m">서버에 키가 있을 때 · '검토 필요' 표시</text>
+
   <!-- ── 대표 흐름 ── -->
-  <rect x="48" y="1008" width="640" height="112" rx="16" class="zone"/>
-  <text x="72" y="1044" font-size="17" font-weight="600" fill="#1f1b16">대표 흐름</text>
-  <text x="160" y="1044" class="m">사진 한 장에서 밀려도 다시 짜 주는 계획까지</text>
+  <rect x="48" y="1024" width="640" height="112" rx="16" class="zone"/>
+  <text x="72" y="1060" font-size="17" font-weight="600" fill="#1f1b16">대표 흐름</text>
+  <text x="160" y="1060" class="m">사진 한 장에서 밀려도 다시 짜 주는 계획까지</text>
   <g font-size="15" font-weight="500" fill="#1f1b16">
-    <text x="72" y="1074" class="m">01</text><text x="72" y="1098">캡처 업로드</text>
-    <text x="194" y="1074" class="m">02</text><text x="194" y="1098">인식·확인</text>
-    <text x="316" y="1074" class="m">03</text><text x="316" y="1098">시험 입력</text>
-    <text x="438" y="1074" class="m">04</text><text x="438" y="1098">블록 배치</text>
-    <rect x="558" y="1088" width="60" height="12" rx="2" fill="#facc15" fill-opacity="0.5"/>
-    <text x="560" y="1074" class="m">05</text><text x="560" y="1098">다시 짜기</text>
+    <text x="72" y="1090" class="m">01</text><text x="72" y="1114">캡처 업로드</text>
+    <text x="194" y="1090" class="m">02</text><text x="194" y="1114">인식·확인</text>
+    <text x="316" y="1090" class="m">03</text><text x="316" y="1114">시험 입력</text>
+    <text x="438" y="1090" class="m">04</text><text x="438" y="1114">블록 배치</text>
+    <rect x="558" y="1104" width="60" height="12" rx="2" fill="#facc15" fill-opacity="0.5"/>
+    <text x="560" y="1090" class="m">05</text><text x="560" y="1114">다시 짜기</text>
   </g>
   <g class="ln">
-    <line x1="160" y1="1093" x2="182" y2="1093" marker-end="url(#arr)"/>
-    <line x1="276" y1="1093" x2="304" y2="1093" marker-end="url(#arr)"/>
-    <line x1="394" y1="1093" x2="426" y2="1093" marker-end="url(#arr)"/>
-    <line x1="516" y1="1093" x2="548" y2="1093" marker-end="url(#arr)"/>
+    <line x1="160" y1="1109" x2="182" y2="1109" marker-end="url(#arr)"/>
+    <line x1="276" y1="1109" x2="304" y2="1109" marker-end="url(#arr)"/>
+    <line x1="394" y1="1109" x2="426" y2="1109" marker-end="url(#arr)"/>
+    <line x1="516" y1="1109" x2="548" y2="1109" marker-end="url(#arr)"/>
   </g>
 
   <!-- ── 화살표 ── -->
@@ -192,23 +200,25 @@
     <line x1="1384" y1="304" x2="1470" y2="304" marker-end="url(#arr)"/>
     <!-- API → R2 -->
     <path d="M1384,340 C1428,340 1426,476 1470,476" marker-end="url(#arr)"/>
+    <!-- API(시간표 인식) → OpenAI 예비 경로: 조건부라 점선 -->
+    <path d="M1384,350 C1440,350 1414,636 1470,636" stroke-dasharray="6 5" marker-end="url(#arr)"/>
     <!-- API → 인식기 / 엔진 -->
     <line x1="906" y1="360" x2="906" y2="406" marker-end="url(#arr)"/>
     <line x1="1230" y1="360" x2="1230" y2="406" marker-end="url(#arr)"/>
     <!-- 엔진 ↔ DB -->
     <line x1="1230" y1="786" x2="1230" y2="814" marker-start="url(#arr)" marker-end="url(#arr)"/>
     <!-- DB → 스케줄러 -->
-    <line x1="1076" y1="884" x2="1062" y2="884" marker-end="url(#arr)"/>
+    <line x1="1076" y1="892" x2="1062" y2="892" marker-end="url(#arr)"/>
     <!-- 스케줄러 → 푸시 서비스 → 서비스워커 -->
-    <line x1="752" y1="884" x2="666" y2="884" marker-end="url(#arr)"/>
-    <line x1="412" y1="884" x2="326" y2="884" marker-end="url(#arr)"/>
+    <line x1="752" y1="892" x2="666" y2="892" marker-end="url(#arr)"/>
+    <line x1="412" y1="892" x2="326" y2="892" marker-end="url(#arr)"/>
   </g>
   <g class="lbl" text-anchor="middle">
     <text x="367" y="304">HTTPS</text>
     <text x="707" y="292">REST · JWT</text>
     <text x="1427" y="292">OAuth</text>
-    <text x="709" y="872">푸시 전송</text>
-    <text x="709" y="908">VAPID</text>
-    <text x="369" y="872">알림</text>
+    <text x="709" y="880">푸시 전송</text>
+    <text x="709" y="916">VAPID</text>
+    <text x="369" y="880">알림</text>
   </g>
 </svg>
