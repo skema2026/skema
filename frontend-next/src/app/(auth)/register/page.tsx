@@ -51,7 +51,7 @@ export default function RegisterPage() {
     registerMutation.mutate(
       { username: form.username.trim(), email: form.email.trim(), password: form.password },
       {
-        onSuccess: () => { toast.success('회원가입이 완료되었습니다. 로그인해주세요.'); router.push('/login'); },
+        onSuccess: () => { toast.success('가입했어요. 로그인해 주세요'); router.push('/login'); },
         onError: (err: unknown) => {
           const error = err as { response?: { status?: number; data?: { detail?: string } } };
           const detail = error?.response?.data?.detail ?? '';
@@ -60,7 +60,7 @@ export default function RegisterPage() {
             setErrors((prev) => ({ ...prev, email: '올바른 이메일 형식이 아닙니다' }));
             toast.error('올바른 이메일 형식이 아닙니다');
           }
-          else toast.error('회원가입 중 오류가 발생했습니다');
+          else toast.error('가입하지 못했어요. 잠시 후 다시 시도해 주세요');
         },
       }
     );

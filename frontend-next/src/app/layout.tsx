@@ -63,7 +63,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-[#f5f8fd] text-[#0f1e3a]" style={{ fontFamily: '"Pretendard Variable", Pretendard, var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif' }} suppressHydrationWarning>
         <Providers>
           {children}
-          <Toaster richColors position="top-center" />
+          <Toaster position="top-center" />
         </Providers>
       </body>
     </html>

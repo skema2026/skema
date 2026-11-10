@@ -173,7 +173,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid rgba(26, 77, 178, 0.22);
+  outline: 2px solid rgba(42, 111, 227, 0.45);
   outline-offset: 2px;
 }
 
@@ -182,59 +182,34 @@ button {
 }
 
 .skema-soft-shadow {
-  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 24px rgba(15, 30, 58, 0.06);
 }
 
+/* unslop: 사진 배경·격자·색 번짐 대신 로고 파랑의 옅은 톤 하나 (첫 화면·로그인과 같은 바탕) */
 .skema-onboarding-screen {
-  background:
-    radial-gradient(circle at 18% 20%, rgba(56,189,248,0.18), transparent 32%),
-    radial-gradient(circle at 82% 18%, rgba(42, 111, 227,0.16), transparent 34%),
-    linear-gradient(135deg, rgba(248,251,255,0.88) 0%, rgba(234,244,255,0.84) 48%, rgba(219,234,254,0.8) 100%),
-    url('/register-bg.jpg') center / cover no-repeat fixed;
+  background: linear-gradient(180deg, #e4efff 0%, #f5f8fd 420px);
   min-height: 100dvh;
   position: relative;
   isolation: isolate;
 }
 
-.skema-onboarding-screen::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(90deg, rgba(42, 111, 227,0.07) 1px, transparent 1px),
-    linear-gradient(rgba(14,165,233,0.06) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.15));
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.15));
-  z-index: -1;
-}
-
 .skema-cute-page {
-  background:
-    linear-gradient(135deg, rgba(246,248,252,0.98), rgba(232,243,255,0.95)),
-    radial-gradient(circle at 18% 8%, rgba(14,165,233,0.18), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(42, 111, 227,0.16), transparent 24%),
-    linear-gradient(90deg, rgba(42, 111, 227,0.06) 1px, transparent 1px),
-    linear-gradient(rgba(14,165,233,0.05) 1px, transparent 1px);
-  background-size: auto, auto, auto, 32px 32px, 32px 32px;
+  background: #f5f8fd;
 }
 
 .skema-card {
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 8px;
-  box-shadow: 0 16px 44px rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  border: 1px solid rgba(15, 30, 58, 0.08);
+  border-radius: 16px;
 }
 
 .skema-sticker {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(23, 32, 51, 0.12);
-  border-radius: 8px;
+  border: 1px solid rgba(15, 30, 58, 0.08);
+  border-radius: 10px;
   background: #fff;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
 .skema-onboarding-screen input,
@@ -291,7 +266,7 @@ button {
 }
 .fc .fc-toolbar-title {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--skema-on-surface);
 }
 .fc .fc-button-group,
@@ -334,7 +309,7 @@ button {
 }
 .fc .fc-col-header-cell-cushion {
   font-size: 12px !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   color: var(--skema-on-surface-variant) !important;
   text-decoration: none !important;
   padding: 0 !important;

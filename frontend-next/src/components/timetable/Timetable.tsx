@@ -505,8 +505,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
 
                 toast.error(
                   response?.status === 409
-                    ? '시간이 겹쳐 이동할 수 없습니다'
-                    : '일정 이동에 실패했습니다',
+                    ? '다른 일정과 겹쳐서 옮길 수 없어요'
+                    : '일정을 옮기지 못했어요',
                   {
                     description: detail,
                     duration: 3500,

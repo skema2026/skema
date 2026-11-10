@@ -1,5 +1,6 @@
 'use client';
 
+import { displayTitle } from '@/lib/utils';
 import { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -79,23 +80,23 @@ export default function RescheduleDialog({
           <DialogTitle>다시 짜기 미리보기</DialogTitle>
         </DialogHeader>
         {preview && (
-          <div className="space-y-4 py-2">
-            <p className="text-sm font-medium text-slate-600">
+          <div className="space-y-4">
+            <p className="text-[14px] leading-[22px] text-[#44536b]">
               {hasMoves
-                ? `못 한 블록 ${preview.summary.target}개 중 ${preview.summary.placed}개를 시험 전날까지 빈 시간에 옮겨요. 수업·시험·개인 일정은 그대로예요.`
-                : '옮길 수 있는 블록이 없어요.'}
+                ? `못 한 블록 ${preview.summary.target}개 중 ${preview.summary.placed}개를 시험 전날까지 빈 시간으로 옮겨요. 수업·시험·개인 일정은 그대로 둬요`
+                : '옮길 수 있는 블록이 없어요'}
             </p>
 
             {hasMoves && (
-              <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              <ul className="max-h-72 divide-y divide-[#0f1e3a]/8 overflow-y-auto rounded-xl border border-[#0f1e3a]/8">
                 {preview.moves.map((m) => (
-                  <li key={m.schedule_id} className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2.5">
-                    <p className="text-sm font-semibold text-slate-950">{m.title}</p>
-                    <p className="mt-1 text-xs font-medium text-slate-400 line-through">
+                  <li key={m.schedule_id} className="px-4 py-3">
+                    <p className="truncate text-[14px] font-medium text-[#0f1e3a]">{displayTitle(m.title)}</p>
+                    <p className="mt-1 font-mono text-[12px] tabular-nums text-[#98a6ba] line-through">
                       {formatSegment(m.from)}
                     </p>
                     {m.to.map((seg) => (
-                      <p key={`${seg.date}-${seg.start_time}`} className="text-xs font-semibold text-blue-700">
+                      <p key={`${seg.date}-${seg.start_time}`} className="font-mono text-[12px] tabular-nums text-[#1f63d6]">
                         → {formatSegment(seg)}
                       </p>
                     ))}
@@ -105,17 +106,17 @@ export default function RescheduleDialog({
             )}
 
             {preview.unplaced.length > 0 && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-                <p className="text-sm font-semibold text-amber-800">⚠️ {preview.warning ?? '자리가 부족해요'}</p>
+              <div className="rounded-xl bg-[#fff8eb] px-4 py-3">
+                <p className="text-[14px] font-medium text-[#92400e]">{preview.warning ?? '자리가 부족해요'}</p>
                 <ul className="mt-1 space-y-0.5">
                   {preview.unplaced.map((u) => (
-                    <li key={u.schedule_id} className="text-xs font-medium text-amber-700">
-                      {u.title} · {u.minutes}분
+                    <li key={u.schedule_id} className="text-[12px] leading-[18px] text-[#92400e]/80">
+                      {displayTitle(u.title)} · {u.minutes}분
                       {u.reason === 'DEADLINE_PASSED' ? ' (시험이 이미 지났어요)' : ` (${formatDay(u.deadline)}까지 빈 시간 없음)`}
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1 text-[11px] font-medium text-amber-600">이 블록들은 그대로 남아요.</p>
+                <p className="mt-1 text-[12px] text-[#92400e]/80">이 블록들은 그대로 남아요</p>
               </div>
             )}
 
@@ -124,7 +125,7 @@ export default function RescheduleDialog({
                 type="button"
                 onClick={close}
                 disabled={isApplying}
-                className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                className="h-11 flex-1 rounded-[10px] border border-[#0f1e3a]/10 bg-white text-[15px] text-[#0f1e3a] transition-colors hover:bg-[#edf3fc] disabled:opacity-50"
               >
                 {hasMoves ? '취소' : '닫기'}
               </button>
@@ -133,9 +134,9 @@ export default function RescheduleDialog({
                   type="button"
                   onClick={() => void apply()}
                   disabled={isApplying}
-                  className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                  className="h-11 flex-1 rounded-[10px] bg-[#2a6fe3] text-[15px] font-medium text-white transition-colors hover:bg-[#1f63d6] disabled:opacity-50"
                 >
-                  {isApplying ? '적용 중...' : '적용'}
+                  {isApplying ? '적용하는 중' : '적용'}
                 </button>
               )}
             </div>

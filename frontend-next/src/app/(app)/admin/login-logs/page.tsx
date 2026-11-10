@@ -70,7 +70,7 @@ export default function AdminLoginLogsPage() {
 
         <section className="overflow-hidden rounded-lg border border-[#d8e2ef] bg-white shadow-sm">
           {loading ? (
-            <div className="flex h-48 items-center justify-center text-sm font-medium text-[#3f4b61]">불러오는 중...</div>
+            <div className="flex h-48 items-center justify-center text-sm font-medium text-[#3f4b61]">불러오는 중</div>
           ) : error ? (
             <div className="flex h-48 items-center justify-center text-sm font-medium text-red-600">{error}</div>
           ) : logs.length === 0 ? (
@@ -78,7 +78,7 @@ export default function AdminLoginLogsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
-                <thead className="bg-[#eaf1ff] text-xs font-semibold text-[#0f172a]">
+                <thead className="bg-[#eaf1ff] text-[13px] text-[#0f172a]">
                   <tr>
                     <th className="px-4 py-3">시간</th>
                     <th className="px-4 py-3">결과</th>
