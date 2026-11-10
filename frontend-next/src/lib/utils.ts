@@ -91,3 +91,8 @@ export function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
   return `${year}년 ${month}월 ${day}일`;
 }
+
+/** 화면에 보일 일정 제목 — 앞에 붙은 이모지(예: 서버가 만든 "📖 과목 준비")를 뗀다. 저장값은 그대로 */
+export function displayTitle(title: string | null | undefined): string {
+  return (title ?? '').replace(/^[\p{Extended_Pictographic}️‍\s]+/u, '');
+}

@@ -80,7 +80,7 @@ export default function RescheduleDialog({
         </DialogHeader>
         {preview && (
           <div className="space-y-4 py-2">
-            <p className="text-sm font-bold text-slate-600">
+            <p className="text-sm font-medium text-slate-600">
               {hasMoves
                 ? `못 한 블록 ${preview.summary.target}개 중 ${preview.summary.placed}개를 시험 전날까지 빈 시간에 옮겨요. 수업·시험·개인 일정은 그대로예요.`
                 : '옮길 수 있는 블록이 없어요.'}
@@ -90,12 +90,12 @@ export default function RescheduleDialog({
               <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {preview.moves.map((m) => (
                   <li key={m.schedule_id} className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2.5">
-                    <p className="text-sm font-black text-slate-950">{m.title}</p>
-                    <p className="mt-1 text-xs font-bold text-slate-400 line-through">
+                    <p className="text-sm font-semibold text-slate-950">{m.title}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-400 line-through">
                       {formatSegment(m.from)}
                     </p>
                     {m.to.map((seg) => (
-                      <p key={`${seg.date}-${seg.start_time}`} className="text-xs font-black text-blue-700">
+                      <p key={`${seg.date}-${seg.start_time}`} className="text-xs font-semibold text-blue-700">
                         → {formatSegment(seg)}
                       </p>
                     ))}
@@ -106,16 +106,16 @@ export default function RescheduleDialog({
 
             {preview.unplaced.length > 0 && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-                <p className="text-sm font-black text-amber-800">⚠️ {preview.warning ?? '자리가 부족해요'}</p>
+                <p className="text-sm font-semibold text-amber-800">⚠️ {preview.warning ?? '자리가 부족해요'}</p>
                 <ul className="mt-1 space-y-0.5">
                   {preview.unplaced.map((u) => (
-                    <li key={u.schedule_id} className="text-xs font-bold text-amber-700">
+                    <li key={u.schedule_id} className="text-xs font-medium text-amber-700">
                       {u.title} · {u.minutes}분
                       {u.reason === 'DEADLINE_PASSED' ? ' (시험이 이미 지났어요)' : ` (${formatDay(u.deadline)}까지 빈 시간 없음)`}
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1 text-[11px] font-bold text-amber-600">이 블록들은 그대로 남아요.</p>
+                <p className="mt-1 text-[11px] font-medium text-amber-600">이 블록들은 그대로 남아요.</p>
               </div>
             )}
 
@@ -124,7 +124,7 @@ export default function RescheduleDialog({
                 type="button"
                 onClick={close}
                 disabled={isApplying}
-                className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 {hasMoves ? '취소' : '닫기'}
               </button>
@@ -133,7 +133,7 @@ export default function RescheduleDialog({
                   type="button"
                   onClick={() => void apply()}
                   disabled={isApplying}
-                  className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
                 >
                   {isApplying ? '적용 중...' : '적용'}
                 </button>

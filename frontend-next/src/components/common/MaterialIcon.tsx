@@ -172,7 +172,7 @@ export default function MaterialIcon({ icon, size = 24, color, filled = false, c
       }}
       width={size}
       height={size}
-      strokeWidth={filled ? 2.35 : 2}
+      strokeWidth={filled ? 1.75 : 1.5}
     />
   );
 }

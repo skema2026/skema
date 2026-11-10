@@ -141,14 +141,14 @@ function ScheduleList({
             >
               <div className="flex items-center justify-between gap-2">
                 <span
-                  className={`truncate text-sm font-black ${
+                  className={`truncate text-sm font-semibold ${
                     isDone ? "text-slate-400 line-through" : "text-slate-900"
                   }`}
                 >
                   {schedule.title}
                 </span>
                 <span
-                  className={`rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black ${
+                  className={`rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold ${
                     isDone ? "text-emerald-500" : "text-slate-600"
                   }`}
                 >
@@ -198,30 +198,30 @@ function DailyReport({
   return (
     <div className="mt-3 space-y-3">
       <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-2xl border border-emerald-300 bg-emerald-50/80 p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+        <div className="rounded-xl border border-black/10 bg-white p-3">
+          <p className="text-[12px] text-[#5f6f88]">
             완료율
           </p>
-          <p className="mt-2 text-lg font-black text-slate-900">{completionRate}%</p>
-          <p className="text-[10px] font-semibold text-slate-500">{done}/{total}</p>
+          <p className="mt-2 font-mono text-lg tabular-nums text-[#0f1e3a]">{completionRate}%</p>
+          <p className="text-[11px] font-semibold text-slate-500">{done}/{total}</p>
         </div>
-        <div className="rounded-2xl border border-blue-400 bg-slate-100 p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-blue-600">
+        <div className="rounded-xl border border-black/10 bg-white p-3">
+          <p className="text-[12px] text-[#5f6f88]">
             여유시간
           </p>
-          <p className="mt-2 text-lg font-black text-slate-900">
+          <p className="mt-2 font-mono text-lg tabular-nums text-[#0f1e3a]">
             {Math.max(Math.floor(freeMinutes / 60), 0)}h
           </p>
-          <p className="text-[10px] font-semibold text-slate-500">
+          <p className="text-[11px] font-semibold text-slate-500">
             {freeMinutes}분
           </p>
         </div>
-        <div className="rounded-2xl border border-amber-400 bg-amber-50 p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-600">
+        <div className="rounded-xl border border-black/10 bg-white p-3">
+          <p className="text-[12px] text-[#5f6f88]">
             확인
           </p>
-          <p className="mt-2 text-lg font-black text-slate-900">{issueCount}</p>
-          <p className="text-[10px] font-semibold text-slate-500">
+          <p className="mt-2 font-mono text-lg tabular-nums text-[#0f1e3a]">{issueCount}</p>
+          <p className="text-[11px] font-semibold text-slate-500">
             {issueCount > 0 ? "검토 필요" : "정상"}
           </p>
         </div>
@@ -241,27 +241,27 @@ function DailyReport({
             className="flex w-full items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left"
           >
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">
+              <p className="text-[12px] text-[#5f6f88]">
                 오늘 시험
               </p>
-              <p className="mt-1 text-sm font-black text-slate-900">{nextExam.title}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">{nextExam.title}</p>
             </div>
-            <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">
+            <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700">
               D-{getDaysUntil(nextExam.exam_date)}
             </span>
           </button>
         ) : (
           <div className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-500">
-            오늘 예정된 시험이 없습니다.
+            오늘 예정된 시험이 없어요
           </div>
         )}
 
         {dayConflictSchedules.length > 0 && (
           <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-red-600">
+            <p className="text-[12px] text-[#5f6f88]">
               겹치는 일정
             </p>
-            <p className="mt-1 text-xs font-bold text-red-700">
+            <p className="mt-1 text-xs font-medium text-red-700">
               {dayConflictSchedules.map(({ schedule }) => schedule.title).join(", ")}
             </p>
           </div>
@@ -269,11 +269,11 @@ function DailyReport({
 
         {issueCount > 0 && (
           <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">
+            <p className="text-[12px] text-[#5f6f88]">
               체크 필요
             </p>
-            <p className="mt-1 text-xs font-bold text-amber-800">
-              {issueItems[0]?.label ?? "추가 검토가 필요해요."}
+            <p className="mt-1 text-xs font-medium text-amber-800">
+              {issueItems[0]?.label ?? "추가 검토가 필요해요"}
             </p>
           </div>
         )}
@@ -283,12 +283,10 @@ function DailyReport({
         type="button"
         onClick={onReschedule}
         disabled={isRegenerating}
-        className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-700 via-blue-500 to-blue-300 p-[1px] transition-all duration-200 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:opacity-50"
+        className="skema-btn-secondary w-full justify-center disabled:opacity-50"
       >
-        <span className="flex w-full items-center justify-center gap-2 rounded-[calc(1rem-1px)] bg-slate-50/90 px-3 py-2.5 text-sm font-black text-blue-600 transition-colors group-hover:bg-blue-50 group-focus-visible:bg-blue-50">
-          <MaterialIcon icon="autorenew" size={16} color="#2563eb" />
-          {isRegenerating ? "다시 짜는 중..." : "다시 짜기"}
-        </span>
+        <MaterialIcon icon="autorenew" size={16} color="currentColor" />
+        {isRegenerating ? "다시 짜는 중" : "다시 짜기"}
       </button>
     </div>
   );
@@ -370,16 +368,13 @@ export default function DayView({
   return (
     <div
       data-day-scroll-container="true"
-      className="h-full overflow-y-auto bg-[#f8fbff] px-3 pb-24 pt-2 sm:px-4"
+      className="h-full overflow-y-auto bg-[#f5f8fd] px-3 pb-24 pt-2 sm:px-4"
     >
       <div className="space-y-2.5">
-        <header className="rounded-xl border border-slate-200/80 bg-white p-2.5">
+        <header className="rounded-xl border border-black/10 bg-white p-4">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-600">
-                {isSelectedDayToday ? "today" : "day"}
-              </p>
-              <h2 className="mt-0.5 text-base font-black text-slate-900">
+              <h2 className="text-base font-medium text-[#0f1e3a]">
                 {formatLongDate(dayDate)}
               </h2>
             </div>
@@ -389,33 +384,28 @@ export default function DayView({
                 type="button"
                 onClick={onReschedule}
                 disabled={isRegenerating}
-                className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-slate-900 disabled:opacity-50"
+                className="skema-btn-secondary h-8 px-3 text-[13px] disabled:opacity-50"
               >
-                <MaterialIcon icon="autorenew" size={13} color="#fff" />
+                <MaterialIcon icon="autorenew" size={16} color="currentColor" />
                 {isRegenerating ? "생성 중" : "다시 짜기"}
               </button>
             </div>
           </div>
 
-          <div className="mt-2 flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5">
-            <span className="text-[12px] font-black text-slate-900">{todaySummaryText}</span>
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">
-              {completionRate}%
-            </span>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[13px] text-[#44536b]">{todaySummaryText}</span>
+            <span className="font-mono text-[13px] tabular-nums text-[#0f1e3a]">{completionRate}%</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#edf3fc]">
+            <div className="h-full rounded-full bg-[#2a6fe3] transition-[width] duration-300" style={{ width: `${completionRate}%` }} />
           </div>
         </header>
 
-        <section className="rounded-xl border border-slate-200/80 bg-white p-2.5">
+        <section className="rounded-xl border border-black/10 bg-white p-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
-                timeline
-              </p>
-              <h3 className="text-sm font-black text-slate-900">오늘 타임라인</h3>
+              <h3 className="text-[15px] font-medium text-[#0f1e3a]">오늘 타임라인</h3>
             </div>
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-700">
-              {isSelectedDayToday ? "현재 시간" : "첫 일정"}
-            </span>
           </div>
 
           <DayTimeline
@@ -433,17 +423,12 @@ export default function DayView({
           />
         </section>
 
-        <section className="rounded-xl border border-slate-200/80 bg-white p-2.5">
+        <section className="rounded-xl border border-black/10 bg-white p-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
-                checklist
-              </p>
-              <h3 className="text-sm font-black text-slate-900">오늘 일정 체크리스트</h3>
+              <h3 className="text-[15px] font-medium text-[#0f1e3a]">오늘 일정 체크리스트</h3>
             </div>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-600">
-              {total}개
-            </span>
+            <span className="font-mono text-[13px] tabular-nums text-[#5f6f88]">{total}개</span>
           </div>
 
           <ScheduleList
@@ -454,19 +439,16 @@ export default function DayView({
           />
         </section>
 
-        <section className="rounded-xl border border-slate-200/80 bg-white p-2.5">
+        <section className="rounded-xl border border-black/10 bg-white p-4">
           <button
             type="button"
             onClick={() => setShowReport((value) => !value)}
             className="flex w-full items-center justify-between gap-2 text-left"
           >
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
-                report
-              </p>
-              <h3 className="text-sm font-black text-slate-900">오늘 리포트</h3>
+              <h3 className="text-[15px] font-medium text-[#0f1e3a]">오늘 리포트</h3>
             </div>
-            <span className="flex items-center gap-1 text-[10px] font-black text-slate-500">
+            <span className="flex items-center gap-1 text-[13px] text-[#5f6f88]">
               핵심 수치
               <MaterialIcon
                 icon={showReport ? "expand_less" : "expand_more"}

@@ -8,7 +8,7 @@
 export type EtaScheduleKind = 'class' | 'personal';
 
 const OPTIONS: { value: EtaScheduleKind; label: string; color: string }[] = [
-  { value: 'class', label: '수업', color: '#3b82f6' },
+  { value: 'class', label: '수업', color: '#4591fd' },
   { value: 'personal', label: '개인', color: '#ec4899' },
 ];
 
@@ -36,7 +36,7 @@ export function ScheduleKindToggle({ value, onChange, size = 'sm' }: Props) {
             role="radio"
             aria-checked={active}
             onClick={() => onChange(opt.value)}
-            className="flex-1 text-xs font-bold transition-colors"
+            className="flex-1 text-xs font-medium transition-colors"
             style={{
               background: active ? opt.color : 'transparent',
               color: active ? '#fff' : '#64748b',

@@ -149,7 +149,7 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
               className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed transition-colors hover:bg-blue-50"
               style={{
                 minHeight: 120,
-                borderColor: hasFile ? '#2563eb' : '#d1d5db',
+                borderColor: hasFile ? '#2a6fe3' : '#d1d5db',
                 background: hasFile ? '#eef1ff' : '#fafbfc',
               }}
             >
@@ -177,7 +177,7 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
 
             {entries.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-xs font-bold text-slate-500">
+                <p className="text-xs font-medium text-slate-500">
                   {entries.length}개 인식됨 · 알바·스터디 같은 개인 일정은 &lsquo;개인&rsquo;으로 골라 주세요
                 </p>
                 <div className="overflow-hidden rounded-lg border">
@@ -187,7 +187,7 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
                       className="flex items-center gap-2 border-b px-3 py-2 text-sm last:border-b-0"
                       style={{ background: i % 2 ? '#f8fbff' : '#fff' }}
                     >
-                      <span className="w-4 text-center font-bold text-blue-700">{DAY_KO[e.day_of_week]}</span>
+                      <span className="w-4 text-center font-medium text-blue-700">{DAY_KO[e.day_of_week]}</span>
                       <span className="flex-1 truncate font-medium">{e.subject_name}</span>
                       <span className="text-xs text-slate-400">{e.start_time}–{e.end_time}</span>
                       <div className="w-24 shrink-0">
@@ -210,7 +210,7 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
             <Button
               onClick={handleSave}
               disabled={entries.length === 0 || parsing || saving}
-              style={{ background: '#2563eb', color: '#fff' }}
+              style={{ background: '#2a6fe3', color: '#fff' }}
             >
               {saving ? '저장 중...' : '저장'}
             </Button>

@@ -592,9 +592,9 @@ export default function DashboardClient({
           style: {
             background: "#EFF6FF",
             border: "1px solid #BFDBFE",
-            color: "#1D4ED8",
+            color: "#1f63d6",
           },
-          icon: <MaterialIcon icon="info" size={14} color="#1D4ED8" />,
+          icon: <MaterialIcon icon="info" size={14} color="#1f63d6" />,
         });
         return;
       }
@@ -749,7 +749,7 @@ export default function DashboardClient({
   return (
     <>
       <DashboardStyles />
-      <div className="flex h-screen flex-col bg-[#f8f9ff]">
+      <div className="flex h-screen flex-col bg-[#f5f8fd]">
         <NotificationBanner
           notification={notification}
           onOpen={(schedule) => {
@@ -785,26 +785,25 @@ export default function DashboardClient({
           isRegenerating={isRegenerating}
         />
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f8f9ff] p-3">
-          <div className="flex w-full flex-col gap-3">
-            <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="flex min-w-0 flex-col rounded-2xl border border-blue-100 bg-sky-50 p-4 shadow-[0_10px_30px_-5px_rgba(0,82,255,0.08)]">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f5f8fd] p-3 sm:p-6">
+          <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-3">
+            <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="flex min-w-0 flex-col">
+                <div className="mb-2 flex flex-wrap items-end justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-xs font-black text-blue-600">
+                    <p className="text-[13px] text-[#5f6f88]">
                       {todayLabel}
                     </p>
-                    <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
+                    <h1 className="mt-1 text-[28px] font-semibold leading-tight tracking-[-0.01em] text-[#0f1e3a]">
                       내 시간표
                     </h1>
-                    <p className="mt-1 text-sm font-bold text-slate-500">
-                      {currentViewLabel} · 표시 {currentViewScheduleCount}개
-                      일정 · 에타 {etaScheduleCount}개
+                    <p className="mt-2 text-[14px] text-[#44536b]">
+                      {currentViewLabel} · 일정 {currentViewScheduleCount}개 · 에타 수업 {etaScheduleCount}개
                     </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex rounded-lg border border-blue-100 bg-blue-50/70 p-1">
+                    <div className="flex rounded-lg bg-[#e6effc] p-1">
                       {VIEW_LABELS.map(({ key, label }) => (
                         <button
                           key={key}
@@ -817,10 +816,10 @@ export default function DashboardClient({
                             );
                             syncUrlState(baseDate, key);
                           }}
-                          className={`rounded-md px-3 py-1.5 text-xs font-black transition ${
+                          className={`h-7 rounded-md px-3 text-[13px] transition-colors ${
                             timetableView === key
-                              ? "bg-blue-600 text-white shadow-sm"
-                              : "text-slate-600 hover:bg-white"
+                              ? "bg-[#2a6fe3] font-medium text-white shadow-[0_1px_2px_rgba(42,111,227,0.25)]"
+                              : "text-[#44536b] hover:text-[#1f63d6]"
                           }`}
                         >
                           {label}
@@ -828,37 +827,37 @@ export default function DashboardClient({
                       ))}
                     </div>
                     <button
-                      className="rounded-lg border border-blue-100 p-2 transition hover:bg-blue-50"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-black/10 bg-white transition-colors hover:bg-[#edf3fc]"
                       onClick={() => moveCalendar(-1)}
                       aria-label="이전"
                     >
                       <MaterialIcon
                         icon="chevron_left"
                         size={18}
-                        color="#2563eb"
+                        color="#44536b"
                       />
                     </button>
                     <button
-                      className="rounded-lg border border-blue-100 px-4 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-50"
+                      className="skema-btn-secondary h-9 px-3 text-[13px]"
                       onClick={resetCalendar}
                     >
                       오늘
                     </button>
                     <button
-                      className="rounded-lg border border-blue-100 p-2 transition hover:bg-blue-50"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-black/10 bg-white transition-colors hover:bg-[#edf3fc]"
                       onClick={() => moveCalendar(1)}
                       aria-label="다음"
                     >
                       <MaterialIcon
                         icon="chevron_right"
                         size={18}
-                        color="#2563eb"
+                        color="#44536b"
                       />
                     </button>
                   </div>
                 </div>
 
-                <div className="mt-4 flex-1 overflow-hidden rounded-2xl border border-blue-100 bg-sky-50 sm:mt-5 sm:min-h-[calc(100vh-170px)]">
+                <div className="mt-4 flex-1 overflow-hidden rounded-xl border border-black/[0.08] bg-white sm:mt-5 sm:min-h-[calc(100vh-200px)]">
                   {timetableView === "week" && (
                     <WeekView
                       days={weekAgendaDays}
@@ -967,10 +966,10 @@ export default function DashboardClient({
                 key={s.id}
                 className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2"
               >
-                <span className="truncate text-sm font-black text-slate-950 mr-2">
+                <span className="truncate text-sm font-semibold text-slate-950 mr-2">
                   {s.title}
                 </span>
-                <span className="shrink-0 text-xs font-bold text-slate-400">
+                <span className="shrink-0 text-xs font-medium text-slate-400">
                   {s.start_time}–{s.end_time}
                 </span>
               </div>

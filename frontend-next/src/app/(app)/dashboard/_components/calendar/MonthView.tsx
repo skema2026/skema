@@ -26,7 +26,7 @@ function MobileMonthAgenda({
   return (
     <div className="bg-[#f8fbff] p-3">
       <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
-        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] font-black text-slate-400">
+        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-400">
           {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
             <div key={day} className="py-1">
               {day}
@@ -57,7 +57,7 @@ function MobileMonthAgenda({
                 }`}
               >
                 <div className="flex h-full flex-col justify-between">
-                  <span className="text-xs font-black leading-none">
+                  <span className="text-xs font-semibold leading-none">
                     {day.date.getDate()}
                   </span>
 
@@ -115,16 +115,16 @@ export default function MonthView({
 
       <div className="hidden h-full overflow-y-auto bg-white p-4 sm:block">
         <div className="mb-3 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3">
-          <span className="text-sm font-black text-slate-950">
+          <span className="text-sm font-semibold text-slate-950">
             {monthLabel}
           </span>
 
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700">
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-700">
             {minutesToTime(wakeStartMinutes)} 기준
           </span>
         </div>
 
-        <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs font-black text-slate-500">
+        <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-500">
           {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
             <div key={day} className="rounded-md bg-blue-50 py-2">
               {day}
@@ -156,7 +156,7 @@ export default function MonthView({
               >
                 <div className="mb-1.5 flex items-center justify-between">
                   <span
-                    className={`text-xs font-black ${
+                    className={`text-xs font-semibold ${
                       isToday ? 'text-blue-700' : 'text-slate-600'
                     }`}
                   >
@@ -164,7 +164,7 @@ export default function MonthView({
                   </span>
 
                   {dayExams.length > 0 && (
-                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-700">
+                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">
                       시험
                     </span>
                   )}
@@ -185,7 +185,7 @@ export default function MonthView({
                 )}
 
                 {items.length > 6 && (
-                  <span className="mt-0.5 block text-[10px] font-black text-slate-400">
+                  <span className="mt-0.5 block text-[11px] font-semibold text-slate-400">
                     +{items.length - 6}개
                   </span>
                 )}

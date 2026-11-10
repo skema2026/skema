@@ -18,7 +18,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
         width: 48,
         height: 28,
         borderRadius: 99,
-        background: checked ? '#2563eb' : '#e2e8f0',
+        background: checked ? '#2a6fe3' : '#e2e8f0',
         border: 'none',
         cursor: disabled ? 'not-allowed' : 'pointer',
         padding: 0,
@@ -65,24 +65,24 @@ export default function NotificationsClient() {
         </button>
         <div style={{
           width: '32px', height: '32px', borderRadius: '10px',
-          background: 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
+          background: 'linear-gradient(135deg, #2a6fe3 0%, #38bdf8 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 8px 18px rgba(37, 99, 235, 0.24)',
+          boxShadow: '0 8px 18px rgba(42, 111, 227, 0.24)',
         }}>
           <MaterialIcon icon="notifications" size={18} color="#fff" filled />
         </div>
-        <span style={{ fontWeight: 800, fontSize: '18px', color: '#0f172a' }}>알림 설정</span>
+        <span style={{ fontWeight: 600, fontSize: '18px', color: '#0f172a' }}>알림 설정</span>
       </header>
 
       <main style={{ maxWidth: 640, margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
         {/* OS 푸시 알림 */}
         <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-          <p className="mb-4 text-[11px] font-black text-slate-400">OS 푸시 알림</p>
+          <p className="mb-4 text-[11px] font-semibold text-slate-400">OS 푸시 알림</p>
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-sm font-black text-slate-950">OS 푸시 알림</p>
-              <p className="mt-0.5 text-xs font-bold text-slate-400">
+              <p className="text-sm font-semibold text-slate-950">OS 푸시 알림</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-400">
                 {push.permission === 'unsupported'
                   ? '이 브라우저는 푸시 알림을 지원하지 않습니다'
                   : push.permission === 'denied'
@@ -97,7 +97,7 @@ export default function NotificationsClient() {
                 <button
                   type="button"
                   onClick={async () => { await push.sendTest(); toast.success('테스트 알림을 전송했습니다'); }}
-                  className="rounded-lg border border-blue-100 px-3 py-1.5 text-xs font-black text-blue-600 transition hover:bg-blue-50"
+                  className="rounded-lg border border-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
                 >
                   테스트
                 </button>
@@ -110,7 +110,7 @@ export default function NotificationsClient() {
             </div>
           </div>
           {push.permission === 'denied' && (
-            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
+            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
               브라우저 주소창 자물쇠 아이콘 → 알림 → 허용으로 변경해주세요
             </p>
           )}
@@ -119,15 +119,15 @@ export default function NotificationsClient() {
         {/* 알림 종류 */}
         {!prefsLoading && (
           <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-            <p className="mb-4 text-[11px] font-black text-slate-400">알림 종류</p>
+            <p className="mb-4 text-[11px] font-semibold text-slate-400">알림 종류</p>
             <div className="divide-y divide-slate-100">
 
               {/* 일정 시작 전 알림 */}
               <div className="py-3 first:pt-0">
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-slate-950">일정 시작 전 알림</p>
-                    <p className="text-xs font-bold text-slate-400">일정 시작 N분 전에 알림</p>
+                    <p className="text-sm font-semibold text-slate-950">일정 시작 전 알림</p>
+                    <p className="text-xs font-medium text-slate-400">일정 시작 N분 전에 알림</p>
                   </div>
                   <Toggle
                     checked={!!prefs.reminder_start}
@@ -136,14 +136,14 @@ export default function NotificationsClient() {
                 </div>
                 {prefs.reminder_start && (
                   <div className="mt-3 rounded-xl bg-blue-50/60 px-3 py-3">
-                    <p className="mb-2 text-xs font-black text-slate-600">몇 분 전에 알릴까요?</p>
+                    <p className="mb-2 text-xs font-semibold text-slate-600">몇 분 전에 알릴까요?</p>
                     <div className="grid grid-cols-5 gap-1.5">
                       {[5, 10, 15, 30, 60].map((m) => (
                         <button
                           key={m}
                           type="button"
                           onClick={() => updatePref('reminder_minutes', m)}
-                          className={`rounded-lg border py-2 text-xs font-black transition ${
+                          className={`rounded-lg border py-2 text-xs font-semibold transition ${
                             reminderMinutes === m
                               ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
                               : 'border-blue-100 bg-white text-slate-600 hover:border-blue-300'
@@ -160,8 +160,8 @@ export default function NotificationsClient() {
               {/* 종료 후 미완료 알림 */}
               <div className="flex items-center justify-between gap-4 py-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-black text-slate-950">미완료 알림</p>
-                  <p className="text-xs font-bold text-slate-400">일정 종료 후에도 미완료면 알림</p>
+                  <p className="text-sm font-semibold text-slate-950">미완료 알림</p>
+                  <p className="text-xs font-medium text-slate-400">일정 종료 후에도 미완료면 알림</p>
                 </div>
                 <Toggle
                   checked={!!prefs.reminder_incomplete}
@@ -180,8 +180,8 @@ export default function NotificationsClient() {
               ] as const).map(({ key, label, desc }) => (
                 <div key={key} className="flex items-center justify-between gap-4 py-3 last:pb-0">
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-slate-950">{label}</p>
-                    <p className="text-xs font-bold text-slate-400">{desc}</p>
+                    <p className="text-sm font-semibold text-slate-950">{label}</p>
+                    <p className="text-xs font-medium text-slate-400">{desc}</p>
                   </div>
                   <Toggle
                     checked={!!prefs[key]}

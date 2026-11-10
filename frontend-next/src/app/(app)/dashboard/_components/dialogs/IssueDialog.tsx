@@ -39,10 +39,10 @@ export default function IssueDialog({
             items.map((item) => (
               <div key={item.key} className="rounded-lg border border-slate-100 p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-black text-slate-500">{item.label}</span>
-                  <span className="text-sm font-black text-slate-950">{item.value}</span>
+                  <span className="text-xs font-semibold text-slate-500">{item.label}</span>
+                  <span className="text-sm font-semibold text-slate-950">{item.value}</span>
                 </div>
-                <p className="mt-1 text-[11px] font-bold text-slate-400">{item.detail}</p>
+                <p className="mt-1 text-[11px] font-medium text-slate-400">{item.detail}</p>
               </div>
             ))
           )}

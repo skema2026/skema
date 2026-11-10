@@ -46,7 +46,7 @@ interface PersonalSchedule {
 
 const DAY_LABELS = ['월','화','수','목','금','토','일'] as const;
 const USER_TYPES = [
-  { id: 'exam_prep',   label: '취준 & 시험준비생', icon: 'menu_book',    desc: '취업/공무원/자격증/입시 등', color: '#c3d0ff', iconColor: '#2563eb' },
+  { id: 'exam_prep',   label: '취준 & 시험준비생', icon: 'menu_book',    desc: '취업/공무원/자격증/입시 등', color: '#c3d0ff', iconColor: '#2a6fe3' },
   { id: 'high_school', label: '중고등학생',         icon: 'school',       desc: '내신/수능 준비',             color: '#d1fae5', iconColor: '#065f46' },
   { id: 'worker',      label: '직장인',             icon: 'work',         desc: '업무 외 자기계발',           color: '#fef3c7', iconColor: '#92400e' },
   { id: 'other',       label: '기타',               icon: 'person',       desc: '위 유형에 해당 없는 경우',   color: '#f1f5f9', iconColor: '#475569' },
@@ -646,14 +646,14 @@ export default function OnboardingPage() {
     return (
       <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-md text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6" style={{ background: '#2563eb' }}>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6" style={{ background: '#2a6fe3' }}>
             <MaterialIcon icon="schedule" size={32} color="#fff" filled />
           </div>
-          <h1 className="text-2xl font-extrabold mb-2" style={{ color: '#181c1e' }}>SKEMA에 오신 것을 환영합니다!</h1>
+          <h1 className="text-2xl font-semibold mb-2" style={{ color: '#181c1e' }}>SKEMA에 오신 것을 환영합니다!</h1>
           <p className="text-sm mb-10" style={{ color: '#334155' }}>먼저 몇 가지 질문에 답해주세요.</p>
 
           <div className="rounded-2xl p-6 mb-8 text-left" style={{ background: '#fff', boxShadow: '0 4px 24px rgba(26,77,178,0.08)', border: '1px solid #ebeef1' }}>
-            <p className="text-lg font-bold mb-1" style={{ color: '#181c1e' }}>현재 대학생이신가요?</p>
+            <p className="text-lg font-medium mb-1" style={{ color: '#181c1e' }}>현재 대학생이신가요?</p>
             <p className="text-sm" style={{ color: '#3f4b61' }}>에타 기반으로 시간표를 더 정확하게 만들어드려요.</p>
           </div>
 
@@ -664,16 +664,16 @@ export default function OnboardingPage() {
                 setSelectedType('student');
                 setPhase('eta-upload');
               }}
-              className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-colors hover:scale-[1.02] active:scale-[0.98]"
               style={{ background: '#fff', borderColor: '#ebeef1', boxShadow: '0 2px 12px rgba(26,77,178,0.06)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.background = '#eef1ff'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2a6fe3'; e.currentTarget.style.background = '#eef1ff'; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#ebeef1'; e.currentTarget.style.background = '#fff'; }}
             >
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: '#d1fae5' }}>
                 <MaterialIcon icon="school" size={30} color="#065f46" filled />
               </div>
               <div>
-                <p className="font-bold text-sm mb-0.5" style={{ color: '#181c1e' }}>네, 대학생이에요</p>
+                <p className="font-medium text-sm mb-0.5" style={{ color: '#181c1e' }}>네, 대학생이에요</p>
                 <p className="text-xs" style={{ color: '#3f4b61' }}>에타 시간표 자동 생성</p>
               </div>
             </button>
@@ -685,7 +685,7 @@ export default function OnboardingPage() {
                 setMessages([{ role: 'ai', text: CHAT_STEPS_NON_COLLEGE[0].question }]);
                 setPhase('chat');
               }}
-              className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-colors hover:scale-[1.02] active:scale-[0.98]"
               style={{ background: '#fff', borderColor: '#ebeef1', boxShadow: '0 2px 12px rgba(26,77,178,0.06)' }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3f4b61'; e.currentTarget.style.background = '#f7fafd'; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#ebeef1'; e.currentTarget.style.background = '#fff'; }}
@@ -694,7 +694,7 @@ export default function OnboardingPage() {
                 <MaterialIcon icon="person" size={30} color="#92400e" filled />
               </div>
               <div>
-                <p className="font-bold text-sm mb-0.5" style={{ color: '#181c1e' }}>아니요</p>
+                <p className="font-medium text-sm mb-0.5" style={{ color: '#181c1e' }}>아니요</p>
                 <p className="text-xs" style={{ color: '#3f4b61' }}>일반 유형으로 진행</p>
               </div>
             </button>
@@ -719,21 +719,21 @@ export default function OnboardingPage() {
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
             <div>
-              <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>에타 시간표 업로드</h2>
+              <h2 className="font-semibold text-lg" style={{ color: '#181c1e' }}>에타 시간표 업로드</h2>
               <p className="text-xs" style={{ color: '#3f4b61' }}>1단계 / 5단계</p>
             </div>
           </div>
 
           {/* Progress */}
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: '20%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: '20%', background: '#2a6fe3' }} />
           </div>
 
           {/* Guide card */}
           <div className="rounded-2xl p-4 mb-5 flex items-start gap-3" style={{ background: '#eef1ff', border: '1px solid #c3d0ff' }}>
-            <MaterialIcon icon="photo_camera" size={24} color="#2563eb" filled className="mt-0.5 flex-shrink-0" />
+            <MaterialIcon icon="photo_camera" size={24} color="#2a6fe3" filled className="mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-sm font-bold mb-1" style={{ color: '#2563eb' }}>에타 시간표 촬영 방법</p>
+              <p className="text-sm font-medium mb-1" style={{ color: '#2a6fe3' }}>에타 시간표 촬영 방법</p>
               <ol className="text-xs leading-relaxed space-y-0.5" style={{ color: '#334155' }}>
                 <li>1. 에브리타임 앱에서 시간표 전체 보기</li>
                 <li>2. 전체 시간표가 보이도록 화면 캡처</li>
@@ -752,8 +752,8 @@ export default function OnboardingPage() {
           />
 
           <div
-            className="rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-3 cursor-pointer transition-all mb-5"
-            style={{ minHeight: 200, borderColor: etaImage ? '#2563eb' : '#d1d5db', background: etaImage ? '#eef1ff' : '#fafbfc' }}
+            className="rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors mb-5"
+            style={{ minHeight: 200, borderColor: etaImage ? '#2a6fe3' : '#d1d5db', background: etaImage ? '#eef1ff' : '#fafbfc' }}
             onClick={() => etaFileRef.current?.click()}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
@@ -772,16 +772,16 @@ export default function OnboardingPage() {
                   style={{ maxHeight: 280 }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center rounded-xl opacity-0 hover:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.4)' }}>
-                  <span className="text-white text-sm font-bold">다른 이미지 선택</span>
+                  <span className="text-white text-sm font-medium">다른 이미지 선택</span>
                 </div>
               </div>
             ) : (
               <>
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#eef1ff' }}>
-                  <MaterialIcon icon="upload_file" size={38} color="#2563eb" filled />
+                  <MaterialIcon icon="upload_file" size={38} color="#2a6fe3" filled />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-bold" style={{ color: '#181c1e' }}>이미지를 드래그하거나 클릭해서 업로드</p>
+                  <p className="text-sm font-medium" style={{ color: '#181c1e' }}>이미지를 드래그하거나 클릭해서 업로드</p>
                   <p className="text-xs mt-1" style={{ color: '#3f4b61' }}>JPG, PNG, WEBP · 최대 20MB</p>
                 </div>
               </>
@@ -791,7 +791,7 @@ export default function OnboardingPage() {
           {etaParsing && (
             <div className="rounded-xl p-4 mb-4 flex items-center gap-3" style={{ background: '#eef1ff', border: '1px solid #c3d0ff' }}>
               <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin flex-shrink-0" style={{ borderColor: '#c3d0ff', borderTopColor: 'transparent' }} />
-              <p className="text-sm font-semibold" style={{ color: '#2563eb' }}>시간표를 읽고 있어요...</p>
+              <p className="text-sm font-semibold" style={{ color: '#2a6fe3' }}>시간표를 읽고 있어요...</p>
             </div>
           )}
 
@@ -813,8 +813,8 @@ export default function OnboardingPage() {
             {etaImage && !etaParsing && (
               <button
                 onClick={() => setPhase('eta-review')}
-                className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all"
-                style={{ background: '#2563eb' }}
+                className="flex-1 py-3 rounded-xl text-sm font-medium text-white transition-colors"
+                style={{ background: '#2a6fe3' }}
               >
                 다음
               </button>
@@ -881,21 +881,21 @@ export default function OnboardingPage() {
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
             <div className="min-w-0">
-              <h2 className="text-lg font-extrabold leading-tight" style={{ color: '#181c1e' }}>시간표 확인 및 수정</h2>
+              <h2 className="text-lg font-semibold leading-tight" style={{ color: '#181c1e' }}>시간표 확인 및 수정</h2>
               <p className="mt-1 text-xs leading-relaxed" style={{ color: '#3f4b61' }}>2단계 / 5단계 · 읽어 온 결과를 확인하고 수정해주세요</p>
             </div>
           </div>
 
           {/* Progress */}
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: '40%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: '40%', background: '#2a6fe3' }} />
           </div>
 
           {/* Status banner */}
           {etaParsing ? (
             <div className="rounded-xl p-3 mb-5 flex items-center gap-2" style={{ background: '#eef1ff', border: '1px solid #c3d0ff' }}>
               <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin flex-shrink-0" style={{ borderColor: '#c3d0ff', borderTopColor: 'transparent' }} />
-              <p className="text-sm font-semibold" style={{ color: '#2563eb' }}>시간표를 다시 읽고 있어요</p>
+              <p className="text-sm font-semibold" style={{ color: '#2a6fe3' }}>시간표를 다시 읽고 있어요</p>
             </div>
           ) : etaEntries.length > 0 ? (
             <div className="rounded-xl p-3 mb-5 flex items-center gap-2" style={{ background: '#d1fae5', border: '1px solid #6ee7b7' }}>
@@ -916,7 +916,7 @@ export default function OnboardingPage() {
           {/* Entry list */}
           <div className="rounded-2xl overflow-hidden mb-4" style={{ background: '#fff', border: '1px solid #ebeef1', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
             {/* Table header */}
-            <div className="hidden gap-2 px-4 py-2.5 text-xs font-bold sm:grid" style={{
+            <div className="hidden gap-2 px-4 py-2.5 text-xs font-medium sm:grid" style={{
               gridTemplateColumns: '2fr 96px 80px 90px 90px 1fr 36px',
               borderBottom: '1px solid #f1f4f7',
               background: '#fafbfc',
@@ -954,7 +954,7 @@ export default function OnboardingPage() {
                     placeholder="과목명을 입력하세요"
                     className="w-full px-2 py-1.5 text-sm rounded-lg border outline-none transition-colors"
                     style={{ borderColor: entry.subject_name ? '#ebeef1' : '#fca5a5', background: '#fafbfc' }}
-                    onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                    onFocus={(e) => e.target.style.borderColor = '#2a6fe3'}
                     onBlur={(e) => e.target.style.borderColor = entry.subject_name ? '#ebeef1' : '#fca5a5'}
                   />
                   {/* 종류: 수업 / 개인 */}
@@ -1016,7 +1016,7 @@ export default function OnboardingPage() {
                   style={{ borderBottom: idx < etaEntries.length - 1 ? '1px solid #f1f4f7' : 'none' }}
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-xs font-extrabold" style={{ color: '#64748b' }}>과목 {idx + 1}</p>
+                    <p className="text-xs font-semibold" style={{ color: '#64748b' }}>과목 {idx + 1}</p>
                     <button
                       onClick={() => removeEntry(entry._id)}
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors"
@@ -1028,7 +1028,7 @@ export default function OnboardingPage() {
                   </div>
 
                   <label className="mb-3 block">
-                    <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>과목명</span>
+                    <span className="mb-1 block text-xs font-medium" style={{ color: '#3f4b61' }}>과목명</span>
                     <input
                       type="text"
                       value={entry.subject_name}
@@ -1036,13 +1036,13 @@ export default function OnboardingPage() {
                       placeholder="과목명을 입력하세요"
                       className="h-11 w-full rounded-xl border px-3 text-base outline-none transition-colors"
                       style={{ borderColor: entry.subject_name ? '#ebeef1' : '#fca5a5', background: '#fafbfc' }}
-                      onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                      onFocus={(e) => e.target.style.borderColor = '#2a6fe3'}
                       onBlur={(e) => e.target.style.borderColor = entry.subject_name ? '#ebeef1' : '#fca5a5'}
                     />
                   </label>
 
                   <div className="mb-3">
-                    <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>종류</span>
+                    <span className="mb-1 block text-xs font-medium" style={{ color: '#3f4b61' }}>종류</span>
                     <ScheduleKindToggle
                       size="md"
                       value={entry.schedule_type}
@@ -1052,7 +1052,7 @@ export default function OnboardingPage() {
 
                   <div className="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
                     <label className="block min-w-0">
-                      <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>요일</span>
+                      <span className="mb-1 block text-xs font-medium" style={{ color: '#3f4b61' }}>요일</span>
                       <select
                         value={entry.day_of_week}
                         onChange={(e) => updateEntry(entry._id, 'day_of_week', Number(e.target.value))}
@@ -1065,7 +1065,7 @@ export default function OnboardingPage() {
                       </select>
                     </label>
                     <label className="block min-w-0">
-                      <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>강의실</span>
+                      <span className="mb-1 block text-xs font-medium" style={{ color: '#3f4b61' }}>강의실</span>
                       <input
                         type="text"
                         value={entry.location ?? ''}
@@ -1079,7 +1079,7 @@ export default function OnboardingPage() {
 
                   <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
                     <label className="block min-w-0">
-                      <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>시작</span>
+                      <span className="mb-1 block text-xs font-medium" style={{ color: '#3f4b61' }}>시작</span>
                       <input
                         type="time"
                         step="300"
@@ -1090,7 +1090,7 @@ export default function OnboardingPage() {
                       />
                     </label>
                     <label className="block min-w-0">
-                      <span className="mb-1 block text-xs font-bold" style={{ color: '#3f4b61' }}>종료</span>
+                      <span className="mb-1 block text-xs font-medium" style={{ color: '#3f4b61' }}>종료</span>
                       <input
                         type="time"
                         step="300"
@@ -1111,9 +1111,9 @@ export default function OnboardingPage() {
               {/* Header */}
               <div className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:py-2.5" style={{ borderBottom: '1px solid #f1f4f7' }}>
                 <div className="flex min-w-0 items-start gap-2 sm:items-center">
-                  <MaterialIcon icon="image" size={16} color="#2563eb" filled />
+                  <MaterialIcon icon="image" size={16} color="#2a6fe3" filled />
                   <div className="min-w-0">
-                    <p className="text-xs font-bold" style={{ color: '#181c1e' }}>업로드한 원본 이미지</p>
+                    <p className="text-xs font-medium" style={{ color: '#181c1e' }}>업로드한 원본 이미지</p>
                     <p className="mt-0.5 text-xs leading-relaxed" style={{ color: '#3f4b61' }}>이미지가 맞는지 확인해주세요</p>
                   </div>
                 </div>
@@ -1121,10 +1121,10 @@ export default function OnboardingPage() {
                   <button
                     onClick={handleReParseEtaImage}
                     disabled={etaParsing}
-                    className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all"
+                    className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
                     style={{
                       background: etaParsing ? '#c3d0ff' : '#eef1ff',
-                      color: '#2563eb',
+                      color: '#2a6fe3',
                       border: '1px solid #c3d0ff',
                       cursor: etaParsing ? 'not-allowed' : 'pointer',
                     }}
@@ -1137,14 +1137,14 @@ export default function OnboardingPage() {
                       </>
                     ) : (
                       <>
-                        <MaterialIcon icon="refresh" size={14} color="#2563eb" filled />
+                        <MaterialIcon icon="refresh" size={14} color="#2a6fe3" filled />
                         다시 분석
                       </>
                     )}
                   </button>
                   <button
                     onClick={() => setEtaImageExpanded((v) => !v)}
-                    className="flex min-h-10 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition-all"
+                    className="flex min-h-10 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors"
                     style={{ background: '#f1f4f7', color: '#334155', border: '1px solid #ebeef1', cursor: 'pointer' }}
                     title={etaImageExpanded ? '이미지 접기' : '이미지 펼치기'}
                   >
@@ -1166,7 +1166,7 @@ export default function OnboardingPage() {
                 <img
                   src={etaImagePreview}
                   alt="원본 시간표"
-                  className="w-full rounded-lg object-contain cursor-pointer transition-all"
+                  className="w-full rounded-lg object-contain cursor-pointer transition-colors"
                   style={{
                     maxHeight: etaImageExpanded ? 'none' : 180,
                     objectFit: 'contain',
@@ -1195,8 +1195,8 @@ export default function OnboardingPage() {
             <button
               onClick={handleSaveAndContinue}
               disabled={etaSaving}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all"
-              style={{ background: etaSaving ? '#93c5fd' : '#2563eb' }}
+              className="flex-1 py-3 rounded-xl text-sm font-medium text-white transition-colors"
+              style={{ background: etaSaving ? '#93c5fd' : '#2a6fe3' }}
             >
               {etaSaving ? '저장 중...' : `${etaEntries.filter(e => e.subject_name.trim()).length}개 확인, 다음`}
             </button>
@@ -1208,7 +1208,7 @@ export default function OnboardingPage() {
       {showEtaOverwriteConfirm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', maxWidth: 360, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
-            <p className="font-extrabold text-base mb-2" style={{ color: '#181c1e' }}>기존 시간표를 교체할까요?</p>
+            <p className="font-semibold text-base mb-2" style={{ color: '#181c1e' }}>기존 시간표를 교체할까요?</p>
             <p className="text-sm mb-2" style={{ color: '#3f4b61' }}>기존 강의 시간표가 모두 삭제되고 새 시간표로 교체됩니다.</p>
             <p className="text-xs rounded-lg px-3 py-2 mb-5" style={{ background: '#f0fdf4', color: '#166534' }}>
               ✓ 개인 일정은 삭제되지 않고 그대로 유지됩니다.
@@ -1219,7 +1219,7 @@ export default function OnboardingPage() {
                 취소
               </button>
               <button onClick={doSaveAndContinue}
-                style={{ flex: 1, height: 44, borderRadius: 11, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                style={{ flex: 1, height: 44, borderRadius: 11, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>
                 교체
               </button>
             </div>
@@ -1236,7 +1236,7 @@ export default function OnboardingPage() {
     return (
       <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4 sm:p-6">
         <div className="w-full max-w-sm text-center">
-          <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-full mb-6" style={{ background: '#2563eb' }}>
+          <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-full mb-6" style={{ background: '#2a6fe3' }}>
             {phase === 'done' ? (
               <MaterialIcon icon="check_circle" size={40} color="#fff" filled />
             ) : (
@@ -1247,7 +1247,7 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          <h2 className="text-xl font-extrabold mb-2" style={{ color: '#181c1e' }}>
+          <h2 className="text-xl font-semibold mb-2" style={{ color: '#181c1e' }}>
             {phase === 'done' ? 'SKEMA 완성!' : '시간표를 만드는 중입니다'}
           </h2>
 
@@ -1260,7 +1260,7 @@ export default function OnboardingPage() {
               {GENERATING_STEPS.map((step, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-3 p-3 rounded-xl text-left transition-all"
+                  className="flex items-center gap-3 p-3 rounded-xl text-left transition-colors"
                   style={{
                     background: i <= generatingStep ? (typeInfo?.color + '40' || '#c3d0ff40') : '#f1f4f7',
                     opacity: i <= generatingStep ? 1 : 0.4,
@@ -1269,7 +1269,7 @@ export default function OnboardingPage() {
                   <MaterialIcon
                     icon={i < generatingStep ? 'check_circle' : i === generatingStep ? 'pending' : 'radio_button_unchecked'}
                     size={16}
-                    color={i <= generatingStep ? '#2563eb' : '#3f4b61'}
+                    color={i <= generatingStep ? '#2a6fe3' : '#3f4b61'}
                     filled
                     className="flex-shrink-0"
                   />
@@ -1326,12 +1326,12 @@ export default function OnboardingPage() {
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
             <div>
-              <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>추가 시험 입력</h2>
+              <h2 className="font-semibold text-lg" style={{ color: '#181c1e' }}>추가 시험 입력</h2>
               <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '3단계 / 5단계' : '1단계 / 3단계'}</p>
             </div>
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '60%' : '33%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '60%' : '33%', background: '#2a6fe3' }} />
           </div>
 
           <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>
@@ -1341,14 +1341,14 @@ export default function OnboardingPage() {
 
           <div className="grid grid-cols-1 gap-2 mb-3 sm:grid-cols-[minmax(0,1fr)_170px_auto]">
             <label className="block min-w-0">
-              <span className="mb-1 block text-[11px] font-bold" style={{ color: '#334155' }}>시험명</span>
+              <span className="mb-1 block text-[11px] font-medium" style={{ color: '#334155' }}>시험명</span>
               <input
                 className="h-12 w-full px-3 text-base border-2 rounded-xl outline-none"
                 style={{ borderColor: '#ebeef1', background: 'rgba(255,255,255,0.6)' }}
                 placeholder="예: 중간고사, 토익"
                 value={examDraft.name}
                 onChange={(e) => updateExamDraft({ name: e.target.value })}
-                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                onFocus={(e) => e.target.style.borderColor = '#2a6fe3'}
                 onBlur={(e) => {
                   e.target.style.borderColor = '#ebeef1';
                   registerInitialExamIfReady({ ...examDraft, name: e.target.value });
@@ -1357,14 +1357,14 @@ export default function OnboardingPage() {
               />
             </label>
             <label className="block min-w-0">
-              <span className="mb-1 block text-[11px] font-bold" style={{ color: examError && !examDraft.date ? '#ef4444' : '#334155' }}>시험 날짜</span>
+              <span className="mb-1 block text-[11px] font-medium" style={{ color: examError && !examDraft.date ? '#ef4444' : '#334155' }}>시험 날짜</span>
               <div
                 className="relative flex h-12 w-full items-center gap-2 rounded-xl border-2 px-3 cursor-pointer"
                 style={{ borderColor: examError && !examDraft.date ? '#ef4444' : '#ebeef1', background: 'rgba(255,255,255,0.72)' }}
                 onClick={() => examDateRef.current?.showPicker?.() ?? examDateRef.current?.click()}
               >
-                <MaterialIcon icon="event" size={17} color={examDraft.date ? '#2563eb' : '#64748b'} />
-                <span className="min-w-0 flex-1 truncate text-base font-bold" style={{ color: examDraft.date ? '#181c1e' : '#64748b' }}>
+                <MaterialIcon icon="event" size={17} color={examDraft.date ? '#2a6fe3' : '#64748b'} />
+                <span className="min-w-0 flex-1 truncate text-base font-medium" style={{ color: examDraft.date ? '#181c1e' : '#64748b' }}>
                   {examDraft.date || '시험 날짜 선택'}
                 </span>
                 <MaterialIcon icon="expand_more" size={18} color="#64748b" />
@@ -1383,14 +1383,14 @@ export default function OnboardingPage() {
             </label>
             {externalExams.length > 0 && (
               <button onClick={() => registerExam()}
-                className="h-12 self-end rounded-xl px-4 text-sm font-bold text-white"
-                style={{ background: '#2563eb', cursor: 'pointer' }}>
+                className="h-12 self-end rounded-xl px-4 text-sm font-medium text-white"
+                style={{ background: '#2a6fe3', cursor: 'pointer' }}>
                 시험 추가
               </button>
             )}
           </div>
           {examError && (
-            <p className="mt-1 text-xs font-bold" style={{ color: '#ef4444' }}>⚠ {examError}</p>
+            <p className="mt-1 text-xs font-medium" style={{ color: '#ef4444' }}>⚠ {examError}</p>
           )}
 
           {externalExams.length > 0 && (
@@ -1399,7 +1399,7 @@ export default function OnboardingPage() {
                 <div key={ex._id} className="flex items-center justify-between px-4 py-2.5 rounded-full" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                   <div className="flex items-center gap-2 min-w-0">
                     <span style={{ color: '#22c55e', fontSize: 10, flexShrink: 0 }}>○</span>
-                    <span className="text-sm font-bold truncate" style={{ color: '#166534' }}>{ex.name}</span>
+                    <span className="text-sm font-medium truncate" style={{ color: '#166534' }}>{ex.name}</span>
                     <span className="text-sm flex-shrink-0" style={{ color: '#166534' }}>{ex.date}</span>
                   </div>
                   <button onClick={() => setExternalExams((prev) => prev.filter((e) => e._id !== ex._id))} className="flex-shrink-0 ml-2">
@@ -1412,7 +1412,7 @@ export default function OnboardingPage() {
 
           {externalExams.length > 0 && (
             <div className="rounded-xl p-4 mb-5" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-              <p className="text-xs font-bold mb-3" style={{ color: '#1e40af' }}>📖 공부 일정 자동 배치</p>
+              <p className="text-xs font-medium mb-3" style={{ color: '#1e40af' }}>📖 공부 일정 자동 배치</p>
               <div className="space-y-2.5">
                 <div className="flex items-center gap-3">
                   <span className="text-xs flex-shrink-0" style={{ color: '#334155', width: 100 }}>시험 몇 일 전부터</span>
@@ -1455,7 +1455,7 @@ export default function OnboardingPage() {
             <button onClick={() => setPhase('personal-schedule')} className="flex-1 py-3 rounded-xl text-sm font-semibold border" style={{ color: '#3f4b61', borderColor: '#ebeef1', background: '#fff' }}>
               건너뛰기
             </button>
-            <button onClick={() => setPhase('personal-schedule')} className="flex-1 py-3 rounded-xl text-sm font-bold text-white" style={{ background: '#2563eb' }}>
+            <button onClick={() => setPhase('personal-schedule')} className="flex-1 py-3 rounded-xl text-sm font-medium text-white" style={{ background: '#2a6fe3' }}>
               {externalExams.length > 0 ? `${externalExams.length}개 등록 →` : '다음 →'}
             </button>
           </div>
@@ -1503,12 +1503,12 @@ export default function OnboardingPage() {
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
             <div>
-              <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>개인 일정 입력</h2>
+              <h2 className="font-semibold text-lg" style={{ color: '#181c1e' }}>개인 일정 입력</h2>
               <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '4단계 / 5단계' : '2단계 / 3단계'}</p>
             </div>
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '80%' : '66%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '80%' : '66%', background: '#2a6fe3' }} />
           </div>
 
           <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>
@@ -1523,7 +1523,7 @@ export default function OnboardingPage() {
               placeholder="일정 제목 (예: 동아리, 운동, 알바)"
               value={scheduleDraft.title}
               onChange={(e) => setScheduleDraft((d) => ({ ...d, title: e.target.value }))}
-              onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+              onFocus={(e) => e.target.style.borderColor = '#2a6fe3'}
               onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
             />
 
@@ -1531,13 +1531,13 @@ export default function OnboardingPage() {
               <button type="button"
                 onClick={() => setScheduleDraft((d) => ({ ...d, is_recurring: true, date: '', days: d.days.length ? d.days : [d.recurring_day] }))}
                 className="flex-1 py-2 text-xs rounded-xl font-semibold border-2 transition-colors"
-                style={{ borderColor: scheduleDraft.is_recurring ? '#2563eb' : '#ebeef1', background: scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: scheduleDraft.is_recurring ? '#2563eb' : '#3f4b61' }}>
+                style={{ borderColor: scheduleDraft.is_recurring ? '#2a6fe3' : '#ebeef1', background: scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: scheduleDraft.is_recurring ? '#2a6fe3' : '#3f4b61' }}>
                 매주 반복
               </button>
               <button type="button"
                 onClick={() => setScheduleDraft((d) => ({ ...d, is_recurring: false }))}
                 className="flex-1 py-2 text-xs rounded-xl font-semibold border-2 transition-colors"
-                style={{ borderColor: !scheduleDraft.is_recurring ? '#2563eb' : '#ebeef1', background: !scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: !scheduleDraft.is_recurring ? '#2563eb' : '#3f4b61' }}>
+                style={{ borderColor: !scheduleDraft.is_recurring ? '#2a6fe3' : '#ebeef1', background: !scheduleDraft.is_recurring ? '#eef1ff' : '#fff', color: !scheduleDraft.is_recurring ? '#2a6fe3' : '#3f4b61' }}>
                 특정 날짜
               </button>
             </div>
@@ -1547,11 +1547,11 @@ export default function OnboardingPage() {
                 {DAY_LABELS.map((d, i) => (
                   <button key={i} type="button"
                     onClick={() => toggleDraftDay(i)}
-                    className="flex-1 py-2 text-xs font-bold rounded-lg border-2 transition-colors"
+                    className="flex-1 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
                     style={{
-                      borderColor: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#2563eb' : '#e2e8f0',
+                      borderColor: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#2a6fe3' : '#e2e8f0',
                       background: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#eef1ff' : '#fff',
-                      color: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#2563eb' : '#64748b',
+                      color: scheduleDraft.days.includes(indexToRecurringDay(i)) ? '#2a6fe3' : '#64748b',
                     }}>
                     {d}
                   </button>
@@ -1564,7 +1564,7 @@ export default function OnboardingPage() {
                 style={{ borderColor: '#ebeef1' }}
                 value={scheduleDraft.date ?? ''}
                 onChange={(e) => setScheduleDraft((d) => ({ ...d, date: e.target.value }))}
-                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                onFocus={(e) => e.target.style.borderColor = '#2a6fe3'}
                 onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
               />
             )}
@@ -1576,25 +1576,25 @@ export default function OnboardingPage() {
                   style={{ borderColor: '#e2e8f0' }}
                   value={scheduleDraft.start_time}
                   onChange={(e) => setScheduleDraft((d) => ({ ...d, start_time: e.target.value }))}
-                  onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                  onFocus={(e) => e.target.style.borderColor = '#2a6fe3'}
                   onBlur={(e) => e.target.style.borderColor = '#e2e8f0'} />
               </label>
               <label className="flex-1">
                 <span className="block text-[11px] font-semibold mb-1" style={{ color: '#334155' }}>
-                  종료 시간{isOvernight && <span className="ml-1 text-[10px] px-1 py-0.5 rounded" style={{ background: '#ede9fe', color: '#7c3aed' }}>다음날</span>}
+                  종료 시간{isOvernight && <span className="ml-1 text-[11px] px-1 py-0.5 rounded" style={{ background: '#ede9fe', color: '#7c3aed' }}>다음날</span>}
                 </span>
                 <input type="time" step="300" className="w-full px-3 py-2.5 text-sm border-2 rounded-xl outline-none"
                   style={{ borderColor: scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0' }}
                   value={scheduleDraft.end_time}
                   onChange={(e) => setScheduleDraft((d) => ({ ...d, end_time: e.target.value }))}
-                  onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                  onFocus={(e) => e.target.style.borderColor = '#2a6fe3'}
                   onBlur={(e) => e.target.style.borderColor = scheduleDraft.start_time === scheduleDraft.end_time ? '#ef4444' : '#e2e8f0'} />
               </label>
             </div>
 
             <button onClick={addSched} disabled={!canAddSched}
-              className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
-              style={{ background: canAddSched ? '#2563eb' : '#d1d5db', cursor: canAddSched ? 'pointer' : 'not-allowed' }}>
+              className="w-full py-2.5 rounded-xl text-sm font-medium text-white"
+              style={{ background: canAddSched ? '#2a6fe3' : '#d1d5db', cursor: canAddSched ? 'pointer' : 'not-allowed' }}>
               + 일정 추가
             </button>
           </div>
@@ -1624,7 +1624,7 @@ export default function OnboardingPage() {
             <button onClick={handleCollegeStartChat} className="flex-1 py-3 rounded-xl text-sm font-semibold border" style={{ color: '#3f4b61', borderColor: '#ebeef1', background: '#fff' }}>
               건너뛰기
             </button>
-            <button onClick={handleCollegeStartChat} className="flex-1 py-3 rounded-xl text-sm font-bold text-white" style={{ background: '#2563eb' }}>
+            <button onClick={handleCollegeStartChat} className="flex-1 py-3 rounded-xl text-sm font-medium text-white" style={{ background: '#2a6fe3' }}>
               {personalSchedules.length > 0 ? `${personalSchedules.length}개 등록 →` : '다음 →'}
             </button>
           </div>
@@ -1648,7 +1648,7 @@ export default function OnboardingPage() {
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
             <div>
-              <h1 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>나에게 맞는 유형 선택</h1>
+              <h1 className="font-semibold text-lg" style={{ color: '#181c1e' }}>나에게 맞는 유형 선택</h1>
               <p className="text-xs" style={{ color: '#3f4b61' }}>
                 {isCollegeStudent ? '2단계 / 2단계' : '1단계'}
               </p>
@@ -1657,7 +1657,7 @@ export default function OnboardingPage() {
 
           {/* Progress */}
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '100%' : '50%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '100%' : '50%', background: '#2a6fe3' }} />
           </div>
 
           {isCollegeStudent && etaEntries.length > 0 && (
@@ -1675,15 +1675,15 @@ export default function OnboardingPage() {
               <button
                 key={type.id}
                 onClick={() => handleTypeSelect(type.id)}
-                className="text-left p-5 rounded-2xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="text-left p-5 rounded-2xl border-2 transition-colors hover:scale-[1.02] active:scale-[0.98]"
                 style={{ background: '#fff', borderColor: '#ebeef1', boxShadow: '0 2px 12px rgba(26,77,178,0.06)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.background = type.color + '30'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2a6fe3'; e.currentTarget.style.background = type.color + '30'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#ebeef1'; e.currentTarget.style.background = '#fff'; }}
               >
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: type.color }}>
                   <MaterialIcon icon={type.icon} size={18} color={type.iconColor} filled />
                 </div>
-                <p className="font-bold text-sm mb-1" style={{ color: '#181c1e' }}>{type.label}</p>
+                <p className="font-medium text-sm mb-1" style={{ color: '#181c1e' }}>{type.label}</p>
                 <p className="text-xs leading-relaxed" style={{ color: '#334155' }}>{type.desc}</p>
               </button>
             ))}
@@ -1721,14 +1721,14 @@ export default function OnboardingPage() {
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
             <div>
-              <h2 className="font-extrabold text-lg" style={{ color: '#181c1e' }}>수면 시간 설정</h2>
+              <h2 className="font-semibold text-lg" style={{ color: '#181c1e' }}>수면 시간 설정</h2>
               <p className="text-xs" style={{ color: '#3f4b61' }}>{isCollegeStudent ? '5단계 / 5단계' : '3단계 / 3단계'}</p>
             </div>
           </div>
 
           {/* Progress */}
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#ebeef1' }}>
-            <div className="h-full rounded-full" style={{ width: '100%', background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: '100%', background: '#2a6fe3' }} />
           </div>
 
           <p className="text-sm font-medium mb-4" style={{ color: '#334155' }}>평소 수면 패턴을 알려주세요</p>
@@ -1777,10 +1777,10 @@ export default function OnboardingPage() {
               <button
                 key={p.label}
                 onClick={() => { setSleepStart(p.start); setSleepEnd(p.end); }}
-                className="px-3 py-1.5 text-xs rounded-full font-medium border-2 transition-all"
+                className="px-3 py-1.5 text-xs rounded-full font-medium border-2 transition-colors"
                 style={{
-                  borderColor: sleepStart === p.start && sleepEnd === p.end ? '#2563eb' : '#c3d0ff',
-                  color: sleepStart === p.start && sleepEnd === p.end ? '#2563eb' : '#334155',
+                  borderColor: sleepStart === p.start && sleepEnd === p.end ? '#2a6fe3' : '#c3d0ff',
+                  color: sleepStart === p.start && sleepEnd === p.end ? '#2a6fe3' : '#334155',
                   background: sleepStart === p.start && sleepEnd === p.end ? '#eef1ff' : '#f0f4ff',
                 }}
               >
@@ -1800,8 +1800,8 @@ export default function OnboardingPage() {
             </button>
             <button
               onClick={handleSleepSubmit}
-              className="flex-1 py-3 rounded-xl text-sm font-bold text-white"
-              style={{ background: '#2563eb' }}
+              className="flex-1 py-3 rounded-xl text-sm font-medium text-white"
+              style={{ background: '#2a6fe3' }}
             >
               완료 →
             </button>
@@ -1833,7 +1833,7 @@ export default function OnboardingPage() {
               <MaterialIcon icon="arrow_back" size={18} color="#334155" />
             </button>
             <div>
-              <p className="font-bold text-sm" style={{ color: '#181c1e' }}>
+              <p className="font-medium text-sm" style={{ color: '#181c1e' }}>
                 {isCollegeStudent ? '학습 목표 설정' : '기본 정보 입력'}
               </p>
               <p className="text-xs" style={{ color: '#3f4b61' }}>{stepIdx + 1} / {activeSteps.length} 단계</p>
@@ -1851,8 +1851,8 @@ export default function OnboardingPage() {
         {/* Progress bar */}
         <div className="w-full h-1.5 rounded-full mb-4" style={{ background: '#ebeef1' }}>
           <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${progress}%`, background: '#2563eb' }}
+            className="h-full rounded-full transition-colors duration-500"
+            style={{ width: `${progress}%`, background: '#2a6fe3' }}
           />
         </div>
 
@@ -1861,7 +1861,7 @@ export default function OnboardingPage() {
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {msg.role === 'ai' && (
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-1 flex-shrink-0 text-white" style={{ background: '#2563eb' }}>
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium mr-2 mt-1 flex-shrink-0 text-white" style={{ background: '#2a6fe3' }}>
                   S
                 </div>
               )}
@@ -1869,7 +1869,7 @@ export default function OnboardingPage() {
                 className="max-w-[80%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed"
                 style={
                   msg.role === 'user'
-                    ? { background: '#2563eb', color: '#fff', borderTopRightRadius: 4 }
+                    ? { background: '#2a6fe3', color: '#fff', borderTopRightRadius: 4 }
                     : { background: '#fff', color: '#181c1e', borderTopLeftRadius: 4, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }
                 }
               >
@@ -1879,7 +1879,7 @@ export default function OnboardingPage() {
           ))}
           {isProcessing && (
             <div className="flex justify-start">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mr-2 mt-1 flex-shrink-0 text-white" style={{ background: '#2563eb' }}>S</div>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium mr-2 mt-1 flex-shrink-0 text-white" style={{ background: '#2a6fe3' }}>S</div>
               <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                 <div className="flex gap-1">
                   {[0, 150, 300].map((d) => (
@@ -1910,8 +1910,8 @@ export default function OnboardingPage() {
                     handleSend(q);
                   }
                 }}
-                className="px-3 py-1.5 text-xs rounded-full font-medium transition-all border-2 hover:border-blue-400 hover:text-blue-600"
-                style={{ borderColor: '#c3d0ff', color: '#2563eb', background: '#f0f4ff' }}
+                className="px-3 py-1.5 text-xs rounded-full font-medium transition-colors border-2 hover:border-blue-400 hover:text-blue-600"
+                style={{ borderColor: '#c3d0ff', color: '#2a6fe3', background: '#f0f4ff' }}
               >
                 {q}
               </button>
@@ -1924,7 +1924,7 @@ export default function OnboardingPage() {
           <input
             className="flex-1 px-4 py-3 text-sm border-2 rounded-xl outline-none transition-colors"
             style={{ borderColor: '#ebeef1', background: '#fff' }}
-            onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+            onFocus={(e) => e.target.style.borderColor = '#2a6fe3'}
             onBlur={(e) => e.target.style.borderColor = '#ebeef1'}
             placeholder={currentStep?.hint || '입력해주세요..'}
             value={input}
@@ -1935,8 +1935,8 @@ export default function OnboardingPage() {
           <button
             onClick={() => handleSend()}
             disabled={!input.trim() || isProcessing}
-            className="px-5 py-3 rounded-xl text-sm font-bold text-white transition-all"
-            style={{ background: (!input.trim() || isProcessing) ? '#93c5fd' : '#2563eb' }}
+            className="px-5 py-3 rounded-xl text-sm font-medium text-white transition-colors"
+            style={{ background: (!input.trim() || isProcessing) ? '#93c5fd' : '#2a6fe3' }}
           >
             <MaterialIcon icon="send" size={22} color="#fff" />
           </button>

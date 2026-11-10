@@ -26,7 +26,7 @@ function usePublicProfile(userId: number) {
   });
 }
 
-const AVATAR_COLORS = ['#2563eb', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+const AVATAR_COLORS = ['#2a6fe3', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -56,7 +56,7 @@ export default function PublicProfilePage() {
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 transition hover:bg-slate-200">
               <MaterialIcon icon="arrow_back" size={18} color="#475569" />
             </button>
-            <h1 className="text-base font-black text-slate-950">프로필</h1>
+            <h1 className="text-base font-semibold text-slate-950">프로필</h1>
           </div>
         </header>
 
@@ -66,7 +66,7 @@ export default function PublicProfilePage() {
           )}
           {isError && (
             <div className="mt-8 rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
-              <p className="text-sm font-black text-slate-700">사용자를 찾을 수 없어요</p>
+              <p className="text-sm font-semibold text-slate-700">사용자를 찾을 수 없어요</p>
             </div>
           )}
 
@@ -75,14 +75,14 @@ export default function PublicProfilePage() {
               {/* 프로필 카드 */}
               <div className="mb-4 rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-2xl font-black text-white"
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-2xl font-semibold text-white"
                     style={{ background: color }}>
                     {data.username.slice(0, 1).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-lg font-black text-slate-950">{data.username}</p>
+                    <p className="text-lg font-semibold text-slate-950">{data.username}</p>
                     {data.joined_at && (
-                      <p className="text-xs font-bold text-slate-400">
+                      <p className="text-xs font-medium text-slate-400">
                         {new Date(data.joined_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} 가입
                       </p>
                     )}
@@ -93,14 +93,14 @@ export default function PublicProfilePage() {
                 {data.streak.current_streak > 0 && (
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <div className="rounded-xl bg-blue-50 px-3 py-2.5 text-center">
-                      <p className={`text-xl font-black ${data.streak.today_checked ? 'text-blue-600' : 'text-slate-400'}`}>
+                      <p className={`text-xl font-semibold ${data.streak.today_checked ? 'text-blue-600' : 'text-slate-400'}`}>
                         {data.streak.current_streak}
                       </p>
-                      <p className="text-[11px] font-black text-slate-400">현재 연속</p>
+                      <p className="text-[11px] font-semibold text-slate-400">현재 연속</p>
                     </div>
                     <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-center">
-                      <p className="text-xl font-black text-slate-600">{data.streak.longest_streak}</p>
-                      <p className="text-[11px] font-black text-slate-400">최장 연속</p>
+                      <p className="text-xl font-semibold text-slate-600">{data.streak.longest_streak}</p>
+                      <p className="text-[11px] font-semibold text-slate-400">최장 연속</p>
                     </div>
                   </div>
                 )}
@@ -109,7 +109,7 @@ export default function PublicProfilePage() {
               {/* 최근 기록 */}
               {data.logs.length > 0 && (
                 <div className="mb-4">
-                  <p className="mb-2 text-[11px] font-black text-slate-400">최근 기록</p>
+                  <p className="mb-2 text-[11px] font-semibold text-slate-400">최근 기록</p>
                   <div className="space-y-2">
                     {data.logs.map(log => (
                       <div key={log.id} className="flex gap-0 overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
@@ -124,7 +124,7 @@ export default function PublicProfilePage() {
                         )}
                         <div className="flex flex-col justify-between px-3 py-2.5">
                           {log.caption
-                            ? <p className="text-sm font-bold text-slate-950 line-clamp-2">{log.caption}</p>
+                            ? <p className="text-sm font-medium text-slate-950 line-clamp-2">{log.caption}</p>
                             : <span />
                           }
                           <p className="text-[11px] text-slate-400">{relTime(log.created_at)}</p>
@@ -137,7 +137,7 @@ export default function PublicProfilePage() {
 
               {data.logs.length === 0 && (
                 <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-sm">
-                  <p className="text-sm font-black text-slate-500">아직 공개된 활동이 없어요</p>
+                  <p className="text-sm font-semibold text-slate-500">아직 공개된 활동이 없어요</p>
                 </div>
               )}
             </>
