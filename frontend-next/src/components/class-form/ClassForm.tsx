@@ -201,59 +201,49 @@ export function ClassForm() {
         { id: editingSchedule.id, ...payload },
         {
           onSuccess: () => {
-            toast.success('일정이 수정되었습니다');
+            toast.success('일정을 수정했어요');
             closeClassForm();
           },
-          onError: () => toast.error('수정 중 오류가 발생했습니다'),
+          onError: () => toast.error('일정을 수정하지 못했어요'),
         }
       );
     } else {
       createSchedule.mutate(payload, {
         onSuccess: (created) => {
-          toast.success(created.length > 1 ? `일정 ${created.length}개가 추가되었습니다` : '일정이 추가되었습니다');
+          toast.success(created.length > 1 ? `일정 ${created.length}개를 추가했어요` : '일정을 추가했어요');
           closeClassForm();
         },
-        onError: () => toast.error('추가 중 오류가 발생했습니다'),
+        onError: () => toast.error('일정을 추가하지 못했어요'),
       });
     }
   };
 
   const isPending = createSchedule.isPending || updateSchedule.isPending || deleteSchedule.isPending;
-  const fieldClassName = 'h-10 rounded-lg border-blue-100 bg-[#fbfdff] px-3 text-sm font-medium text-slate-950 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-blue-200 focus-visible:ring-offset-0';
+  const fieldClassName = 'h-11 rounded-[10px] border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] placeholder:text-[#98a6ba] focus-visible:border-[#2a6fe3] focus-visible:ring-3 focus-visible:ring-[#2a6fe3]/15 focus-visible:ring-offset-0';
   const selectedViewTargets = scopeToTargets(form.view_scope);
 
   const handleDelete = () => {
     if (!editingSchedule) return;
     deleteSchedule.mutate(editingSchedule.id, {
       onSuccess: () => {
-        toast.success('일정이 삭제되었습니다');
+        toast.success('일정을 삭제했어요');
         closeClassForm();
       },
-      onError: () => toast.error('삭제 중 오류가 발생했습니다'),
+      onError: () => toast.error('일정을 삭제하지 못했어요'),
     });
   };
 
   return (
     <Dialog open={isClassFormOpen} onOpenChange={(open) => !open && closeClassForm()}>
-      <DialogContent className="max-h-[88vh] w-[calc(100vw-2rem)] max-w-[520px] overflow-hidden border border-blue-100 bg-white p-0 shadow-2xl sm:max-w-[520px] sm:rounded-lg">
-        <DialogHeader className="border-b border-blue-50 bg-[#fbfdff] px-4 py-3 text-left sm:px-6">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600">
-              <MaterialIcon icon={editingSchedule ? 'edit_calendar' : 'add'} size={18} color="#fff" />
-            </span>
-            <div>
-              <p className="text-xs font-semibold text-blue-600">시간표 관리</p>
-              <DialogTitle className="text-lg font-semibold text-slate-950">
-                {editingSchedule ? '일정 수정' : '일정 추가'}
-              </DialogTitle>
-            </div>
-          </div>
+      <DialogContent className="max-h-[88vh] w-[calc(100vw-2rem)] max-w-[520px] gap-0 overflow-hidden bg-white p-0 sm:max-w-[520px]">
+        <DialogHeader className="border-b border-[#0f1e3a]/8 px-5 py-4 text-left sm:px-6">
+          <DialogTitle>{editingSchedule ? '일정 수정' : '일정 추가'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex max-h-[calc(88vh-72px)] min-h-0 flex-col">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
           {/* Title */}
           <div className="space-y-1.5">
-            <Label htmlFor="title" className="text-sm font-semibold text-slate-950">제목 *</Label>
+            <Label htmlFor="title" className="text-[13px] font-normal text-[#44536b]">제목</Label>
             <Input
               id="title"
               placeholder="일정 제목"
@@ -269,12 +259,12 @@ export function ClassForm() {
               }}
               className={cn(fieldClassName, errors.title && 'border-red-500 focus-visible:ring-red-100')}
             />
-            {errors.title && <p className="text-red-500 text-xs">{errors.title}</p>}
+            {errors.title && <p className="text-[12px] text-[#dc2626]">{errors.title}</p>}
           </div>
 
           {/* Schedule Type */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-semibold text-slate-950">유형</Label>
+            <Label className="text-[13px] font-normal text-[#44536b]">유형</Label>
             <div className="grid grid-cols-4 gap-1.5">
               {SCHEDULE_TYPE_OPTIONS.map(({ value, label, icon }) => {
                 const selected = form.schedule_type === value;
@@ -291,14 +281,14 @@ export function ClassForm() {
                       }
                     }}
                     className={cn(
-                      'flex flex-col items-center justify-center gap-1 rounded-lg border py-2 px-1 text-center transition',
+                      'flex flex-col items-center justify-center gap-1 rounded-[10px] border px-1 py-2 text-center transition-colors',
                       selected
-                        ? 'border-blue-600 bg-blue-50 shadow-sm'
-                        : 'border-blue-100 bg-white hover:border-blue-300 hover:bg-blue-50/60'
+                        ? 'border-[#2a6fe3] bg-[#eaf2ff]'
+                        : 'border-[#0f1e3a]/10 bg-white hover:bg-[#f5f8fd]'
                     )}
                   >
-                    <MaterialIcon icon={icon} size={18} color={selected ? '#2a6fe3' : '#64748b'} />
-                    <span className={cn('text-xs font-semibold', selected ? 'text-blue-700' : 'text-slate-950')}>{label}</span>
+                    <MaterialIcon icon={icon} size={18} color={selected ? '#2a6fe3' : '#5f6f88'} />
+                    <span className={cn('text-[13px]', selected ? 'text-[#1f63d6]' : 'text-[#0f1e3a]')}>{label}</span>
                   </button>
                 );
               })}
@@ -307,8 +297,8 @@ export function ClassForm() {
 
           {/* 반복 방식 토글 */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-semibold text-slate-950">일정 방식</Label>
-            <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-blue-100 bg-blue-50/70 p-1">
+            <Label className="text-[13px] font-normal text-[#44536b]">일정 방식</Label>
+            <div className="grid grid-cols-2 gap-1 rounded-[10px] bg-[#e6effc] p-1">
               <button
                 type="button"
                 onClick={() => {
@@ -317,10 +307,10 @@ export function ClassForm() {
                   setForm((f) => ({ ...f, date: '', view_scope: 'all' }));
                 }}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                  'h-8 rounded-lg px-3 text-[14px] transition-colors',
                   isRecurring
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-white'
+                    ? 'bg-[#2a6fe3] font-medium text-white'
+                    : 'text-[#44536b] hover:text-[#1f63d6]'
                 )}
               >
                 매주 반복
@@ -332,10 +322,10 @@ export function ClassForm() {
                   setForm((f) => ({ ...f, view_scope: 'all' }));
                 }}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-semibold transition',
+                  'h-8 rounded-lg px-3 text-[14px] transition-colors',
                   !isRecurring
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-white'
+                    ? 'bg-[#2a6fe3] font-medium text-white'
+                    : 'text-[#44536b] hover:text-[#1f63d6]'
                 )}
               >
                 특정 날짜
@@ -346,8 +336,8 @@ export function ClassForm() {
           {/* View scope */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-sm font-semibold text-slate-950">표시 위치</Label>
-              <span className="text-xs font-medium text-slate-400">기본: 전체</span>
+              <Label className="text-[13px] font-normal text-[#44536b]">표시 위치</Label>
+              <span className="text-[12px] text-[#5f6f88]">기본은 전체</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
               {VIEW_SCOPE_OPTIONS.map((option) => {
@@ -367,28 +357,28 @@ export function ClassForm() {
                       }));
                     }}
                     className={cn(
-                      'flex flex-col items-center justify-center gap-1 rounded-lg border py-2 px-1 text-center transition',
+                      'flex flex-col items-center justify-center gap-1 rounded-[10px] border px-1 py-2 text-center transition-colors',
                       selected
-                        ? 'border-blue-600 bg-blue-50 shadow-sm'
-                        : 'border-blue-100 bg-white hover:border-blue-300 hover:bg-blue-50/60'
+                        ? 'border-[#2a6fe3] bg-[#eaf2ff]'
+                        : 'border-[#0f1e3a]/10 bg-white hover:bg-[#f5f8fd]'
                     )}
                   >
-                    <MaterialIcon icon={option.icon} size={18} color={selected ? '#2a6fe3' : '#64748b'} />
-                    <span className={cn('text-xs font-semibold', selected ? 'text-blue-700' : 'text-slate-950')}>
+                    <MaterialIcon icon={option.icon} size={18} color={selected ? '#2a6fe3' : '#5f6f88'} />
+                    <span className={cn('text-[13px]', selected ? 'text-[#1f63d6]' : 'text-[#0f1e3a]')}>
                       {option.label}
                     </span>
-                    <span className="text-xs text-slate-500">{option.desc}</span>
+                    <span className="text-[12px] text-[#5f6f88]">{option.desc}</span>
                   </button>
                 );
               })}
             </div>
-            {errors.view_scope && <p className="text-red-500 text-xs">{errors.view_scope}</p>}
+            {errors.view_scope && <p className="text-[12px] text-[#dc2626]">{errors.view_scope}</p>}
           </div>
 
           {/* 매주 반복 → 요일 선택 / 특정 날짜 → 날짜 입력 */}
           {isRecurring ? (
             <div className="space-y-1.5">
-              <Label className="text-sm font-semibold text-slate-950">요일</Label>
+              <Label className="text-[13px] font-normal text-[#44536b]">요일</Label>
               <div className="grid grid-cols-7 gap-1">
                 {DAY_NAMES_FULL.map((day, idx) => {
                   const recurringDay = indexToRecurringDay(idx);
@@ -410,10 +400,10 @@ export function ClassForm() {
                         });
                       }}
                       className={cn(
-                        'h-9 rounded-lg border text-sm font-semibold transition',
+                        'h-10 rounded-[10px] border text-[14px] transition-colors',
                         selected
-                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                          : 'border-blue-100 bg-white text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700'
+                          ? 'border-[#2a6fe3] bg-[#2a6fe3] font-medium text-white'
+                          : 'border-[#0f1e3a]/10 bg-white text-[#44536b] hover:bg-[#f5f8fd]'
                       )}
                     >
                       {day.slice(0, 1)}
@@ -421,11 +411,11 @@ export function ClassForm() {
                   );
                 })}
               </div>
-              {errors.days && <p className="text-red-500 text-xs">{errors.days}</p>}
+              {errors.days && <p className="text-[12px] text-[#dc2626]">{errors.days}</p>}
             </div>
           ) : (
             <div className="space-y-1.5">
-              <Label htmlFor="date" className="text-sm font-semibold text-slate-950">날짜 *</Label>
+              <Label htmlFor="date" className="text-[13px] font-normal text-[#44536b]">날짜</Label>
               <Input
                 id="date"
                 type="date"
@@ -437,9 +427,9 @@ export function ClassForm() {
                 }}
                 className={cn(fieldClassName, errors.date && 'border-red-500 focus-visible:ring-red-100')}
               />
-              {errors.date && <p className="text-red-500 text-xs">{errors.date}</p>}
+              {errors.date && <p className="text-[12px] text-[#dc2626]">{errors.date}</p>}
               {form.date && (
-                <p className="text-xs text-gray-500">요일: {DAY_NAMES_FULL[recurringDayToIndex(form.recurring_day)]} (자동 계산)</p>
+                <p className="text-[12px] text-[#5f6f88]">{DAY_NAMES_FULL[recurringDayToIndex(form.recurring_day)]}</p>
               )}
             </div>
           )}
@@ -447,7 +437,7 @@ export function ClassForm() {
           {/* Time */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="start_time" className="text-sm font-semibold text-slate-950">시작 시간 *</Label>
+              <Label htmlFor="start_time" className="text-[13px] font-normal text-[#44536b]">시작 시간</Label>
               <Input
                 id="start_time"
                 type="time"
@@ -456,10 +446,10 @@ export function ClassForm() {
                 onChange={(e) => setForm({ ...form, start_time: e.target.value })}
                 className={cn(fieldClassName, errors.start_time && 'border-red-500 focus-visible:ring-red-100')}
               />
-              {errors.start_time && <p className="text-red-500 text-xs">{errors.start_time}</p>}
+              {errors.start_time && <p className="text-[12px] text-[#dc2626]">{errors.start_time}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="end_time" className="text-sm font-semibold text-slate-950">종료 시간 *</Label>
+              <Label htmlFor="end_time" className="text-[13px] font-normal text-[#44536b]">종료 시간</Label>
               <Input
                 id="end_time"
                 type="time"
@@ -468,16 +458,16 @@ export function ClassForm() {
                 onChange={(e) => setForm({ ...form, end_time: e.target.value })}
                 className={cn(fieldClassName, errors.end_time && 'border-red-500 focus-visible:ring-red-100')}
               />
-              {errors.end_time && <p className="text-red-500 text-xs">{errors.end_time}</p>}
+              {errors.end_time && <p className="text-[12px] text-[#dc2626]">{errors.end_time}</p>}
             </div>
           </div>
 
           {/* Location */}
           <div className="space-y-1.5">
-            <Label htmlFor="location" className="text-sm font-semibold text-slate-950">장소 (선택)</Label>
+            <Label htmlFor="location" className="text-[13px] font-normal text-[#44536b]">장소 · 선택</Label>
             <Input
               id="location"
-              placeholder="장소를 입력하세요"
+              placeholder="예: 소프트웨어관 406"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
               className={fieldClassName}
@@ -486,10 +476,10 @@ export function ClassForm() {
 
           {/* Color */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-semibold text-slate-950">
-              색상 {isAutoColor && <span className="text-xs font-medium text-slate-400">(자동)</span>}
+            <Label className="text-[13px] font-normal text-[#44536b]">
+              색 {isAutoColor && <span className="text-[12px] text-[#5f6f88]">· 제목에 맞춰 자동</span>}
             </Label>
-            <div className="grid grid-cols-10 gap-1.5 rounded-lg border border-blue-50 bg-[#fbfdff] p-2">
+            <div className="grid grid-cols-10 gap-1.5 rounded-xl bg-[#f5f8fd] p-2">
               {ALL_SCHEDULE_COLORS.map((color) => {
                 const selected = form.color === color;
                 return (
@@ -498,8 +488,8 @@ export function ClassForm() {
                     type="button"
                     onClick={() => { setIsAutoColor(false); setForm({ ...form, color }); }}
                     className={cn(
-                      'aspect-square rounded-md border transition',
-                      selected ? 'scale-105 border-slate-950 shadow-sm ring-2 ring-blue-200' : 'border-transparent hover:scale-105'
+                      'aspect-square rounded-md border transition-colors',
+                      selected ? 'border-white ring-2 ring-[#0f1e3a]' : 'border-transparent'
                     )}
                     aria-label={`색상 ${color}`}
                     style={{ background: color }}
@@ -517,41 +507,38 @@ export function ClassForm() {
                 type="checkbox"
                 checked={form.is_completed}
                 onChange={(e) => setForm({ ...form, is_completed: e.target.checked })}
-                className="h-4 w-4 rounded border-blue-200 text-blue-600"
+                className="h-4 w-4 rounded border-[#bcd8fe] text-[#1f63d6]"
               />
               <Label htmlFor="is_completed" className="cursor-pointer">완료 표시</Label>
             </div>
           )}
 
           {errors.conflict && (
-            <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
-              <span className="text-red-500 mt-0.5">⚠️</span>
-              <p className="text-red-600 text-xs leading-relaxed">{errors.conflict}</p>
-            </div>
+            <p className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] leading-[20px] text-[#b91c1c]">{errors.conflict}</p>
           )}
 
           </div>
 
-          <DialogFooter className="mx-0 mb-0 mt-0 flex-row justify-between gap-2 rounded-none border-t border-blue-50 bg-white px-4 py-3 sm:px-6">
+          <DialogFooter className="mx-0 mb-0 mt-0 flex-row justify-between gap-2 rounded-none border-t border-[#0f1e3a]/8 bg-white px-5 py-4 sm:px-6">
             <div>
               {editingSchedule && (
                 <Button
                   type="button"
-                  variant="destructive"
+                  variant="ghost"
                   onClick={handleDelete}
                   disabled={isPending}
-                  className="h-9 px-3 text-sm"
+                  className="h-10 rounded-[10px] px-3 text-[14px] text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626]"
                 >
                   삭제
                 </Button>
               )}
             </div>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={closeClassForm} className="h-9 rounded-lg border-blue-100 px-4 text-sm font-semibold text-slate-700 hover:bg-blue-50">
+              <Button type="button" variant="outline" onClick={closeClassForm} className="h-10 rounded-[10px] border-[#0f1e3a]/10 px-4 text-[14px] text-[#0f1e3a] hover:bg-[#edf3fc]">
                 취소
               </Button>
-              <Button type="submit" className="h-9 rounded-lg bg-blue-600 px-5 text-sm font-semibold hover:bg-blue-700" disabled={isPending}>
-                {isPending ? '저장 중...' : editingSchedule ? '수정' : '추가'}
+              <Button type="submit" className="h-10 rounded-[10px] bg-[#2a6fe3] px-5 text-[14px] font-medium text-white hover:bg-[#1f63d6]" disabled={isPending}>
+                {isPending ? '저장하는 중' : editingSchedule ? '수정' : '추가'}
               </Button>
             </div>
           </DialogFooter>

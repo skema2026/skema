@@ -52,14 +52,14 @@ export default function LoginPage() {
       toast.error(
         error === 'oauth_email_exists'
           ? '이미 이메일로 가입된 계정입니다. 아이디·비밀번호로 로그인해주세요'
-          : '소셜 로그인에 실패했습니다',
+          : '소셜 로그인을 하지 못했어요',
       );
       window.history.replaceState({}, '', '/login');
       return;
     }
     if (token) {
       setToken(token);
-      toast.success('로그인 되었습니다');
+      toast.success('로그인했어요');
       window.history.replaceState({}, '', '/login');
       router.push('/onboarding');
     }
@@ -82,11 +82,11 @@ export default function LoginPage() {
     ev.preventDefault();
     if (!validate()) return;
     loginMutation.mutate({ email: form.username, password: form.password }, {
-      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인 되었습니다'); router.push('/onboarding'); },
+      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인했어요'); router.push('/onboarding'); },
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };
-        if (error?.response?.status === 401) toast.error('아이디 또는 비밀번호가 올바르지 않습니다');
-        else toast.error(apiErrorMessage(err, '로그인 중 오류가 발생했습니다'));
+        if (error?.response?.status === 401) toast.error('아이디나 비밀번호가 맞지 않아요');
+        else toast.error(apiErrorMessage(err, '로그인하지 못했어요'));
       },
     });
   };

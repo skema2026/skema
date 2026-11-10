@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { displayTitle } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { useCreateStudyLog } from '@/hooks/useStudyLogs';
 import type { GroupOut } from '@/hooks/useGroups';
@@ -114,7 +115,7 @@ export default function StudyLogModal({
         }
       }, 1000);
     } catch {
-      toast.error('카메라/마이크 권한을 허용해주세요.');
+      toast.error('카메라와 마이크 권한을 허용해 주세요');
       setRecordState('idle');
     }
   };
@@ -122,7 +123,7 @@ export default function StudyLogModal({
   const submitLog = async () => {
     if (!schedule) return;
     if (!file && !caption.trim()) {
-      toast.error('영상 또는 한 마디를 입력해주세요.');
+      toast.error('영상이나 한마디를 넣어 주세요');
       return;
     }
 
@@ -140,10 +141,10 @@ export default function StudyLogModal({
       await Promise.all(
         targets.map((groupId) => createStudyLog.mutateAsync(makeForm(groupId))),
       );
-      toast.success('기록이 올라갔어요!');
+      toast.success('기록을 남겼어요');
       closeModal();
     } catch {
-      toast.error('업로드에 실패했습니다.');
+      toast.error('기록을 올리지 못했어요');
     }
   };
 
@@ -165,22 +166,22 @@ export default function StudyLogModal({
         }}
       />
       {schedule && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-sm rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-base font-semibold text-slate-950">기록 남기기</p>
-                <p className="text-xs font-medium text-blue-600">{schedule.title} 완료</p>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#0f1e3a]/30 sm:items-center">
+          <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-[0_12px_32px_rgba(15,30,58,0.12)] sm:rounded-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[17px] font-semibold text-[#0f1e3a]">기록 남기기</p>
+                <p className="mt-0.5 truncate text-[13px] text-[#5f6f88]">{displayTitle(schedule.title)} 완료</p>
               </div>
-              <button type="button" onClick={closeModal} className="text-slate-400">
+              <button type="button" onClick={closeModal} aria-label="닫기" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#5f6f88] transition-colors hover:bg-[#edf3fc]">
                 <MaterialIcon icon="close" size={20} color="currentColor" />
               </button>
             </div>
 
             {groups.length > 0 && (
-              <div className="mb-3">
-                <p className="mb-1.5 text-[11px] font-semibold text-slate-400">
-                  올릴 그룹 <span className="text-slate-300">(복수 선택 가능 · 내 기록에도 자동 표시)</span>
+              <div className="mb-4">
+                <p className="mb-2 text-[13px] text-[#44536b]">
+                  올릴 그룹 <span className="text-[#5f6f88]">· 여러 개 고를 수 있어요</span>
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {groups.map((group) => {
@@ -194,7 +195,7 @@ export default function StudyLogModal({
                             ? previous.filter((id) => id !== group.id)
                             : [...previous, group.id]
                         ))}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${selected ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}
+                        className={`h-8 rounded-lg border px-3 text-[13px] transition-colors ${selected ? 'border-[#2a6fe3] bg-[#eaf2ff] font-medium text-[#1f63d6]' : 'border-[#0f1e3a]/10 bg-white text-[#44536b] hover:bg-[#f5f8fd]'}`}
                       >
                         {group.name}
                       </button>
@@ -202,55 +203,55 @@ export default function StudyLogModal({
                   })}
                 </div>
                 {groupIds.length === 0 && (
-                  <p className="mt-1 text-[11px] text-slate-400">그룹 미선택 → 내 기록에만 저장</p>
+                  <p className="mt-2 text-[12px] text-[#5f6f88]">그룹을 안 고르면 내 기록에만 남아요</p>
                 )}
               </div>
             )}
 
-            <div className="mb-3 overflow-hidden rounded-2xl bg-slate-900" style={{ aspectRatio: '4/3' }}>
+            <div className="mb-4 overflow-hidden rounded-xl bg-[#0f1e3a]" style={{ aspectRatio: '4/3' }}>
               {recordState === 'idle' && (
                 <div className="relative flex h-full flex-col items-center justify-center gap-3">
                   <button
                     type="button"
                     onClick={flipCamera}
-                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-700/80 text-white"
+                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white transition-colors hover:bg-white/25"
                   >
                     <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
                   </button>
                   <button
                     type="button"
                     onClick={() => void startRecording(facingMode)}
-                    className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 shadow-lg transition active:scale-95"
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-[#2a6fe3] transition-transform active:scale-95"
                   >
                     <MaterialIcon icon="videocam" size={24} color="#fff" />
                   </button>
-                  <p className="text-xs font-semibold text-slate-400">
+                  <p className="text-[13px] text-white/70">
                     3초 촬영 · {facingMode === 'user' ? '전면' : '후면'} 카메라
                   </p>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300"
+                    className="flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-[13px] text-white/80 transition-colors hover:bg-white/20"
                   >
-                    <MaterialIcon icon="upload_file" size={12} color="currentColor" />
+                    <MaterialIcon icon="upload_file" size={16} color="currentColor" />
                     파일에서 올리기
                   </button>
                 </div>
               )}
               {recordState === 'requesting' && (
                 <div className="flex h-full items-center justify-center">
-                  <p className="text-sm font-semibold text-white">카메라 권한 요청 중...</p>
+                  <p className="text-[14px] text-white">카메라 권한을 요청하는 중</p>
                 </div>
               )}
               {recordState === 'recording' && (
                 <div className="relative h-full">
                   <video ref={liveVideoCallbackRef} autoPlay muted playsInline className="h-full w-full object-cover" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[72px] font-semibold text-white drop-shadow-lg">{countdown}</span>
+                    <span className="font-mono text-[72px] font-medium tabular-nums text-white">{countdown}</span>
                   </div>
-                  <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5">
+                  <div className="absolute left-2 top-2 flex h-6 items-center gap-1.5 rounded-md bg-[#dc2626] px-2">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                    <span className="text-[11px] font-semibold text-white">REC</span>
+                    <span className="text-[12px] text-white">녹화 중</span>
                   </div>
                 </div>
               )}
@@ -264,20 +265,21 @@ export default function StudyLogModal({
                       setPreview(null);
                       setRecordState('idle');
                     }}
-                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+                    aria-label="다시 찍기"
+                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg bg-black/50 text-white"
                   >
-                    <MaterialIcon icon="refresh" size={12} color="currentColor" />
+                    <MaterialIcon icon="refresh" size={16} color="currentColor" />
                   </button>
                 </div>
               )}
             </div>
 
             <textarea
-              placeholder="한 마디 남기기 (선택사항)"
+              placeholder="한마디 · 선택"
               value={caption}
               onChange={(event) => setCaption(event.target.value.slice(0, 200))}
               rows={2}
-              className="mb-3 w-full resize-none rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2 text-sm font-medium text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              className="mb-4 w-full resize-none rounded-[10px] border border-[#0f1e3a]/10 bg-white px-3 py-2.5 text-[15px] text-[#0f1e3a] transition-colors placeholder:text-[#98a6ba] focus:border-[#2a6fe3] focus:outline-none focus:ring-3 focus:ring-[#2a6fe3]/15"
             />
 
             <div className="flex gap-2">
@@ -285,14 +287,14 @@ export default function StudyLogModal({
                 type="button"
                 disabled={createStudyLog.isPending || recordState === 'recording' || recordState === 'requesting'}
                 onClick={() => void submitLog()}
-                className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-40"
+                className="h-11 flex-1 rounded-[10px] bg-[#2a6fe3] text-[15px] font-medium text-white transition-colors hover:bg-[#1f63d6] disabled:opacity-40"
               >
-                {createStudyLog.isPending ? '등록 중...' : '기록 남기기'}
+                {createStudyLog.isPending ? '등록하는 중' : '기록 남기기'}
               </button>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-xl border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700"
+                className="h-11 rounded-[10px] border border-[#0f1e3a]/10 px-4 text-[15px] text-[#0f1e3a] transition-colors hover:bg-[#edf3fc]"
               >
                 취소
               </button>

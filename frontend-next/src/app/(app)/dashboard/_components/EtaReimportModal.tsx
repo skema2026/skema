@@ -14,6 +14,7 @@ import {
 import { api } from '@/lib/api';
 import { ScheduleKindToggle, toEtaKind, type EtaScheduleKind } from '@/components/timetable/ScheduleKindToggle';
 import { apiErrorMessage } from '@/lib/apiError';
+import MaterialIcon from '@/components/common/MaterialIcon';
 
 interface ParsedEntry {
   subject_name: string;
@@ -78,9 +79,9 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
         schedule_type?: string;
       }>;
       setEntries(parsed.map((e) => ({ ...e, location: e.location ?? '', schedule_type: toEtaKind(e.schedule_type) })));
-      if (parsed.length === 0) toast('시간표를 인식하지 못했습니다. 다른 이미지로 시도해 주세요.');
+      if (parsed.length === 0) toast('시간표를 읽지 못했어요. 다른 캡처로 해 보세요');
     } catch (err) {
-      toast.error(apiErrorMessage(err, '이미지 분석에 실패했습니다.'));
+      toast.error(apiErrorMessage(err, '시간표를 읽지 못했어요'));
     } finally {
       setParsing(false);
     }
@@ -117,11 +118,11 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
           })),
         });
       }
-      toast.success(`${valid.length}개 과목을 시간표에 등록했습니다`);
+      toast.success(`수업 ${valid.length}개를 시간표에 넣었어요`);
       qc.invalidateQueries({ queryKey: ['schedules'] });
       handleClose();
     } catch {
-      toast.error('저장에 실패했습니다. 다시 시도해 주세요.');
+      toast.error('저장하지 못했어요. 다시 시도해 주세요');
     } finally {
       setSaving(false);
     }
@@ -130,12 +131,12 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
   return (
     <>
       <Dialog open={open && !confirmOpen} onOpenChange={(o) => !o && handleClose()}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto border-[#d8e2ef]">
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>강의 시간표 재업로드</DialogTitle>
+            <DialogTitle>시간표 다시 가져오기</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4">
             <input
               ref={fileRef}
               type="file"
@@ -146,11 +147,10 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
 
             <div
               onClick={() => fileRef.current?.click()}
-              className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed transition-colors hover:bg-blue-50"
+              className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed transition-colors hover:bg-[#eaf2ff]"
               style={{
-                minHeight: 120,
-                borderColor: hasFile ? '#2a6fe3' : '#d1d5db',
-                background: hasFile ? '#eef1ff' : '#fafbfc',
+                borderColor: hasFile ? '#2a6fe3' : '#bcd8fe',
+                background: hasFile ? '#eaf2ff' : '#f5f8fd',
               }}
             >
               {previewUrl ? (
@@ -158,38 +158,39 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
                 <img src={previewUrl} alt="preview" className="max-h-36 rounded-lg object-contain" />
               ) : (
                 <>
-                  <span style={{ fontSize: 30 }}>📷</span>
-                  <p className="text-sm font-semibold text-slate-600">클릭해서 시간표 이미지 선택</p>
-                  <p className="text-xs text-slate-400">에브리타임 스크린샷 권장</p>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-[#2a6fe3]">
+                    <MaterialIcon icon="upload_file" size={18} color="currentColor" />
+                  </span>
+                  <p className="text-[14px] font-medium text-[#0f1e3a]">시간표 캡처 고르기</p>
+                  <p className="text-[12px] text-[#5f6f88]">에브리타임 시간표 화면 캡처</p>
                 </>
               )}
             </div>
 
             {parsing && (
-              <div className="flex items-center gap-2 rounded-lg p-3" style={{ background: '#eef1ff' }}>
+              <div className="flex items-center gap-2 rounded-xl bg-[#eaf2ff] px-4 py-3">
                 <div
                   className="h-4 w-4 flex-shrink-0 animate-spin rounded-full border-2 border-t-transparent"
-                  style={{ borderColor: '#c3d0ff', borderTopColor: 'transparent' }}
+                  style={{ borderColor: '#bcd8fe', borderTopColor: 'transparent' }}
                 />
-                <p className="text-sm font-semibold text-blue-700">시간표를 읽고 있어요...</p>
+                <p className="text-[14px] text-[#1f63d6]">시간표를 읽는 중</p>
               </div>
             )}
 
             {entries.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-xs font-medium text-slate-500">
-                  {entries.length}개 인식됨 · 알바·스터디 같은 개인 일정은 &lsquo;개인&rsquo;으로 골라 주세요
+                <p className="text-[12px] text-[#5f6f88]">
+                  {entries.length}개 인식 · 알바·스터디 같은 개인 일정은 &lsquo;개인&rsquo;으로 골라 주세요
                 </p>
-                <div className="overflow-hidden rounded-lg border">
+                <div className="overflow-hidden rounded-xl border border-[#0f1e3a]/8">
                   {entries.map((e, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-2 border-b px-3 py-2 text-sm last:border-b-0"
-                      style={{ background: i % 2 ? '#f8fbff' : '#fff' }}
+                      className="flex h-11 items-center gap-2 border-b border-[#0f1e3a]/8 px-3 text-[14px] last:border-b-0"
                     >
-                      <span className="w-4 text-center font-medium text-blue-700">{DAY_KO[e.day_of_week]}</span>
-                      <span className="flex-1 truncate font-medium">{e.subject_name}</span>
-                      <span className="text-xs text-slate-400">{e.start_time}–{e.end_time}</span>
+                      <span className="w-4 text-center font-medium text-[#1f63d6]">{DAY_KO[e.day_of_week]}</span>
+                      <span className="flex-1 truncate text-[#0f1e3a]">{e.subject_name}</span>
+                      <span className="font-mono text-[12px] tabular-nums text-[#5f6f88]">{e.start_time}–{e.end_time}</span>
                       <div className="w-24 shrink-0">
                         <ScheduleKindToggle
                           value={e.schedule_type}
@@ -210,33 +211,32 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
             <Button
               onClick={handleSave}
               disabled={entries.length === 0 || parsing || saving}
-              style={{ background: '#2a6fe3', color: '#fff' }}
+              className="bg-[#2a6fe3] text-white hover:bg-[#1f63d6]"
             >
-              {saving ? '저장 중...' : '저장'}
+              {saving ? '저장하는 중' : '저장'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={confirmOpen} onOpenChange={(o) => !o && setConfirmOpen(false)}>
-        <DialogContent className="max-w-sm border-[#d8e2ef]">
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>시간표 덮어쓰기 확인</DialogTitle>
           </DialogHeader>
-          <div className="py-2 space-y-2">
-            <p className="text-sm text-slate-600">
-              기존에 등록된 강의 시간표{' '}
-              <strong className="text-slate-900">{existingEtaCount}개</strong>를 모두 삭제하고
-              새로 업로드하겠습니까?
+          <div className="space-y-3">
+            <p className="text-[14px] leading-[22px] text-[#44536b]">
+              지금 등록된 수업{' '}
+              <span className="font-medium text-[#0f1e3a]">{existingEtaCount}개</span>를 모두 지우고 새로 저장할까요?
             </p>
-            <p className="text-xs rounded-lg px-3 py-2" style={{ background: '#f0fdf4', color: '#166534' }}>
-              ✓ 개인 일정은 삭제되지 않고 그대로 유지됩니다.
+            <p className="rounded-xl bg-[#f5f8fd] px-4 py-3 text-[13px] text-[#44536b]">
+              직접 넣은 개인 일정과 시험은 그대로 남아요
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>취소</Button>
-            <Button onClick={doSave} disabled={saving} style={{ background: '#ef4444', color: '#fff' }}>
-              {saving ? '저장 중...' : '기존 삭제 후 새로 저장'}
+            <Button onClick={doSave} disabled={saving} className="bg-[#dc2626] text-white hover:bg-[#b91c1c]">
+              {saving ? '저장하는 중' : '지우고 새로 저장'}
             </Button>
           </DialogFooter>
         </DialogContent>

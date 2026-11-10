@@ -353,7 +353,7 @@ export default function DashboardClient({
     localStorage.setItem(warnKey, "1");
 
     examsTomorrow.forEach((exam) => {
-      toast.warning(`내일 "${exam.title}" 시험이 있습니다`, {
+      toast.warning(`내일 "${exam.title}" 시험이 있어요`, {
         duration: 15000,
       });
     });
@@ -558,7 +558,7 @@ export default function DashboardClient({
             key: "eta",
             label: "시간표 인식",
             value: "필요",
-            detail: "이미지를 올리면 수업 시간표를 빠르게 채울 수 있습니다",
+            detail: "캡처를 올리면 수업을 한 번에 채울 수 있어요",
             tone: "blue",
           },
         ]
@@ -609,7 +609,7 @@ export default function DashboardClient({
   const handleLogout = () => {
     logout();
     queryClient.clear();
-    toast.success("로그아웃 되었습니다");
+    toast.success("로그아웃했어요");
     window.location.replace("/login");
   };
 
@@ -621,7 +621,7 @@ export default function DashboardClient({
       const { data } = await api.post<{ token: string }>("/share-tokens", {});
       setShareToken(data.token);
     } catch {
-      toast.error("공유 링크 생성 중 오류가 발생했습니다");
+      toast.error("공유 링크를 만들지 못했어요");
     } finally {
       setIsGeneratingShare(false);
     }
@@ -634,7 +634,7 @@ export default function DashboardClient({
   const copyShareUrl = () => {
     if (shareUrl) {
       navigator.clipboard.writeText(shareUrl);
-      toast.success("링크가 복사되었습니다");
+      toast.success("링크를 복사했어요");
     }
   };
 

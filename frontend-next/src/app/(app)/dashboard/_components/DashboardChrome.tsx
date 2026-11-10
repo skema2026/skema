@@ -72,11 +72,10 @@ export function NotificationBanner({ notification, onOpen, onDismiss }: Notifica
         right: 16,
         zIndex: 200,
         background: '#fff',
-        border: '1px solid rgba(195,198,213,0.25)',
-        borderLeft: '4px solid var(--skema-primary)',
+        border: '1px solid rgba(15,30,58,0.08)',
         borderRadius: 14,
         padding: '12px 16px',
-        boxShadow: '0 8px 32px rgba(24,28,30,0.12)',
+        boxShadow: '0 12px 32px rgba(15,30,58,0.12)',
         maxWidth: 300,
         display: 'flex',
         gap: 10,
@@ -85,17 +84,18 @@ export function NotificationBanner({ notification, onOpen, onDismiss }: Notifica
       }}
       onClick={() => onOpen(notification)}
     >
-      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#dae1ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <MaterialIcon icon="notifications_active" size={18} color="var(--skema-primary)" filled />
+      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#eaf2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <MaterialIcon icon="notifications_active" size={16} color="#2a6fe3" />
       </div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 600, fontSize: 13, color: '#181c1e' }}>곧 시작! (클릭하면 일정 확인)</div>
-        <div style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>{notification.title} — {notification.start_time}</div>
+        <div style={{ fontWeight: 500, fontSize: 14, color: '#0f1e3a' }}>곧 시작해요</div>
+        <div style={{ fontSize: 13, color: '#44536b', marginTop: 2 }}>{notification.title} — {notification.start_time}</div>
       </div>
       <button
         type="button"
         onClick={handleDismiss}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3f4b61', fontSize: 16, padding: 0, lineHeight: 1 }}
+        aria-label="닫기"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5f6f88', fontSize: 16, padding: 0, lineHeight: 1 }}
       >
         ×
       </button>
