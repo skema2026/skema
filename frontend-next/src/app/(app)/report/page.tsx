@@ -122,7 +122,7 @@ export default function ReportPage() {
             <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #4F46E5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MaterialIcon icon="bar_chart" size={15} color="#fff" filled />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 800, color: '#181c1e' }}>주간 수행률 리포트</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#181c1e' }}>주간 수행률 리포트</span>
           </div>
         </div>
       </header>
@@ -140,9 +140,9 @@ export default function ReportPage() {
 
           <div style={{ textAlign: 'center' }}>
             {isCurrentWeek && (
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#4F46E5', letterSpacing: 1, marginBottom: 2 }}>이번 주</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#4F46E5', letterSpacing: 1, marginBottom: 2 }}>이번 주</div>
             )}
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#181c1e' }}>{formatWeekRange(monday)}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#181c1e' }}>{formatWeekRange(monday)}</div>
           </div>
 
           <button
@@ -165,13 +165,13 @@ export default function ReportPage() {
             {/* 전체 요약 */}
             <div style={{ background: '#fff', borderRadius: 16, padding: '20px 20px', border: '1px solid #ebeef1', display: 'flex', alignItems: 'center', gap: 20 }}>
               <div style={{ flexShrink: 0, width: 80, height: 80, borderRadius: '50%', border: `5px solid ${overallColor}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `${overallColor}10` }}>
-                <span style={{ fontSize: 22, fontWeight: 900, color: overallColor, lineHeight: 1 }}>
+                <span style={{ fontSize: 22, fontWeight: 600, color: overallColor, lineHeight: 1 }}>
                   {overallPct !== null ? `${overallPct}%` : '-'}
                 </span>
                 <span style={{ fontSize: 10, color: overallColor, fontWeight: 600, marginTop: 2 }}>완료율</span>
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 15, fontWeight: 800, color: '#181c1e', marginBottom: 4 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: '#181c1e', marginBottom: 4 }}>
                   {allTotal > 0 ? `${allDone}개 완료 / ${allTotal}개 전체` : '이번 주 일정 없음'}
                 </p>
                 <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
@@ -184,7 +184,7 @@ export default function ReportPage() {
                     { label: '총 계획 시간', value: `${Math.floor(allMins / 60)}h ${allMins % 60}m`, color: '#4F46E5', bg: '#ede9fe' },
                   ].map(({ label, value, color, bg }) => (
                     <div key={label} style={{ padding: '4px 10px', borderRadius: 20, background: bg, display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color }}>{value}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color }}>{value}</span>
                       <span style={{ fontSize: 11, color, opacity: 0.8 }}>{label}</span>
                     </div>
                   ))}
@@ -194,7 +194,7 @@ export default function ReportPage() {
 
             {/* 요일별 수행률 */}
             <div style={{ background: '#fff', borderRadius: 16, padding: '20px', border: '1px solid #ebeef1' }}>
-              <p style={{ fontSize: 14, fontWeight: 800, color: '#181c1e', marginBottom: 16 }}>요일별 수행률</p>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#181c1e', marginBottom: 16 }}>요일별 수행률</p>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
                 {days.map(({ label, pct, isToday, done, total, mins }) => {
                   const barH = pct !== null ? Math.max(pct * 0.9, 4) : 0;
@@ -225,7 +225,7 @@ export default function ReportPage() {
             {/* 유형별 분석 */}
             {typeStats.length > 0 ? (
               <div style={{ background: '#fff', borderRadius: 16, padding: '20px', border: '1px solid #ebeef1' }}>
-                <p style={{ fontSize: 14, fontWeight: 800, color: '#181c1e', marginBottom: 16 }}>유형별 분석</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#181c1e', marginBottom: 16 }}>유형별 분석</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {typeStats.map(({ type, label, color, icon, done, total, mins }) => {
                     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -237,11 +237,11 @@ export default function ReportPage() {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                             <span style={{ fontSize: 16 }}>{icon}</span>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#181c1e' }}>{label}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#181c1e' }}>{label}</span>
                             <span style={{ fontSize: 11, color: '#94a3b8' }}>· {total}개 · {timeStr}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 13, fontWeight: 800, color }}>{pct}%</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color }}>{pct}%</span>
                             <span style={{ fontSize: 11, color: '#94a3b8' }}>{done}/{total}</span>
                           </div>
                         </div>
@@ -266,7 +266,7 @@ export default function ReportPage() {
               <div style={{ background: 'linear-gradient(135deg, #ede9fe, #dbeafe)', borderRadius: 16, padding: '16px 20px', border: '1px solid #c4b5fd' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   <MaterialIcon icon="lightbulb" size={16} color="#7c3aed" filled />
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#4c1d95' }}>학습 패턴 인사이트</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#4c1d95' }}>학습 패턴 인사이트</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {(() => {

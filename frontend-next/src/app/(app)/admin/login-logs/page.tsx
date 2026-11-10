@@ -55,30 +55,30 @@ export default function AdminLoginLogsPage() {
       <div className="mx-auto max-w-7xl">
         <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-extrabold text-[#0f172a]">로그인 로그</h1>
+            <h1 className="text-2xl font-semibold text-[#0f172a]">로그인 로그</h1>
             <p className="mt-1 text-sm text-[#3f4b61]">관리자는 로그인에 사용된 아이디/이메일, 성공 여부, 접속 정보를 확인할 수 있습니다.</p>
           </div>
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#bfd0ff] bg-white px-4 py-2 text-sm font-bold text-[#2563eb]"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#bfd0ff] bg-white px-4 py-2 text-sm font-medium text-[#2a6fe3]"
           >
-            <MaterialIcon icon="arrow_back" size={16} color="#2563eb" />
+            <MaterialIcon icon="arrow_back" size={16} color="#2a6fe3" />
             대시보드
           </button>
         </header>
 
         <section className="overflow-hidden rounded-lg border border-[#d8e2ef] bg-white shadow-sm">
           {loading ? (
-            <div className="flex h-48 items-center justify-center text-sm font-bold text-[#3f4b61]">불러오는 중...</div>
+            <div className="flex h-48 items-center justify-center text-sm font-medium text-[#3f4b61]">불러오는 중...</div>
           ) : error ? (
-            <div className="flex h-48 items-center justify-center text-sm font-bold text-red-600">{error}</div>
+            <div className="flex h-48 items-center justify-center text-sm font-medium text-red-600">{error}</div>
           ) : logs.length === 0 ? (
-            <div className="flex h-48 items-center justify-center text-sm font-bold text-[#3f4b61]">로그가 없습니다.</div>
+            <div className="flex h-48 items-center justify-center text-sm font-medium text-[#3f4b61]">로그가 없습니다.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
-                <thead className="bg-[#eaf1ff] text-xs font-extrabold uppercase text-[#0f172a]">
+                <thead className="bg-[#eaf1ff] text-xs font-semibold text-[#0f172a]">
                   <tr>
                     <th className="px-4 py-3">시간</th>
                     <th className="px-4 py-3">결과</th>
@@ -95,7 +95,7 @@ export default function AdminLoginLogsPage() {
                     <tr key={log.id} className="border-t border-[#eef2f7] align-top">
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-[#0f172a]">{formatDate(log.created_at)}</td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${log.success ? 'bg-[#d1fae5] text-[#047857]' : 'bg-[#fee2e2] text-[#b91c1c]'}`}>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${log.success ? 'bg-[#d1fae5] text-[#047857]' : 'bg-[#fee2e2] text-[#b91c1c]'}`}>
                           {log.success ? '성공' : '실패'}
                         </span>
                         {!log.success && log.failure_reason ? (

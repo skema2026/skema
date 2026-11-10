@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+// 한글 글꼴: Pretendard (SIL OFL 1.1). 글자 범위별로 쪼갠 파일이라 화면에 쓰인 글자 묶음만 받는다
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 import { Providers } from "@/components/providers/Providers";
 import { Toaster } from "@/components/ui/sonner";
@@ -58,7 +60,7 @@ export default function RootLayout({
           })();
         `}} />
       </head>
-      <body className="min-h-full flex flex-col bg-[#f6f8fc] text-[#0f172a]" style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col bg-[#f5f8fd] text-[#0f1e3a]" style={{ fontFamily: '"Pretendard Variable", Pretendard, var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif' }} suppressHydrationWarning>
         <Providers>
           {children}
           <Toaster richColors position="top-center" />

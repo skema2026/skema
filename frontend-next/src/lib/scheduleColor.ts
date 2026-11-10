@@ -32,8 +32,8 @@ const DIVERSE_PALETTE = [
   // 🔵 Blue
   '#0891B2', // cyan-600    — 사이언
   '#0284C7', // sky-600     — 스카이 블루
-  '#2563EB', // blue-600    — 로열 블루
-  '#1D4ED8', // blue-700    — 딥 블루
+  '#2a6fe3', // blue-600    — 로열 블루
+  '#1f63d6', // blue-700    — 딥 블루
 
   // 🟣 Purple
   '#4F46E5', // indigo-600  — 인디고
@@ -72,6 +72,9 @@ const DIVERSE_PALETTE = [
   '#9F1239', // rose-800     — 딥 로즈
 ] as const;
 
+/** 시험 공부 블록 색 — 시험마다 하나씩. 로고 파랑과 어울리는 차가운 계열(인디고·사이언·바이올렛·틸), 수업 하늘색과는 구분 */
+const STUDY_PALETTE = ['#4f46e5', '#0891b2', '#7c3aed', '#0d9488', '#4338ca', '#0369a1'] as const;
+
 /** ClassForm 색상 선택 UI에 표시할 전체 팔레트 */
 export const ALL_SCHEDULE_COLORS: string[] = [...DIVERSE_PALETTE];
 
@@ -94,7 +97,7 @@ function hashToPalette(key: string, palette: readonly string[]): string {
 // ── 유형별 고정색 ─────────────────────────────────────────────────────────────
 
 export const SCHEDULE_TYPE_COLORS: Record<string, string> = {
-  class:      '#3b82f6',
+  class:      '#4591fd', // 로고 하늘색
   study:      '#059669',
   assignment: '#f59e0b',
   activity:   '#ec4899',
@@ -113,10 +116,11 @@ export function getDisplayColor(schedule: Schedule): string {
   const { schedule_source, linked_exam_id, schedule_type, color } = schedule;
 
   if (schedule_source === 'eta_import') {
-    return SCHEDULE_TYPE_COLORS[schedule_type] ?? '#3b82f6';
+    return SCHEDULE_TYPE_COLORS[schedule_type] ?? '#4591fd';
   }
   if (schedule_type === 'study' && schedule_source === 'ai_generated' && linked_exam_id) {
-    return hashToPalette(`exam:${linked_exam_id}`, DIVERSE_PALETTE);
+    // unslop: 공부 블록은 차가운 계열 몇 가지만. 수업(하늘색)과 겹치지 않게
+    return hashToPalette(`exam:${linked_exam_id}`, STUDY_PALETTE);
   }
   return color || '#6366f1';
 }

@@ -89,7 +89,7 @@ export function NotificationBanner({ notification, onOpen, onDismiss }: Notifica
         <MaterialIcon icon="notifications_active" size={18} color="var(--skema-primary)" filled />
       </div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#181c1e' }}>곧 시작! (클릭하면 일정 확인)</div>
+        <div style={{ fontWeight: 600, fontSize: 13, color: '#181c1e' }}>곧 시작! (클릭하면 일정 확인)</div>
         <div style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>{notification.title} — {notification.start_time}</div>
       </div>
       <button
@@ -150,7 +150,7 @@ export function DashboardHeader({
         justifyContent: 'space-between',
         padding: '0 20px',
         borderBottom: '1px solid var(--skema-container)',
-        background: 'rgba(255,255,255,0.94)',
+        background: 'rgba(255,255,255,0.96)',
         position: 'sticky',
         top: 0,
         zIndex: 30,
@@ -162,9 +162,9 @@ export function DashboardHeader({
           type="button"
           onClick={() => router.back()}
           title="이전으로"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--skema-surface-low)', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer' }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5f6f88] transition-colors hover:bg-[#edf3fc] hover:text-[#0f1e3a]"
         >
-          <MaterialIcon icon="arrow_back" size={18} color="var(--skema-on-surface-variant)" />
+          <MaterialIcon icon="arrow_back" size={18} color="currentColor" />
         </button>
         <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           <Image
@@ -175,20 +175,14 @@ export function DashboardHeader({
             style={{ display: 'block', width: '28px', height: '28px', borderRadius: '7px', objectFit: 'contain' }}
           />
         </div>
-        <span className="skema-headline" style={{ fontWeight: 800, fontSize: '18px', color: 'var(--skema-on-surface)', letterSpacing: 0 }}>SKEMA</span>
+        <span style={{ fontWeight: 600, fontSize: '17px', color: '#0f1e3a', letterSpacing: '-0.01em' }}>SKEMA</span>
         {todayPct !== null && (
           <span
             className="skema-dashboard-title-badge"
-            style={{
-              padding: '2px 10px',
-              borderRadius: 9999,
-              fontSize: 11,
-              fontWeight: 700,
-              background: todayPct >= 80 ? '#d1fae5' : todayPct >= 40 ? '#fef9c3' : 'var(--skema-surface-low)',
-              color: todayPct >= 80 ? '#059669' : todayPct >= 40 ? '#d97706' : 'var(--skema-on-surface-variant)',
-            }}
+            title={`오늘 일정 ${todayTotal}개 중 ${todayDone}개 완료`}
+            style={{ marginLeft: 8, fontSize: 13, color: '#5f6f88', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
           >
-            오늘 {todayPct}% ({todayDone}/{todayTotal})
+            오늘 {todayDone}/{todayTotal}
           </span>
         )}
       </div>
@@ -198,18 +192,18 @@ export function DashboardHeader({
           type="button"
           onClick={onAddSchedule}
           title="일정 추가"
-          className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-400 px-5 py-2 text-sm font-bold text-white shadow-sm hover:opacity-90"
+          className="flex h-9 items-center gap-2 rounded-lg bg-[#2a6fe3] px-4 text-[14px] font-medium text-white transition-colors hover:bg-[#1f63d6] active:scale-[0.98]"
         >
-          <MaterialIcon icon="add" size={16} color="#fff" />
+          <MaterialIcon icon="add" size={16} color="currentColor" />
           <span className="hide-mobile">일정 추가</span>
         </button>
         <button
           type="button"
           onClick={onOpenSetlog}
           title="기록"
-          className="flex items-center gap-2 rounded-lg bg-slate-950 px-5 py-2 text-sm font-bold text-white shadow-sm hover:bg-slate-800"
+          className="skema-btn-secondary"
         >
-          <MaterialIcon icon="photo_camera" size={16} color="#fff" />
+          <MaterialIcon icon="photo_camera" size={16} color="currentColor" />
           <span className="hide-mobile">기록</span>
         </button>
 
@@ -218,55 +212,53 @@ export function DashboardHeader({
           onClick={onReschedule}
           disabled={isRegenerating}
           title="못 한 공부·과제 블록을 시험 전날까지 빈 시간에 다시 배치"
-          className="group inline-flex items-center rounded-lg p-[1px] bg-gradient-to-r from-sky-200 via-blue-400 to-blue-600 hover:from-sky-300 hover:via-blue-500 hover:to-blue-700 disabled:opacity-50"
+          className="skema-btn-secondary disabled:opacity-50"
         >
-          <span className="flex items-center gap-2 rounded-[calc(0.5rem-1px)] bg-white/90 px-5 py-2 text-sm font-bold text-blue-700">
-            <MaterialIcon icon="autorenew" size={16} color="#2563eb" />
-            <span className="hide-mobile">{isRegenerating ? '계산 중...' : '다시 짜기'}</span>
-          </span>
+          <MaterialIcon icon="autorenew" size={16} color="currentColor" />
+          <span className="hide-mobile">{isRegenerating ? '계산 중' : '다시 짜기'}</span>
         </button>
         <button
           type="button"
           onClick={onUploadTimetable}
           title="시간표 업로드"
-          className="flex items-center gap-2 rounded-lg bg-blue-50 px-5 py-2 text-sm font-bold text-slate-900 hover:bg-blue-100"
+          className="skema-btn-secondary"
         >
-          <MaterialIcon icon="upload_file" size={16} color="#2563eb" />
+          <MaterialIcon icon="upload_file" size={16} color="currentColor" />
           <span className="hide-mobile">시간표 업로드</span>
         </button>
         <button
           type="button"
           onClick={onShare}
           title="공유"
-          style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#F1F3F5', border: 'none', borderRadius: '10px', padding: '7px 12px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+          className="flex h-9 items-center gap-2 rounded-lg px-3 text-[14px] text-[#44536b] transition-colors hover:bg-[#edf3fc] hover:text-[#0f1e3a]"
         >
-          <MaterialIcon icon="share" size={16} color="#475569" />
+          <MaterialIcon icon="share" size={16} color="currentColor" />
           <span className="hide-mobile">공유</span>
         </button>
 
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-blue-100 bg-white px-1.5 py-1 pr-2 shadow-sm transition-all outline-none hover:border-blue-200 hover:bg-blue-50">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="text-xs font-black" style={{ background: 'var(--skema-secondary-container)', color: 'var(--skema-primary)' }}>
+          <DropdownMenuTrigger className="flex h-9 items-center gap-2 rounded-lg border border-black/10 bg-white pl-1 pr-2 transition-colors outline-none hover:bg-[#edf3fc]">
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className="text-xs font-medium" style={{ background: '#edf3fc', color: '#44536b' }}>
                 {fallback}
               </AvatarFallback>
             </Avatar>
-            <span className="hide-mobile max-w-[120px] truncate text-xs font-black text-slate-700">
+            <span className="hide-mobile max-w-[120px] truncate text-[13px] text-[#0f1e3a]">
               {displayName}
             </span>
             <MaterialIcon icon="expand_more" size={14} color="#64748b" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72 overflow-hidden rounded-2xl border-blue-100 p-2 shadow-xl">
+          <DropdownMenuContent align="end" className="w-72 overflow-hidden rounded-xl border-black/10 p-2 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
             <DropdownMenuGroup>
-              <DropdownMenuLabel className="rounded-xl bg-blue-50 p-3">
+              <DropdownMenuLabel className="rounded-lg bg-[#edf3fc] p-3">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-11 w-11">
-                    <AvatarFallback className="text-sm font-black" style={{ background: 'var(--skema-primary)', color: '#fff' }}>
+                    <AvatarFallback className="text-sm font-semibold" style={{ background: 'var(--skema-primary)', color: '#fff' }}>
                       {fallback}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-slate-950">{displayName}</p>
+                    <p className="truncate text-sm font-semibold text-slate-950">{displayName}</p>
                     <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{user?.email}</p>
                   </div>
                 </div>
@@ -274,22 +266,22 @@ export function DashboardHeader({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={onOpenProfile} className="gap-2 rounded-lg py-2.5 font-bold">
-                <MaterialIcon icon="person" size={16} color="#2563eb" />
+              <DropdownMenuItem onClick={onOpenProfile} className="gap-2 rounded-lg py-2.5 font-medium">
+                <MaterialIcon icon="person" size={16} color="#2a6fe3" />
                 프로필 관리
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onShare} className="gap-2 rounded-lg py-2.5 font-bold">
-                <MaterialIcon icon="share" size={16} color="#2563eb" />
+              <DropdownMenuItem onClick={onShare} className="gap-2 rounded-lg py-2.5 font-medium">
+                <MaterialIcon icon="share" size={16} color="#2a6fe3" />
                 시간표 공유
               </DropdownMenuItem>
               {user?.is_admin && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={onOpenAdminUsers} className="gap-2 rounded-lg py-2.5 font-bold">
+                  <DropdownMenuItem onClick={onOpenAdminUsers} className="gap-2 rounded-lg py-2.5 font-medium">
                     <MaterialIcon icon="person" size={16} color="#64748b" />
                     관리자 회원 관리
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onOpenAdminLogs} className="gap-2 rounded-lg py-2.5 font-bold">
+                  <DropdownMenuItem onClick={onOpenAdminLogs} className="gap-2 rounded-lg py-2.5 font-medium">
                     <MaterialIcon icon="history" size={16} color="#64748b" />
                     관리자 로그인 로그
                   </DropdownMenuItem>
@@ -298,14 +290,14 @@ export function DashboardHeader({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => router.push('/notifications')} className="gap-2 rounded-lg py-2.5 font-bold">
-                <MaterialIcon icon="notifications" size={16} color="#2563eb" />
+              <DropdownMenuItem onClick={() => router.push('/notifications')} className="gap-2 rounded-lg py-2.5 font-medium">
+                <MaterialIcon icon="notifications" size={16} color="#2a6fe3" />
                 알림 설정
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={onLogout} className="gap-2 rounded-lg py-2.5 font-bold text-red-600 focus:text-red-600">
+              <DropdownMenuItem onClick={onLogout} className="gap-2 rounded-lg py-2.5 font-medium text-red-600 focus:text-red-600">
                 <MaterialIcon icon="close" size={16} color="#dc2626" />
                 로그아웃
               </DropdownMenuItem>

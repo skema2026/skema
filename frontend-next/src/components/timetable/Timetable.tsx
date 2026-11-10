@@ -28,6 +28,7 @@ import type { Schedule, ExamSchedule } from '@/types';
 import { useUIStore } from '@/store/uiStore';
 import { useUpdateSchedule } from '@/hooks/useSchedules';
 import { getDisplayColor } from '@/lib/scheduleColor';
+import { displayTitle } from '@/lib/utils';
 import { timeToMinutes, minutesToTime, dateStringToDow } from '@/lib/timetableParser';
 import { indexToRecurringDay, recurringDayToIndex } from '@/lib/recurringDay';
 
@@ -138,8 +139,8 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, startMinutes, 
         left:          2,
         right:         2,
         height,
-        background:    `${color}99`,
-        borderRadius:  7,
+        background:    `${color}1f`,
+        borderRadius:  6,
         borderLeft:    `3px solid ${color}`,
         padding:       isCompact ? '1px 5px' : '4px 7px',
         overflow:      'hidden',
@@ -151,37 +152,36 @@ function EventBlock({ schedule: s, isConflict, readOnly, isFaded, startMinutes, 
         touchAction:   'none',
         zIndex:        isFaded ? 0 : 1,
         boxSizing:     'border-box',
-        boxShadow:     isFaded ? 'none' : `0 1px 4px ${color}33`,
         transition:    isFaded ? 'none' : 'opacity 0.1s',
       }}
     >
       <div style={{
-        fontSize:       isCompact ? 10 : 11,
-        fontWeight:     700,
-        color:          '#374151',
+        fontSize:       isCompact ? 11 : 12,
+        fontWeight: 500,
+        color:          '#0f1e3a',
         overflow:       'hidden',
         textOverflow:   'ellipsis',
         whiteSpace:     'nowrap',
         textDecoration: s.is_completed ? 'line-through' : 'none',
         lineHeight:     1.3,
       }}>
-        {s.title}
+        {displayTitle(s.title)}
       </div>
       {!isCompact && (
-        <div style={{ fontSize: 10, color: '#4b5563', marginTop: 1 }}>
+        <div style={{ fontSize: 11, color: '#44536b', marginTop: 2, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
           {s.start_time}–{s.end_time}
         </div>
       )}
       {!isCompact && s.location && (
         <div style={{
-          fontSize:     9,
-          color:        '#6b7280',
+          fontSize:     11,
+          color:        '#5f6f88',
           marginTop:    1,
           overflow:     'hidden',
           textOverflow: 'ellipsis',
           whiteSpace:   'nowrap',
         }}>
-          📍 {s.location}
+          {s.location}
         </div>
       )}
     </div>
@@ -221,7 +221,7 @@ function GhostBlock({ schedule: s, slot, durationSlots, startMinutes }: {
     >
       <div style={{
         fontSize:   isCompact ? 10 : 11,
-        fontWeight: 700,
+        fontWeight: 600,
         color:      color,
         overflow:   'hidden',
         textOverflow: 'ellipsis',
@@ -564,12 +564,12 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
           fontSize:     12,
           fontWeight:   600,
         }}>
-          ⚠️ 시간이 겹치는 일정이 {conflictIds.size}개 있습니다. 빨간 테두리로 표시된 일정을 확인하세요.
+          시간이 겹치는 일정이 {conflictIds.size}개 있습니다. 빨간 테두리로 표시된 일정을 확인하세요.
         </div>
       )}
 
       {/* ── Day header (weekday + date) ── */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #d8e2ef', background: '#f8fbff' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.08)', background: '#fff' }}>
         <div style={{ width: GUTTER_W, flexShrink: 0 }} />
         {visibleDays.map((dow) => {
           // Compute the calendar date for this column
@@ -581,8 +581,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
           const dateLabel = `${colDate.getMonth() + 1}/${colDate.getDate()}`;
 
           const bg    = hasExam ? '#fef08a' : isPreExam ? '#fff1f2' : isToday ? '#eef1ff' : 'transparent';
-          const color = hasExam ? '#78350f' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#2563eb' : '#3f4b61';
-          const sub   = hasExam ? '#92400e' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#2563eb' : '#aaa';
+          const color = hasExam ? '#78350f' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#2a6fe3' : '#3f4b61';
+          const sub   = hasExam ? '#92400e' : isPreExam ? '#DC2626' : dow >= 5 ? '#e11d48' : isToday ? '#2a6fe3' : '#aaa';
 
           return (
             <div key={`hdr-${dow}`}
@@ -590,24 +590,24 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
               style={{
                 flex:      1,
                 textAlign: 'center',
-                padding:   '5px 2px',
+                padding:   '8px 2px',
                 background: bg,
                 borderBottom: isPreExam && !hasExam ? '2px solid #fca5a5' : undefined,
                 cursor: onDayClick ? 'pointer' : undefined,
               }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color, lineHeight: 1.2 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color, lineHeight: 1.3 }}>
                 {ALL_DAYS[dow]}
               </div>
-              <div style={{ fontSize: 10, fontWeight: (hasExam || isToday || isPreExam) ? 700 : 400, color: sub, lineHeight: 1.2, marginTop: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: (hasExam || isToday || isPreExam) ? 500 : 400, color: sub, lineHeight: 1.3, marginTop: 2, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
                 {dateLabel}
               </div>
               {hasExam && (
-                <div style={{ fontSize: 8, fontWeight: 700, color: '#92400e', marginTop: 2, letterSpacing: 0.3 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: '#92400e', marginTop: 2 }}>
                   시험
                 </div>
               )}
               {isPreExam && !hasExam && (
-                <div style={{ fontSize: 8, fontWeight: 700, color: '#DC2626', marginTop: 2, letterSpacing: 0.3 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: '#DC2626', marginTop: 2 }}>
                   시험 전날
                 </div>
               )}
@@ -642,8 +642,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
             gap:            10,
             pointerEvents:  'none',
           }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: '#475569' }}>이번 주 일정이 없습니다</p>
-            <p style={{ fontSize: 12, color: '#94a3b8' }}>헤더의 &quot;+ 일정 추가&quot; 버튼을 눌러 첫 일정을 추가해보세요</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: '#475569' }}>이번 주 일정이 없어요</p>
+            <p style={{ fontSize: 12, color: '#94a3b8' }}>위의 일정 추가 버튼으로 첫 일정을 넣어 보세요</p>
           </div>
         )}
         {/* Time gutter — :00 labels + :30 minor marks */}
@@ -660,14 +660,14 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                 position:   'absolute',
                 top:        i * SLOT_H - 6,
                 right:      6,
-                fontSize:   isHour ? 10 : 8,
-                color:      isHour ? '#bbb' : '#ddd',
+                fontSize:   11,
+                color:      '#98a6ba',
+                fontFamily: 'var(--font-mono)',
+                fontVariantNumeric: 'tabular-nums',
                 lineHeight: 1,
                 userSelect: 'none',
               }}>
-                {isHour
-                  ? slotToTime(i, startMinutes)
-                  : slotToTime(i, startMinutes).slice(3)}
+                {isHour ? slotToTime(i, startMinutes) : ''}
               </div>
             );
           })}
@@ -681,8 +681,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
               flex:       1,
               position:   'relative',
               height:     gridHeight,
-              borderLeft: '1px solid #f0f0f0',
-              background: dow >= 5 ? 'rgba(225,29,72,0.02)' : 'transparent',
+              borderLeft: '1px solid #e6edf7',
+              background: dow >= 5 ? 'rgba(69,145,253,0.045)' : 'transparent',
             }}
           >
             {/* Grid lines */}
@@ -693,8 +693,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                 right:         0,
                 top:           i * SLOT_H,
                 borderTop:     i % 2 === 0
-                  ? '1px solid #e8eaed'
-                  : '1px dashed #f3f4f6',
+                  ? '1px solid #dfe7f3'
+                  : '1px dashed #edf2f9',
                 pointerEvents: 'none',
               }} />
             ))}
@@ -750,8 +750,8 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                       ...examStyle,
                     }}
                   >
-                    <div style={{ fontSize: 8, fontWeight: 700, color: '#78350f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      📝 {e.title}
+                    <div style={{ fontSize: 8, fontWeight: 600, color: '#78350f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      시험 · {e.title}
                     </div>
                   </div>
                 );
@@ -783,14 +783,14 @@ export function Timetable({ schedules, exams = [], readOnly = false, weekStart: 
                   }}
                 >
                   <div style={{
-                    fontSize:     9,
-                    fontWeight:   700,
+                    fontSize:     11,
+                    fontWeight: 500,
                     color:        '#78350f',
                     overflow:     'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace:   'nowrap',
                   }}>
-                    📝 {e.title}
+                    시험 · {e.title}
                   </div>
                 </div>
               );

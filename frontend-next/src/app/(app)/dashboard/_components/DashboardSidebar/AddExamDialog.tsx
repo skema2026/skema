@@ -77,7 +77,7 @@ export default function AddExamDialog({ open, onOpenChange, onCreated }: AddExam
           }}
         >
           <label className="block">
-            <span className="mb-1 block text-xs font-black text-slate-600">시험 이름</span>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">시험 이름</span>
             <input
               type="text"
               value={title}
@@ -85,22 +85,22 @@ export default function AddExamDialog({ open, onOpenChange, onCreated }: AddExam
               placeholder="예: 자료구조 기말고사"
               maxLength={100}
               autoFocus
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-400"
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-black text-slate-600">시험 날짜</span>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">시험 날짜</span>
             <input
               type="date"
               value={date}
               min={today}
               onChange={(e) => { setDate(e.target.value); setError(''); }}
               aria-label="시험 날짜"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-400"
             />
           </label>
-          {error && <p className="text-xs font-bold text-red-600">{error}</p>}
-          <p className="text-[11px] font-bold leading-relaxed text-slate-400">
+          {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+          <p className="text-[11px] font-medium leading-relaxed text-slate-400">
             추가하면 시험 전날까지 빈 시간에 공부 블록을 배치하는 창이 바로 열려요.
           </p>
           <div className="flex gap-2 pt-1">
@@ -108,14 +108,14 @@ export default function AddExamDialog({ open, onOpenChange, onCreated }: AddExam
               type="button"
               onClick={() => close(false)}
               disabled={createExam.isPending}
-              className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={createExam.isPending}
-              className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
             >
               {createExam.isPending ? '추가 중...' : '추가'}
             </button>
