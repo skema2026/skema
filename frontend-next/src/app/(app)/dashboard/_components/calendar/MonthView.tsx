@@ -24,9 +24,9 @@ function MobileMonthAgenda({
   'days' | 'monthDate' | 'todayStr' | 'onDayClick'
 >) {
   return (
-    <div className="bg-[#f8fbff] p-3">
-      <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
-        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] font-black text-slate-400">
+    <div className="p-3">
+      <div className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-3">
+        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[12px] text-[#5f6f88]">
           {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
             <div key={day} className="py-1">
               {day}
@@ -46,18 +46,18 @@ function MobileMonthAgenda({
                 key={`mobile-month-${day.dateStr}`}
                 type="button"
                 onClick={() => onDayClick(day.date)}
-                className={`aspect-square min-w-0 rounded-xl border p-1 text-left transition ${
+                className={`aspect-square min-w-0 rounded-[10px] border p-1.5 text-left transition-colors ${
                   isToday
-                    ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                    ? 'border-[#2a6fe3] bg-[#2a6fe3] text-white'
                     : isCurrentMonth
                       ? count
-                        ? 'border-blue-100 bg-blue-50/70 text-slate-800'
-                        : 'border-slate-100 bg-white text-slate-500'
-                      : 'border-transparent bg-slate-50/50 text-slate-300'
+                        ? 'border-[#0f1e3a]/8 bg-white text-[#0f1e3a]'
+                        : 'border-[#0f1e3a]/8 bg-white text-[#5f6f88]'
+                      : 'border-transparent bg-transparent text-[#98a6ba]'
                 }`}
               >
                 <div className="flex h-full flex-col justify-between">
-                  <span className="text-xs font-black leading-none">
+                  <span className="font-mono text-[13px] leading-none tabular-nums">
                     {day.date.getDate()}
                   </span>
 
@@ -66,7 +66,7 @@ function MobileMonthAgenda({
                       {day.exams.length > 0 && (
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${
-                            isToday ? 'bg-amber-200' : 'bg-amber-400'
+                            isToday ? 'bg-white' : 'bg-[#dc2626]'
                           }`}
                         />
                       )}
@@ -77,7 +77,7 @@ function MobileMonthAgenda({
                           className="h-1.5 w-1.5 rounded-full"
                           style={{
                             background: isToday
-                              ? '#bfdbfe'
+                              ? 'rgba(255,255,255,0.7)'
                               : getDisplayColor(schedule),
                           }}
                         />
@@ -113,26 +113,21 @@ export default function MonthView({
         />
       </div>
 
-      <div className="hidden h-full overflow-y-auto bg-white p-4 sm:block">
-        <div className="mb-3 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3">
-          <span className="text-sm font-black text-slate-950">
-            {monthLabel}
-          </span>
-
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700">
-            {minutesToTime(wakeStartMinutes)} 기준
+      <div className="hidden h-full overflow-y-auto bg-white p-5 sm:block">
+        <div className="mb-4 flex items-baseline justify-between">
+          <span className="text-[15px] font-medium text-[#0f1e3a]">{monthLabel}</span>
+          <span className="font-mono text-[12px] tabular-nums text-[#5f6f88]">
+            하루 시작 {minutesToTime(wakeStartMinutes)}
           </span>
         </div>
 
-        <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs font-black text-slate-500">
+        <div className="grid grid-cols-7 pb-2 text-center text-[13px] text-[#5f6f88]">
           {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
-            <div key={day} className="rounded-md bg-blue-50 py-2">
-              {day}
-            </div>
+            <div key={day}>{day}</div>
           ))}
         </div>
 
-        <div className="grid min-h-[540px] grid-cols-7 gap-2">
+        <div className="grid min-h-[540px] grid-cols-7 gap-px overflow-hidden rounded-xl border border-[#0f1e3a]/8 bg-[#0f1e3a]/8">
           {days.map((day) => {
             const date = day.date;
             const dateStr = day.dateStr;
@@ -146,32 +141,33 @@ export default function MonthView({
               <button
                 key={dateStr}
                 onClick={() => onDayClick(date)}
-                className={`min-h-[112px] rounded-lg border p-2 text-left transition hover:border-blue-300 hover:bg-blue-50 ${
-                  isToday
-                    ? 'border-blue-500 bg-blue-50'
-                    : isCurrentMonth
-                      ? 'border-blue-100 bg-white'
-                      : 'border-slate-100 bg-slate-50/70 opacity-60'
+                className={`min-h-[108px] p-2 text-left transition-colors hover:bg-[#f5f8fd] ${
+                  isCurrentMonth ? 'bg-white' : 'bg-[#f5f8fd]'
                 }`}
               >
-                <div className="mb-1.5 flex items-center justify-between">
+                <div className="mb-2 flex items-center justify-between">
                   <span
-                    className={`text-xs font-black ${
-                      isToday ? 'text-blue-700' : 'text-slate-600'
+                    className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 font-mono text-[13px] tabular-nums ${
+                      isToday
+                        ? 'bg-[#2a6fe3] font-medium text-white'
+                        : isCurrentMonth
+                          ? 'text-[#0f1e3a]'
+                          : 'text-[#98a6ba]'
                     }`}
                   >
                     {date.getDate()}
                   </span>
 
                   {dayExams.length > 0 && (
-                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-700">
+                    <span className="flex items-center gap-1 text-[12px] text-[#dc2626]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#dc2626]" />
                       시험
                     </span>
                   )}
                 </div>
 
                 {items.length > 0 && (
-                  <div className="flex flex-wrap gap-0.5">
+                  <div className={`flex flex-wrap gap-1 ${isCurrentMonth ? '' : 'opacity-50'}`}>
                     {items.slice(0, 6).map((schedule) => (
                       <span
                         key={`dot-${dateStr}-${schedule.id}`}
@@ -185,8 +181,8 @@ export default function MonthView({
                 )}
 
                 {items.length > 6 && (
-                  <span className="mt-0.5 block text-[10px] font-black text-slate-400">
-                    +{items.length - 6}개
+                  <span className="mt-1 block font-mono text-[11px] tabular-nums text-[#5f6f88]">
+                    +{items.length - 6}
                   </span>
                 )}
               </button>

@@ -1,6 +1,7 @@
 
 'use client';
 
+import { displayTitle } from "@/lib/utils";
 import { useCallback, useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import { Timetable } from '@/components/timetable/Timetable';
@@ -73,7 +74,7 @@ function MobileWeekAgenda({
   }, [scrollToDateStr, scrollToDateInternal, onScrollConsumed]);
 
   return (
-    <div ref={containerRef} className="space-y-3 bg-[#f8fbff] p-3">
+    <div ref={containerRef} className="space-y-3 bg-[#f5f8fd] p-3">
       <div className="grid grid-cols-7 gap-1.5">
         {days.map((day) => {
           const isToday = day.dateStr === todayStr;
@@ -84,29 +85,29 @@ function MobileWeekAgenda({
               key={day.dateStr}
               type="button"
               onClick={() => onShowDayView(day.date)}
-              className={`min-w-0 rounded-xl border px-1 py-2 text-center transition ${
+              className={`min-w-0 rounded-lg border px-1 py-2 text-center transition-colors ${
                 isToday
-                  ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                  ? 'border-[#0f1e3a] bg-[#0f1e3a] text-white'
                   : count
-                    ? 'border-blue-100 bg-white text-slate-800'
-                    : 'border-slate-100 bg-white/70 text-slate-400'
+                    ? 'border-black/10 bg-white text-[#0f1e3a]'
+                    : 'border-black/[0.06] bg-transparent text-[#98a6ba]'
               }`}
             >
-              <p className="text-[11px] font-black leading-none">
+              <p className="text-[11px] font-semibold leading-none">
                 {SHORT_WEEKDAY_FORMATTER.format(day.date)}
               </p>
 
-              <p className="mt-1 text-sm font-black leading-none">
+              <p className="mt-1 font-mono text-sm font-medium leading-none tabular-nums">
                 {day.date.getDate()}
               </p>
 
               <p
-                className={`mt-1 text-[10px] font-black leading-none ${
+                className={`mt-1 text-[11px] leading-none ${
                   isToday
-                    ? 'text-blue-100'
+                    ? 'text-white/70'
                     : count
-                      ? 'text-blue-600'
-                      : 'text-slate-300'
+                      ? 'text-[#5f6f88]'
+                      : 'text-[#cfdbec]'
                 }`}
               >
                 {count ? `${count}개` : '-'}
@@ -117,11 +118,11 @@ function MobileWeekAgenda({
       </div>
 
       {activeDays.length === 0 ? (
-        <div className="rounded-2xl border border-blue-100 bg-white px-4 py-8 text-center">
-          <p className="text-sm font-black text-slate-700">
-            이번 주 일정이 없습니다
+        <div className="rounded-xl border border-black/[0.08] bg-white px-4 py-8 text-center">
+          <p className="text-sm font-semibold text-slate-700">
+            이번 주 일정이 없어요
           </p>
-          <p className="mt-1 text-xs font-bold text-slate-400">
+          <p className="mt-1 text-xs font-medium text-slate-400">
             상단 + 버튼으로 일정을 추가할 수 있어요
           </p>
         </div>
@@ -134,19 +135,19 @@ function MobileWeekAgenda({
               <section
                 key={`agenda-${day.dateStr}`}
                 data-agenda-date={day.dateStr}
-                className={`scroll-mt-3 rounded-2xl border bg-white p-3 shadow-sm ${
-                  isToday ? 'border-blue-300' : 'border-blue-100'
+                className={`scroll-mt-3 rounded-xl border bg-white p-3 ${
+                  isToday ? 'border-black/20' : 'border-black/[0.08]'
                 }`}
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-black text-blue-600">
+                    <p className="text-[12px] text-[#5f6f88]">
                       {isToday
                         ? '오늘'
                         : LONG_WEEKDAY_FORMATTER.format(day.date)}
                     </p>
 
-                    <h3 className="mt-0.5 text-base font-black text-slate-950">
+                    <h3 className="mt-0.5 text-base font-medium text-[#0f1e3a]">
                       {day.date.getMonth() + 1}월 {day.date.getDate()}일
                     </h3>
                   </div>
@@ -154,7 +155,7 @@ function MobileWeekAgenda({
                   <button
                     type="button"
                     onClick={() => onShowDayView(day.date)}
-                    className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-black text-white transition hover:bg-blue-700"
+                    className="h-7 rounded-md px-2 text-[13px] text-[#44536b] transition-colors hover:bg-[#edf3fc] hover:text-[#0f1e3a]"
                   >
                     자세히
                   </button>
@@ -175,11 +176,11 @@ function MobileWeekAgenda({
                           color="#d97706"
                         />
 
-                        <p className="min-w-0 flex-1 truncate text-sm font-black text-amber-900">
+                        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-amber-900">
                           {exam.title}
                         </p>
 
-                        <span className="text-xs font-black text-amber-700">
+                        <span className="text-xs font-semibold text-amber-700">
                           {exam.exam_time || '종일'}
                         </span>
                       </div>
@@ -191,10 +192,10 @@ function MobileWeekAgenda({
                       key={`mobile-week-${day.dateStr}-${schedule.id}`}
                       type="button"
                       onClick={() => onScheduleClick(schedule)}
-                      className={`w-full rounded-xl border py-2 pl-0 pr-3 text-left transition hover:border-blue-300 hover:bg-blue-50 ${
+                      className={`w-full rounded-lg border py-2 pl-0 pr-3 text-left transition-colors hover:bg-[#f5f8fd] ${
                         schedule.is_completed
-                          ? 'border-slate-100 bg-slate-50 opacity-70'
-                          : 'border-blue-100 bg-[#fbfdff]'
+                          ? 'border-black/[0.06] bg-white opacity-60'
+                          : 'border-black/[0.08] bg-white'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -207,26 +208,26 @@ function MobileWeekAgenda({
                           }}
                         />
 
-                        <div className="w-[64px] shrink-0 text-xs font-black text-blue-700">
+                        <div className="w-[56px] shrink-0 font-mono text-[13px] tabular-nums text-[#0f1e3a]">
                           {schedule.start_time}
 
-                          <span className="block text-[11px] font-bold text-slate-400">
+                          <span className="block text-[12px] text-[#98a6ba]">
                             {schedule.end_time}
                           </span>
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <p
-                            className={`truncate text-sm font-black ${
+                            className={`truncate text-sm font-medium ${
                               schedule.is_completed
                                 ? 'text-slate-400 line-through'
                                 : 'text-slate-950'
                             }`}
                           >
-                            {schedule.title}
+                            {displayTitle(schedule.title)}
                           </p>
 
-                          <p className="mt-0.5 truncate text-[11px] font-bold text-slate-400">
+                          <p className="mt-0.5 truncate text-[12px] text-[#5f6f88]">
                             {schedule.location ||
                               (schedule.schedule_type === 'study'
                                 ? '공부 일정'
@@ -242,7 +243,7 @@ function MobileWeekAgenda({
                           }
                           size={16}
                           color={
-                            schedule.is_completed ? '#94a3b8' : '#2563eb'
+                            schedule.is_completed ? '#98a6ba' : '#98a6ba'
                           }
                         />
                       </div>

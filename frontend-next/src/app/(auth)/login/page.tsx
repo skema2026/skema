@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useLogin } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { authCss } from '../authStyles';
 import { apiErrorMessage } from '@/lib/apiError';
 
 const GoogleIcon = () => (
@@ -51,14 +52,14 @@ export default function LoginPage() {
       toast.error(
         error === 'oauth_email_exists'
           ? '이미 이메일로 가입된 계정입니다. 아이디·비밀번호로 로그인해주세요'
-          : '소셜 로그인에 실패했습니다',
+          : '소셜 로그인을 하지 못했어요',
       );
       window.history.replaceState({}, '', '/login');
       return;
     }
     if (token) {
       setToken(token);
-      toast.success('로그인 되었습니다');
+      toast.success('로그인했어요');
       window.history.replaceState({}, '', '/login');
       router.push('/onboarding');
     }
@@ -81,215 +82,18 @@ export default function LoginPage() {
     ev.preventDefault();
     if (!validate()) return;
     loginMutation.mutate({ email: form.username, password: form.password }, {
-      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인 되었습니다'); router.push('/onboarding'); },
+      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인했어요'); router.push('/onboarding'); },
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };
-        if (error?.response?.status === 401) toast.error('아이디 또는 비밀번호가 올바르지 않습니다');
-        else toast.error(apiErrorMessage(err, '로그인 중 오류가 발생했습니다'));
+        if (error?.response?.status === 401) toast.error('아이디나 비밀번호가 맞지 않아요');
+        else toast.error(apiErrorMessage(err, '로그인하지 못했어요'));
       },
     });
   };
 
   return (
     <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; }
-
-        .lp-root {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          position: relative;
-          overflow-x: hidden;
-          overflow-y: auto;
-          background:
-            radial-gradient(circle at 18% 20%, rgba(56,189,248,0.18), transparent 32%),
-            radial-gradient(circle at 82% 18%, rgba(37,99,235,0.16), transparent 34%),
-            linear-gradient(135deg, rgba(248,251,255,0.86) 0%, rgba(234,244,255,0.82) 48%, rgba(219,234,254,0.78) 100%),
-            url('/register-bg.jpg') center / cover no-repeat fixed;
-          font-family: inherit;
-        }
-        .lp-overlay {
-          position: absolute; inset: 0; pointer-events: none;
-          background:
-            linear-gradient(90deg, rgba(37,99,235,0.07) 1px, transparent 1px),
-            linear-gradient(rgba(14,165,233,0.06) 1px, transparent 1px);
-          background-size: 28px 28px;
-          mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.15));
-        }
-
-        /* Navbar */
-        .lp-nav {
-          position: relative; z-index: 20;
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 20px clamp(20px, 4vw, 56px);
-        }
-        .lp-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-        .lp-logo-box {
-          width: 34px; height: 34px; border-radius: 9px;
-          background: transparent;
-          display: flex; align-items: center; justify-content: center;
-          box-shadow: 0 10px 26px rgba(19,63,124,0.22);
-        }
-        .lp-logo-text { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: 0; }
-        .lp-nav-btn {
-          padding: 8px 24px; border-radius: 999px; font-size: 14px; font-weight: 600;
-          color: #2563eb; text-decoration: none;
-          border: 1px solid #bfd0ff;
-          background: rgba(255,255,255,0.92);
-          backdrop-filter: blur(14px);
-          box-shadow: 0 10px 30px rgba(15,23,42,0.07);
-          transition: background 0.2s, transform 0.2s;
-        }
-        .lp-nav-btn:hover { background: #eaf1ff; transform: translateY(-1px); }
-
-        /* Body */
-        .lp-body {
-          position: relative; z-index: 1;
-          flex: 1; display: flex; align-items: center;
-          padding: 0 clamp(20px, 4vw, 56px) 48px;
-          gap: 40px;
-          justify-content: center;
-        }
-
-        /* Left */
-        .lp-left { flex: 1; max-width: 560px; }
-        .lp-left h2 {
-          font-size: clamp(2rem, 3.2vw, 2.75rem);
-          font-weight: 800; line-height: 1.2;
-          color: #0f172a; letter-spacing: 0; margin: 0 0 12px;
-        }
-        .lp-left h2 em { font-style: normal; color: #0ea5e9; }
-        .lp-feat { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
-        .lp-feat-icon {
-          width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
-          background: #fff;
-          border: 1px solid rgba(14,165,233,0.18);
-          box-shadow: 0 6px 0 rgba(14,165,233,0.08), 0 10px 24px rgba(15,23,42,0.08);
-          display: flex; align-items: center; justify-content: center;
-        }
-        .lp-feat-name { font-weight: 700; font-size: 14px; color: #0f172a; margin-bottom: 2px; }
-        .lp-feat-desc { font-size: 13px; color: #475569; }
-
-        /* Card */
-        .lp-card {
-          width: 100%;
-          max-width: 420px;
-          flex-shrink: 0;
-          background: rgba(255,255,255,0.58);
-          backdrop-filter: blur(28px) saturate(145%);
-          -webkit-backdrop-filter: blur(28px) saturate(145%);
-          border: 1px solid rgba(255,255,255,0.78);
-          border-radius: 24px;
-          box-shadow:
-            0 30px 90px rgba(37,99,235,0.18),
-            0 12px 36px rgba(15,23,42,0.08),
-            inset 0 1px 0 rgba(255,255,255,0.95);
-          padding: 34px 30px 28px;
-          }
-        .lp-card-title { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0 0 3px; }
-        .lp-card-sub   { font-size: 13px; color: #3f4b61; margin: 0 0 20px; }
-
-        /* Social */
-        .lp-soc {
-          width: 100%; height: 44px;
-          display: flex; align-items: center; justify-content: center; gap: 9px;
-          border-radius: 11px; border: none;
-          font-size: 14px; font-weight: 600; font-family: inherit;
-          cursor: pointer; margin-bottom: 7px;
-          transition: filter .15s, transform .1s;
-        }
-        .lp-soc:hover  { filter: brightness(1.07); transform: translateY(-1px); }
-        .lp-soc:active { transform: translateY(0); }
-        .lp-google { background: rgba(255,255,255,0.84); color: #1f2937; border: 1px solid rgba(255,255,255,0.7) !important; backdrop-filter: blur(6px); }
-        .lp-naver  { background: #03C75A; color: #fff; }
-        .lp-kakao  { background: #FEE500; color: #3C1E1E; }
-
-        /* Divider */
-        .lp-div { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
-        .lp-div-line { flex: 1; height: 1px; background: rgba(255,255,255,0.38); }
-        .lp-card .lp-div-line { background: rgba(15,23,42,0.12); }
-        .lp-div-txt  { font-size: 12px; color: rgba(30,40,70,0.52); white-space: nowrap; }
-
-        /* Fields */
-        .lp-field {
-          display: flex;
-          align-items: center;
-          background: rgba(255,255,255,0.68);
-          border: 1px solid rgba(191,219,254,0.9);
-          border-radius: 14px;
-          overflow: hidden;
-          margin-bottom: 7px;
-          transition: box-shadow .2s, border-color .2s, background .2s;
-        }
-        .lp-field:focus-within {
-          border-color: #2563eb;
-          box-shadow: 0 0 0 3px rgba(37,99,235,0.18);
-        }
-        .lp-field.err { border-color: rgba(220,38,38,0.55); }
-        .lp-label {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 0 11px;
-          min-width: 80px;
-          height: 46px;
-          border-right: 1px solid rgba(37,99,235,0.10);
-          background: rgba(239,246,255,0.72);
-          font-size: 13px;
-          font-weight: 700;
-          color: #0f172a;
-          flex-shrink: 0;
-        }
-        .lp-field input {
-          flex: 1; height: 46px; padding: 0 13px;
-          background: transparent; border: none; outline: none;
-          font-size: 13px; color: #0f172a; font-family: inherit;
-        }
-        .lp-field input::placeholder { color: rgba(50,65,100,0.42); }
-        .lp-pw-toggle {
-          background: none; border: none; cursor: pointer;
-          color: rgba(50,65,100,0.5); padding: 0 12px;
-          display: flex; align-items: center;
-          transition: color .15s;
-        }
-        .lp-pw-toggle:hover { color: #0f172a; }
-        .lp-err { font-size: 11px; color: #dc2626; margin: -3px 0 5px 4px; }
-
-        /* Submit */
-        .lp-submit {
-          width: 100%; height: 48px; margin-top: 8px;
-          border: none; border-radius: 11px;
-          font-size: 15px; font-weight: 700; font-family: inherit;
-          cursor: pointer; color: #fff;
-          background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-          box-shadow: 0 12px 28px rgba(26,77,178,0.24);
-          transition: filter .15s, transform .1s;
-        }
-        .lp-submit:hover:not(:disabled) { filter: brightness(1.09); transform: translateY(-1px); }
-        .lp-submit:active:not(:disabled) { transform: translateY(0); }
-        .lp-submit:disabled {
-          background: linear-gradient(90deg, #94a3b8 0%, #8fb8b4 100%);
-          box-shadow: none; cursor: not-allowed;
-        }
-
-        .lp-foot { margin-top: 14px; text-align: center; font-size: 13px; color: #334155; }
-        .lp-foot a { color: #2563eb; font-weight: 700; text-decoration: none; }
-        .lp-foot a:hover { text-decoration: underline; }
-
-        @media (max-width: 980px) {
-          .lp-left { display: none; }
-          .lp-body  { justify-content: center; padding: 0 16px 40px; }
-          .lp-nav   { padding: 18px 24px; }
-          .lp-card  { max-width: 100%; }
-        }
-        @media (max-width: 480px) {
-          .lp-card { padding: 26px 18px 22px; border-radius: 16px; }
-          .lp-label { min-width: 70px; font-size: 12px; padding: 0 9px; }
-          .lp-logo-text { font-size: 16px; }
-          .lp-nav-btn { padding: 8px 14px; }
-        }
-      `}</style>
+      <style>{authCss('lp')}</style>
 
       <div className="lp-root">
         <div className="lp-overlay" />
@@ -313,19 +117,18 @@ export default function LoginPage() {
         <div className="lp-body">
           {/* Left branding */}
           <div className="lp-left">
-            <h2>밀려도 다시 짜 주는<br />나만의 <em>스마트 시간표</em></h2>
-            <p style={{ fontSize: '15px', lineHeight: 1.8, color: '#2d3a55', margin: '0 0 24px', maxWidth: '380px' }}>
-              시험 일정과 기존 수업을 분석해 빈 시간에<br />
-              최적의 학습 계획을 자동으로 만들어드립니다.
+            <h2>하루 밀려도<br /><em>다시 짜 주는</em> 시간표</h2>
+            <p>
+              에타 시간표 캡처 한 장으로 수업을 넣고, 시험 날짜를 넣으면 수업 사이 빈 시간에 공부 블록이 들어갑니다.
             </p>
             {[
-              { icon: 'calendar_month', title: '시험 기반 자동 배치',    desc: '시험 날짜를 등록하고 학습 빈도를 설정하면 빈 시간에 공부 블록을 자동으로 넣어드립니다.' },
-              { icon: 'autorenew',      title: '밀린 공부는 다시 짜기', desc: '못 한 공부는 버튼 한 번으로 시험 전날까지 빈 시간에 다시 배치합니다.' },
-              { icon: 'bar_chart',      title: '주간 수행률 리포트',      desc: '완료한 일정을 시각화해 학습 패턴을 파악할 수 있습니다.' },
+              { icon: 'calendar_month', title: '시험 공부 자동 배치',    desc: '시험 전날까지 빈 30분 칸에 공부 블록을 넣어요. 주에 며칠, 하루 몇 시간인지 고를 수 있어요' },
+              { icon: 'autorenew',      title: '밀린 공부는 다시 짜기', desc: '못 한 블록만 남은 빈 시간으로 옮겨요. 수업과 시험은 그대로 둡니다' },
+              { icon: 'bar_chart',      title: '주간 리포트',      desc: '이번 주에 끝낸 블록과 못 한 블록을 요일별로 보여 줘요' },
             ].map((f) => (
               <div className="lp-feat" key={f.title}>
                 <div className="lp-feat-icon">
-                  <MaterialIcon icon={f.icon} size={20} color="#2563eb" />
+                  <MaterialIcon icon={f.icon} size={18} color="currentColor" />
                 </div>
                 <div>
                   <div className="lp-feat-name">{f.title}</div>
@@ -337,8 +140,8 @@ export default function LoginPage() {
 
           {/* Glass card */}
           <div className="lp-card">
-            <div className="lp-card-title">다시 오셨군요</div>
-            <div className="lp-card-sub">SKEMA 계정으로 로그인하세요</div>
+            <div className="lp-card-title">로그인</div>
+            <div className="lp-card-sub">소셜 계정이나 아이디로 로그인해요</div>
 
             <button className="lp-soc lp-google" onClick={() => handleSocialLogin('google')}>
               <GoogleIcon /> Google로 로그인
@@ -365,14 +168,14 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit}>
               <div className={`lp-field${errors.username ? ' err' : ''}`}>
-                <div className="lp-label"><MaterialIcon icon="person" size={14} color="#334155" />아이디</div>
+                <div className="lp-label"><MaterialIcon icon="person" size={16} color="currentColor" />아이디</div>
                 <input type="text" autoComplete="username" placeholder="아이디를 입력하세요" value={form.username}
                   onChange={(e) => setForm({ ...form, username: e.target.value })} />
               </div>
               {errors.username && <div className="lp-err">{errors.username}</div>}
 
               <div className={`lp-field${errors.password ? ' err' : ''}`}>
-                <div className="lp-label"><MaterialIcon icon="lock" size={14} color="#334155" />비밀번호</div>
+                <div className="lp-label"><MaterialIcon icon="lock" size={16} color="currentColor" />비밀번호</div>
                 <input type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="비밀번호를 입력하세요" value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })} />
                 <button type="button" className="lp-pw-toggle" onClick={() => setShowPassword(!showPassword)}>
@@ -382,7 +185,7 @@ export default function LoginPage() {
               {errors.password && <div className="lp-err">{errors.password}</div>}
 
               <button type="submit" className="lp-submit" disabled={loginMutation.isPending}>
-                {loginMutation.isPending ? '로그인 중...' : '로그인'}
+                {loginMutation.isPending ? '로그인 중' : '로그인'}
               </button>
             </form>
 

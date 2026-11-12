@@ -43,8 +43,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="skema-cute-page min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-11 w-11 animate-spin rounded-full border-4 border-[#e8f3ff] border-t-[#2563eb]" />
-          <p className="text-sm font-bold text-[#3f4b61]">SKEMA를 준비하고 있습니다</p>
+          <div className="h-11 w-11 animate-spin rounded-full border-4 border-[#e8f3ff] border-t-[#2a6fe3]" />
+          <p className="text-sm font-medium text-[#3f4b61]">SKEMA를 준비하고 있습니다</p>
         </div>
       </div>
     );

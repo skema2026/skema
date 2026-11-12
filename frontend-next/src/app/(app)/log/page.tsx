@@ -1,5 +1,6 @@
 'use client';
 
+import { displayTitle } from '@/lib/utils';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -35,16 +36,17 @@ function StatusPill({
   tone?: 'blue' | 'green' | 'slate' | 'fire' | 'red';
 }) {
   const cls = {
-    blue:  'bg-blue-50 text-blue-700',
-    green: 'bg-emerald-50 text-emerald-700',
-    slate: 'bg-slate-100 text-slate-600',
-    fire:  'border border-blue-200 bg-[#EFF6FF] text-blue-700',
-    red:   'bg-red-50 text-red-600',
+    blue:  'bg-[#eaf2ff] text-[#1f63d6]',
+    green: 'bg-[#eaf2ff] text-[#1f63d6]',
+    slate: 'bg-[#edf3fc] text-[#44536b]',
+    fire:  'bg-[#eaf2ff] text-[#1f63d6]',
+    red:   'bg-[#fef2f2] text-[#dc2626]',
   }[tone];
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${cls}`}>{children}</span>;
+  return <span className={`inline-flex h-6 items-center rounded-md px-2 text-[12px] ${cls}`}>{children}</span>;
 }
 
-const AVATAR_COLORS = ['#2563eb', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+// 프로필 동그라미 색: 로고 파랑과 어울리는 차가운 계열
+const AVATAR_COLORS = ['#2a6fe3', '#4f46e5', '#0891b2', '#0d9488', '#7c3aed', '#4591fd'];
 function avatarColor(userId: number) { return AVATAR_COLORS[userId % AVATAR_COLORS.length]; }
 
 // ── 그룹 만들기 / 참여 모달 ───────────────────────────────────────────────────
@@ -64,34 +66,31 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
     if (!name.trim()) return;
     try {
       await create.mutateAsync({ name: name.trim(), description: description.trim() || undefined });
-      toast.success('그룹이 만들어졌어요!');
+      toast.success('그룹을 만들었어요');
       onClose();
-    } catch { toast.error('그룹 생성에 실패했습니다.'); }
+    } catch { toast.error('그룹을 만들지 못했어요'); }
   };
 
   const handleJoin = async (inviteCode: string) => {
     try {
       await join.mutateAsync(inviteCode.trim().toUpperCase());
-      toast.success('그룹에 참여했어요!');
+      toast.success('그룹에 참여했어요');
       onClose();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
-      toast.error(err?.response?.data?.detail ?? '코드를 확인해주세요.');
+      toast.error(err?.response?.data?.detail ?? '초대코드를 확인해 주세요');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 backdrop-blur-sm sm:items-center">
-      <div className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#0f1e3a]/30 sm:items-center">
+      <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-[0_12px_32px_rgba(15,30,58,0.12)] sm:rounded-2xl">
         <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
-            <MaterialIcon icon="group" size={16} color="#fff" />
-          </div>
-          <p className="flex-1 text-base font-black text-slate-950">
+          <p className="flex-1 text-[17px] font-semibold text-[#0f1e3a]">
             {mode === 'menu' ? '그룹' : mode === 'create' ? '새 그룹 만들기' : '그룹 참여'}
           </p>
-          <button type="button" onClick={onClose} className="text-slate-400">
-            <MaterialIcon icon="close" size={20} color="currentColor" />
+          <button type="button" onClick={onClose} aria-label="닫기" className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5f6f88] transition-colors hover:bg-[#edf3fc]">
+            <MaterialIcon icon="close" size={18} color="currentColor" />
           </button>
         </div>
 
@@ -100,27 +99,27 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={() => setMode('create')}
-              className="flex w-full items-center gap-4 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition hover:bg-blue-50"
+              className="flex w-full items-center gap-4 rounded-xl border border-[#0f1e3a]/8 bg-white p-4 transition-colors hover:bg-[#f5f8fd]"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600">
-                <MaterialIcon icon="add" size={20} color="#fff" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#eaf2ff] text-[#2a6fe3]">
+                <MaterialIcon icon="add" size={18} color="currentColor" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-black text-slate-950">새 그룹 만들기</p>
-                <p className="text-xs font-bold text-slate-400">초대코드를 생성해 친구를 초대하세요</p>
+                <p className="text-[14px] font-medium text-[#0f1e3a]">새 그룹 만들기</p>
+                <p className="text-[12px] text-[#5f6f88]">초대코드를 만들어 친구를 불러요</p>
               </div>
             </button>
             <button
               type="button"
               onClick={() => setMode('join')}
-              className="flex w-full items-center gap-4 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition hover:bg-blue-50"
+              className="flex w-full items-center gap-4 rounded-xl border border-[#0f1e3a]/8 bg-white p-4 transition-colors hover:bg-[#f5f8fd]"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800">
-                <MaterialIcon icon="search" size={20} color="#fff" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#eaf2ff] text-[#2a6fe3]">
+                <MaterialIcon icon="search" size={18} color="currentColor" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-black text-slate-950">그룹 찾기</p>
-                <p className="text-xs font-bold text-slate-400">이름 검색 또는 초대코드로 참여</p>
+                <p className="text-[14px] font-medium text-[#0f1e3a]">그룹 찾기</p>
+                <p className="text-[12px] text-[#5f6f88]">그룹 이름이나 초대코드로 찾아요</p>
               </div>
             </button>
           </div>
@@ -133,22 +132,22 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
               value={name}
               onChange={e => setName(e.target.value.slice(0, 100))}
               placeholder="그룹 이름 (예: CS 스터디)"
-              className="mb-2 h-12 w-full rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 text-sm font-black text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              className="mb-2 h-11 w-full rounded-[10px] border border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] transition-colors placeholder:text-[#98a6ba] focus:border-[#2a6fe3] focus:outline-none focus:ring-3 focus:ring-[#2a6fe3]/15"
             />
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value.slice(0, 200))}
               placeholder="그룹 설명 (선택사항) — 어떤 그룹인지 간단히 적어주세요"
               rows={2}
-              className="mb-4 w-full resize-none rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 py-3 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              className="mb-4 w-full resize-none rounded-[10px] border border-[#0f1e3a]/10 bg-white px-3 py-2.5 text-[15px] text-[#0f1e3a] transition-colors placeholder:text-[#98a6ba] focus:border-[#2a6fe3] focus:outline-none focus:ring-3 focus:ring-[#2a6fe3]/15"
             />
             <button
               type="button"
               onClick={handleCreate}
               disabled={!name.trim() || create.isPending}
-              className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white disabled:opacity-40"
+              className="h-11 w-full rounded-[10px] bg-[#2a6fe3] text-[15px] font-medium text-white transition-colors hover:bg-[#1f63d6] disabled:opacity-40"
             >
-              {create.isPending ? '만드는 중...' : '그룹 만들기'}
+              {create.isPending ? '만드는 중' : '그룹 만들기'}
             </button>
           </>
         )}
@@ -156,10 +155,10 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
         {mode === 'join' && (
           <>
             {/* 탭 */}
-            <div className="mb-3 flex rounded-xl bg-slate-100 p-1">
+            <div className="mb-3 grid grid-cols-2 gap-1 rounded-[10px] bg-[#e6effc] p-1">
               {(['search', 'code'] as const).map(t => (
                 <button key={t} type="button" onClick={() => setJoinTab(t)}
-                  className={`flex-1 rounded-lg py-2 text-xs font-black transition ${joinTab === t ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-400'}`}>
+                  className={`h-8 rounded-lg text-[13px] transition-colors ${joinTab === t ? 'bg-[#2a6fe3] font-medium text-white' : 'text-[#44536b] hover:text-[#1f63d6]'}`}>
                   {t === 'search' ? '이름으로 검색' : '초대코드 입력'}
                 </button>
               ))}
@@ -172,22 +171,22 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
                   value={searchQ}
                   onChange={e => setSearchQ(e.target.value)}
                   placeholder="그룹 이름 검색..."
-                  className="mb-3 h-11 w-full rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 text-sm font-black text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  className="mb-3 h-11 w-full rounded-[10px] border border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] transition-colors placeholder:text-[#98a6ba] focus:border-[#2a6fe3] focus:outline-none focus:ring-3 focus:ring-[#2a6fe3]/15"
                 />
                 <div className="max-h-56 space-y-2 overflow-y-auto">
-                  {searching && <p className="py-2 text-center text-xs text-slate-400">검색 중...</p>}
+                  {searching && <p className="py-2 text-center text-[12px] text-[#5f6f88]">검색하는 중</p>}
                   {!searching && searchQ.trim() && searchResults.length === 0 && (
-                    <p className="py-2 text-center text-xs text-slate-400">결과가 없어요</p>
+                    <p className="py-2 text-center text-[12px] text-[#5f6f88]">결과가 없어요</p>
                   )}
                   {searchResults.map(g => (
-                    <div key={g.id} className="flex items-center justify-between rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
+                    <div key={g.id} className="flex items-center justify-between rounded-xl border border-[#0f1e3a]/8 bg-white px-4 py-3">
                       <div>
-                        <p className="text-sm font-black text-slate-950">{g.name}</p>
-                        {g.description && <p className="text-xs font-bold text-slate-400 line-clamp-1">{g.description}</p>}
-                        <p className="text-[11px] text-slate-400">{g.member_count}명</p>
+                        <p className="text-[14px] font-medium text-[#0f1e3a]">{g.name}</p>
+                        {g.description && <p className="text-[12px] text-[#5f6f88] line-clamp-1">{g.description}</p>}
+                        <p className="text-[11px] text-[#5f6f88]">{g.member_count}명</p>
                       </div>
                       <button type="button" onClick={() => handleJoin(g.invite_code)} disabled={join.isPending}
-                        className="rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-40">
+                        className="h-8 rounded-lg bg-[#2a6fe3] px-3 text-[13px] text-white transition-colors hover:bg-[#1f63d6] disabled:opacity-40">
                         참여
                       </button>
                     </div>
@@ -201,11 +200,11 @@ function GroupSetupModal({ onClose }: { onClose: () => void }) {
                   value={code}
                   onChange={e => setCode(e.target.value.toUpperCase())}
                   placeholder="초대코드 입력"
-                  className="mb-4 h-12 w-full rounded-2xl border border-blue-100 bg-[#fbfdff] px-4 text-center text-lg font-black tracking-widest text-slate-950 placeholder:text-slate-400 placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  className="mb-4 h-12 w-full rounded-[10px] border border-[#0f1e3a]/10 bg-white px-4 text-center font-mono text-[18px] tabular-nums text-[#0f1e3a] transition-colors placeholder:font-sans placeholder:text-[15px] placeholder:text-[#98a6ba] focus:border-[#2a6fe3] focus:outline-none focus:ring-3 focus:ring-[#2a6fe3]/15"
                 />
                 <button type="button" onClick={() => handleJoin(code)} disabled={!code.trim() || join.isPending}
-                  className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white disabled:opacity-40">
-                  {join.isPending ? '참여 중...' : '참여하기'}
+                  className="h-11 w-full rounded-[10px] bg-[#2a6fe3] text-[15px] font-medium text-white transition-colors hover:bg-[#1f63d6] disabled:opacity-40">
+                  {join.isPending ? '참여하는 중' : '참여하기'}
                 </button>
               </>
             )}
@@ -278,9 +277,9 @@ function UploadModal({
     } catch (err: unknown) {
       const name = (err as { name?: string }).name;
       if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
-        toast.error('카메라를 찾을 수 없습니다. 파일에서 올려주세요.');
+        toast.error('카메라를 찾지 못했어요. 파일에서 올려 주세요');
       } else {
-        toast.error('카메라/마이크 권한을 허용해주세요.');
+        toast.error('카메라와 마이크 권한을 허용해 주세요');
       }
       setRecordState('idle');
     }
@@ -343,7 +342,7 @@ function UploadModal({
   };
 
   const handleSubmit = async () => {
-    if (!file && !caption.trim()) { toast.error('영상 또는 한 마디를 입력해주세요.'); return; }
+    if (!file && !caption.trim()) { toast.error('영상이나 한마디를 넣어 주세요'); return; }
 
     const makeForm = (gid?: number) => {
       const form = new FormData();
@@ -359,36 +358,33 @@ function UploadModal({
       // 그룹 선택: 그룹마다 1번씩 업로드 (내 기록에도 자동으로 뜸)
       const targets = groupIds.length > 0 ? groupIds : [undefined];
       await Promise.all(targets.map(gid => create.mutateAsync(makeForm(gid))));
-      toast.success('기록이 등록됐습니다!');
+      toast.success('기록을 남겼어요');
       onClose();
-    } catch { toast.error('업로드에 실패했습니다.'); }
+    } catch { toast.error('기록을 올리지 못했어요'); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 backdrop-blur-sm sm:items-center">
-      <div className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#0f1e3a]/30 sm:items-center">
+      <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-[0_12px_32px_rgba(15,30,58,0.12)] sm:rounded-2xl">
         <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
-            <MaterialIcon icon="videocam" size={16} color="#fff" />
-          </div>
-          <p className="flex-1 text-base font-black text-slate-950">기록 남기기</p>
-          <button type="button" onClick={onClose} className="text-slate-400">
-            <MaterialIcon icon="close" size={20} color="currentColor" />
+          <p className="flex-1 text-[17px] font-semibold text-[#0f1e3a]">기록 남기기</p>
+          <button type="button" onClick={onClose} aria-label="닫기" className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5f6f88] transition-colors hover:bg-[#edf3fc]">
+            <MaterialIcon icon="close" size={18} color="currentColor" />
           </button>
         </div>
 
         {scheduleTitle && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2.5">
-            <MaterialIcon icon="check_circle" size={14} color="#2563eb" />
-            <p className="text-xs font-black text-blue-700">{scheduleTitle} 완료</p>
+          <div className="mb-3 flex items-center gap-2 rounded-xl bg-[#eaf2ff] px-3 py-2.5">
+            <MaterialIcon icon="check_circle" size={14} color="#2a6fe3" />
+            <p className="text-[13px] text-[#1f63d6]">{displayTitle(scheduleTitle)} 완료</p>
           </div>
         )}
 
         {/* 그룹 선택 (복수 선택 가능) */}
         {groups.length > 0 && (
           <div className="mb-3">
-            <p className="mb-1.5 text-[11px] font-black text-slate-400">
-              올릴 그룹 <span className="text-slate-300">(복수 선택 가능 · 그룹 선택하면 내 기록에도 자동으로 표시)</span>
+            <p className="mb-2 text-[13px] text-[#44536b]">
+              올릴 그룹 <span className="text-[#5f6f88]">· 여러 개 고를 수 있어요</span>
             </p>
             <div className="flex flex-wrap gap-2">
               {groups.map(g => {
@@ -400,10 +396,10 @@ function UploadModal({
                     onClick={() => setGroupIds(prev =>
                       selected ? prev.filter(id => id !== g.id) : [...prev, g.id]
                     )}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
+                    className={`h-8 rounded-lg border px-3 text-[13px] transition-colors ${
                       selected
-                        ? 'border-blue-500 bg-blue-600 text-white'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                        ? 'border-[#2a6fe3] bg-[#2a6fe3] text-white'
+                        : 'border-[#0f1e3a]/10 bg-white text-[#44536b] hover:border-[#bcd8fe]'
                     }`}
                   >
                     {g.name}
@@ -412,23 +408,23 @@ function UploadModal({
               })}
             </div>
             {groupIds.length === 0 && (
-              <p className="mt-1 text-[11px] text-slate-400">그룹 미선택 → 내 기록에만 저장</p>
+              <p className="mt-1 text-[11px] text-[#5f6f88]">그룹 미선택 → 내 기록에만 저장</p>
             )}
           </div>
         )}
 
         {/* 영상 촬영 영역 */}
-        <div className="mb-3 overflow-hidden rounded-2xl bg-slate-900" style={{ aspectRatio: '4/3' }}>
+        <div className="mb-4 overflow-hidden rounded-xl bg-[#0f1e3a]" style={{ aspectRatio: '4/3' }}>
           {/* 대기 — 카메라 켜기 버튼 */}
           {recordState === 'idle' && (
             <div className="flex h-full flex-col items-center justify-center gap-3">
               <button type="button" onClick={() => startPreview(facingMode)}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-lg transition active:scale-95">
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-[#2a6fe3] transition-transform active:scale-95">
                 <MaterialIcon icon="videocam" size={28} color="#fff" />
               </button>
-              <p className="text-xs font-black text-slate-400">카메라 켜기</p>
+              <p className="text-[13px] text-[#5f6f88]">카메라 켜기</p>
               <button type="button" onClick={() => fileRef.current?.click()}
-                className="flex items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-xs font-black text-slate-300 transition hover:bg-slate-700">
+                className="flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-[13px] text-white/80 transition-colors hover:bg-white/20">
                 <MaterialIcon icon="upload_file" size={14} color="currentColor" />
                 파일에서 올리기
               </button>
@@ -438,7 +434,7 @@ function UploadModal({
           {/* 권한 요청 중 */}
           {recordState === 'requesting' && (
             <div className="flex h-full items-center justify-center">
-              <p className="text-sm font-black text-white">카메라 권한 요청 중...</p>
+              <p className="text-[14px] font-medium text-white">카메라 권한을 요청하는 중</p>
             </div>
           )}
 
@@ -449,21 +445,21 @@ function UploadModal({
               {/* 상단 버튼들 */}
               <div className="absolute top-2 right-2 flex gap-2">
                 <button type="button" onClick={flipCamera}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700/80 text-white">
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white">
                   <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
                 </button>
                 <button type="button" onClick={() => setAudioEnabled(v => !v)}
-                  className={`flex h-8 w-8 items-center justify-center rounded-full ${audioEnabled ? 'bg-blue-600' : 'bg-slate-700/80'} text-white`}>
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${audioEnabled ? 'bg-[#2a6fe3]' : 'bg-white/15'} text-white`}>
                   <MaterialIcon icon={audioEnabled ? 'videocam' : 'videocam_off'} size={16} color="currentColor" />
                 </button>
               </div>
-              <p className="absolute bottom-12 inset-x-0 text-center text-[11px] font-black text-white/70">
+              <p className="absolute bottom-12 inset-x-0 text-center text-[12px] text-white/70">
                 {audioEnabled ? '소리 켜짐' : '소리 꺼짐'}
               </p>
               {/* 녹화 시작 버튼 */}
               <div className="absolute bottom-3 inset-x-0 flex justify-center">
                 <button type="button" onClick={beginRecording}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 shadow-lg transition active:scale-95 border-4 border-white">
+                  className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-[#dc2626] transition-transform active:scale-95">
                   <span className="h-6 w-6 rounded-full bg-white" />
                 </button>
               </div>
@@ -475,11 +471,11 @@ function UploadModal({
             <div className="relative h-full">
               <video ref={liveVideoCallbackRef} autoPlay muted playsInline className="h-full w-full object-cover" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-[80px] font-black text-white drop-shadow-lg">{countdown}</span>
+                <span className="font-mono text-[80px] font-medium tabular-nums text-white">{countdown}</span>
               </div>
-              <div className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-red-500 px-2.5 py-1">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-                <span className="text-[11px] font-black text-white">REC</span>
+              <div className="absolute top-3 left-3 flex h-6 items-center gap-1.5 rounded-md bg-[#dc2626] px-2">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                <span className="text-[12px] text-white">녹화 중</span>
               </div>
             </div>
           )}
@@ -489,7 +485,7 @@ function UploadModal({
             <div className="relative h-full">
               <video src={preview} controls playsInline className="h-full w-full object-cover" />
               <button type="button" onClick={resetVideo}
-                className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80">
+                className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-lg bg-black/50 text-white transition-colors hover:bg-black/70">
                 <MaterialIcon icon="refresh" size={14} color="currentColor" />
               </button>
             </div>
@@ -504,16 +500,16 @@ function UploadModal({
           value={caption}
           onChange={e => setCaption(e.target.value.slice(0, 200))}
           rows={2}
-          className="mb-3 w-full resize-none rounded-2xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          className="mb-3 w-full resize-none rounded-[10px] border border-[#0f1e3a]/10 bg-white px-3 py-2.5 text-[15px] text-[#0f1e3a] transition-colors placeholder:text-[#98a6ba] focus:border-[#2a6fe3] focus:outline-none focus:ring-3 focus:ring-[#2a6fe3]/15"
         />
 
         <button
           type="button"
           onClick={handleSubmit}
           disabled={create.isPending || recordState === 'recording' || recordState === 'requesting'}
-          className="h-12 w-full rounded-2xl bg-blue-600 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-40"
+          className="h-11 w-full rounded-[10px] bg-[#2a6fe3] text-[15px] font-medium text-white transition-colors hover:bg-[#1f63d6] disabled:opacity-40"
         >
-          {create.isPending ? '등록 중...' : '기록 남기기'}
+          {create.isPending ? '등록하는 중' : '기록 남기기'}
         </button>
       </div>
     </div>
@@ -549,32 +545,32 @@ function MemberCard({
   const hasLog = slot.log_id !== null;
 
   return (
-    <div className={`overflow-hidden rounded-2xl border shadow-sm ${hasLog ? 'border-blue-100 bg-white' : 'border-slate-100 bg-slate-50'}`}>
+    <div className={`overflow-hidden rounded-2xl border ${hasLog ? 'border-[#0f1e3a]/8 bg-white' : 'border-[#0f1e3a]/10 bg-[#f5f8fd]'}`}>
       {/* 멤버 헤더 */}
       <div className="flex items-center justify-between px-3 py-2.5">
         <div className="flex items-center gap-2.5">
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-sm font-black text-white"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[14px] font-medium text-white"
             style={{ background: hasLog ? color : '#cbd5e1' }}
           >
             {slot.username.slice(0, 1).toUpperCase()}
           </div>
           <div>
-            <p className={`text-sm font-black ${hasLog ? 'text-slate-950' : 'text-slate-400'}`}>
+            <p className={`text-[14px] font-medium ${hasLog ? 'text-[#0f1e3a]' : 'text-[#5f6f88]'}`}>
               {slot.username}
             </p>
             {slot.schedule_title && (
-              <p className="text-[11px] font-bold text-blue-600">{slot.schedule_title} 완료</p>
+              <p className="text-[12px] text-[#1f63d6]">{slot.schedule_title} 완료</p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          {relTime && <span className="text-[11px] text-slate-400">{relTime}</span>}
+          {relTime && <span className="text-[11px] text-[#5f6f88]">{relTime}</span>}
           {isMe && hasLog && onDelete && slot.log_id && (
             <button
               type="button"
               onClick={() => onDelete(slot.log_id!)}
-              className="flex h-7 w-7 items-center justify-center rounded-xl text-slate-300 transition hover:bg-red-50 hover:text-red-400"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#98a6ba] transition-colors hover:bg-[#fef2f2] hover:text-[#dc2626]"
             >
               <MaterialIcon icon="delete" size={14} color="currentColor" />
             </button>
@@ -606,7 +602,7 @@ function MemberCard({
               {/* 캡션 오버레이 (영상+텍스트 둘 다 있을 때) */}
               {slot.caption && !isVideoUrl(slot.photo_url) && (
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
-                  <p className="text-xs font-bold text-white line-clamp-2">{slot.caption}</p>
+                  <p className="text-[12px] text-white line-clamp-2">{slot.caption}</p>
                 </div>
               )}
             </div>
@@ -615,7 +611,7 @@ function MemberCard({
           {/* 사진 없고 캡션만 있는 경우 */}
           {!slot.photo_url && slot.caption && (
             <div className="px-3 pb-1">
-              <p className="text-sm font-bold leading-relaxed text-slate-950">{slot.caption}</p>
+              <p className="text-[14px] leading-[22px] text-[#0f1e3a]">{slot.caption}</p>
             </div>
           )}
 
@@ -624,20 +620,20 @@ function MemberCard({
             <button
               type="button"
               onClick={() => slot.log_id && toggle.mutate({ logId: slot.log_id, emoji: '👍' })}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition ${
+              className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[13px] transition-colors ${
                 liked
-                  ? 'border-blue-500 bg-blue-600 text-white'
-                  : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:text-blue-600'
+                  ? 'border-[#2a6fe3] bg-[#eaf2ff] text-[#1f63d6]'
+                  : 'border-[#0f1e3a]/10 bg-white text-[#5f6f88] hover:bg-[#f5f8fd]'
               }`}
             >
-              <MaterialIcon icon="thumb_up" size={12} color={liked ? '#fff' : 'currentColor'} />
+              <MaterialIcon icon="thumb_up" size={16} color="currentColor" />
               <span>{likeCount > 0 ? likeCount : '좋아요'}</span>
             </button>
           </div>
         </>
       ) : (
         <div className="flex h-10 items-center justify-center">
-          <p className="text-xs font-bold text-slate-300">아직 기록을 올리지 않았어요</p>
+          <p className="text-[12px] text-[#98a6ba]">아직 기록을 올리지 않았어요</p>
         </div>
       )}
     </div>
@@ -660,43 +656,43 @@ function GroupFeed({
 
   const handleDelete = async (id: number) => {
     if (!confirm('이 기록을 삭제할까요?')) return;
-    try { await deleteLog.mutateAsync(id); toast.success('삭제됐습니다.'); }
-    catch { toast.error('삭제에 실패했습니다.'); }
+    try { await deleteLog.mutateAsync(id); toast.success('삭제했어요'); }
+    catch { toast.error('삭제하지 못했어요'); }
   };
 
   const handleLeave = async () => {
     if (!confirm(`'${group.name}' 그룹에서 나갈까요?`)) return;
-    try { await leave.mutateAsync(group.id); toast.success('그룹에서 나왔습니다.'); }
-    catch { toast.error('실패했습니다.'); }
+    try { await leave.mutateAsync(group.id); toast.success('그룹에서 나왔어요'); }
+    catch { toast.error('나가지 못했어요'); }
   };
 
-  if (isLoading) return <div className="flex h-40 items-center justify-center text-sm text-slate-400">불러오는 중...</div>;
+  if (isLoading) return <div className="flex h-40 items-center justify-center text-[14px] text-[#5f6f88]">불러오는 중</div>;
   if (isError) return (
     <div className="flex h-40 flex-col items-center justify-center gap-3">
-      <p className="text-sm text-slate-400">피드를 불러오지 못했어요</p>
-      <button type="button" onClick={() => refetch()} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">다시 시도</button>
+      <p className="text-[14px] text-[#5f6f88]">피드를 불러오지 못했어요</p>
+      <button type="button" onClick={() => refetch()} className="h-9 rounded-lg bg-[#2a6fe3] px-4 text-[13px] text-white transition-colors hover:bg-[#1f63d6]">다시 시도</button>
     </div>
   );
 
   return (
     <div>
       {/* 그룹 정보 바 */}
-      <div className="mb-3 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
+      <div className="mb-3 rounded-xl border border-[#0f1e3a]/8 bg-white px-4 py-3">
         {group.description && (
-          <p className="mb-2 text-xs font-bold text-slate-500">{group.description}</p>
+          <p className="mb-2 text-[12px] text-[#5f6f88]">{group.description}</p>
         )}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-black text-slate-400">초대코드</p>
+            <p className="text-[12px] text-[#5f6f88]">초대코드</p>
             <div className="flex items-center gap-2">
-              <p className="text-base font-black tracking-widest text-blue-700">{group.invite_code}</p>
+              <p className="font-mono text-[16px] font-medium tabular-nums text-[#1f63d6]">{group.invite_code}</p>
               <button
                 type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(group.invite_code);
-                  toast.success('초대코드가 복사됐습니다!');
+                  toast.success('초대코드를 복사했어요');
                 }}
-                className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-600 transition hover:bg-blue-100"
+                className="flex items-center gap-1 rounded-lg bg-[#eaf2ff] px-2 py-1 text-[12px] text-[#1f63d6] transition-colors hover:bg-[#dcebff]"
               >
                 <MaterialIcon icon="content_copy" size={12} color="currentColor" />
                 복사
@@ -708,7 +704,7 @@ function GroupFeed({
             <button
               type="button"
               onClick={handleLeave}
-              className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-black text-red-500 transition hover:bg-red-100"
+              className="h-8 rounded-lg px-3 text-[13px] text-[#dc2626] transition-colors hover:bg-[#fef2f2]"
             >
               나가기
             </button>
@@ -727,7 +723,7 @@ function GroupFeed({
         return (
           <div key={day.date} className="mb-6">
             <div className="mb-2 flex items-center gap-2">
-              <p className="text-sm font-black text-slate-950">{dateLabel}</p>
+              <p className="text-[14px] font-medium text-[#0f1e3a]">{dateLabel}</p>
               <StatusPill tone={postedUsers === totalUsers ? 'green' : 'slate'}>
                 {postedUsers}/{totalUsers}명
               </StatusPill>
@@ -772,42 +768,40 @@ export default function LogPage() {
 
   const handleDeleteMyLog = async (id: number) => {
     if (!confirm('이 기록을 삭제할까요?')) return;
-    try { await deleteLog.mutateAsync(id); toast.success('삭제됐습니다.'); }
-    catch { toast.error('삭제에 실패했습니다.'); }
+    try { await deleteLog.mutateAsync(id); toast.success('삭제했어요'); }
+    catch { toast.error('삭제하지 못했어요'); }
   };
 
   return (
-    <div className="min-h-dvh bg-[#eaf1ff]">
-      <div className="mx-auto max-w-lg min-h-dvh bg-[#f7f9ff]">
+    <div className="min-h-dvh bg-[#f5f8fd]">
+      <div className="mx-auto min-h-dvh max-w-2xl">
 
         {/* 헤더 */}
-        <header className="sticky top-0 z-20 border-b border-blue-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
+        <header className="sticky top-0 z-20 border-b border-[#0f1e3a]/8 bg-white px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 transition hover:bg-slate-200"
+                aria-label="뒤로"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#44536b] transition-colors hover:bg-[#edf3fc]"
               >
-                <MaterialIcon icon="arrow_back" size={18} color="#475569" />
+                <MaterialIcon icon="arrow_back" size={18} color="currentColor" />
               </button>
-              <div>
-                <p className="text-[11px] font-black text-blue-600">SKEMA</p>
-                <h1 className="text-base font-black leading-none text-slate-950">기록</h1>
-              </div>
+              <h1 className="text-[17px] font-semibold text-[#0f1e3a]">기록</h1>
             </div>
             <div className="flex items-center gap-2">
               {streak && streak.current_streak > 0 && (
                 <StatusPill tone={streak.today_checked ? 'fire' : 'slate'}>
-                  🔥 {streak.current_streak}일
+                  연속 {streak.current_streak}일
                 </StatusPill>
               )}
               <button
                 type="button"
                 onClick={() => setShowUpload(true)}
-                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-[#2a6fe3] px-3 text-[14px] font-medium text-white transition-colors hover:bg-[#1f63d6]"
               >
-                <MaterialIcon icon="add" size={15} color="#fff" />
+                <MaterialIcon icon="add" size={16} color="#fff" />
                 기록하기
               </button>
             </div>
@@ -819,13 +813,13 @@ export default function LogPage() {
             <button
               type="button"
               onClick={() => setMainTab('me')}
-              className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black transition ${
+              className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] transition-colors ${
                 mainTab === 'me'
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-[#2a6fe3] font-medium text-white'
+                  : 'bg-[#edf3fc] text-[#44536b] hover:bg-[#e1eaf6]'
               }`}
             >
-              <MaterialIcon icon="person" size={12} color={mainTab === 'me' ? '#fff' : 'currentColor'} />
+              <MaterialIcon icon="person" size={16} color={mainTab === 'me' ? '#fff' : 'currentColor'} />
               내 기록
             </button>
 
@@ -835,10 +829,10 @@ export default function LogPage() {
                 key={g.id}
                 type="button"
                 onClick={() => { setSelectedGroupId(g.id); setMainTab('group'); }}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black transition ${
+                className={`h-8 shrink-0 rounded-lg px-3 text-[13px] transition-colors ${
                   mainTab === 'group' && activeGroup?.id === g.id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-[#2a6fe3] font-medium text-white'
+                    : 'bg-[#edf3fc] text-[#44536b] hover:bg-[#e1eaf6]'
                 }`}
               >
                 {g.name}
@@ -847,30 +841,31 @@ export default function LogPage() {
             <button
               type="button"
               onClick={() => setShowGroupSetup(true)}
-              className="shrink-0 flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-500 transition hover:bg-slate-200"
+              className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] text-[#5f6f88] transition-colors hover:bg-[#edf3fc]"
             >
-              <MaterialIcon icon="add" size={12} color="currentColor" />
+              <MaterialIcon icon="add" size={16} color="currentColor" />
               그룹 추가
             </button>
           </div>
         </header>
 
-        <main className="px-4 py-4">
+        <main className="px-4 py-5 sm:px-6">
           {groupsLoading ? (
-            <div className="flex h-40 items-center justify-center text-sm text-slate-400">불러오는 중...</div>
+            <div className="flex h-40 items-center justify-center text-[14px] text-[#5f6f88]">불러오는 중</div>
           ) : mainTab === 'me' ? (
             /* ── 내 기록 탭 ── */
             <div>
               {myLoading ? (
-                <div className="flex h-40 items-center justify-center text-sm text-slate-400">불러오는 중...</div>
+                <div className="flex h-40 items-center justify-center text-[14px] text-[#5f6f88]">불러오는 중</div>
               ) : !myData?.items.length ? (
-                <div className="mt-8 rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-sm">
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
-                    <MaterialIcon icon="edit_note" size={24} color="#93c5fd" />
+                <div className="mt-8 rounded-2xl border border-[#0f1e3a]/8 bg-white p-8 text-center">
+                  <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#eaf2ff]">
+                    <MaterialIcon icon="edit_note" size={18} color="#2a6fe3" />
                   </div>
-                  <p className="text-sm font-black text-slate-700">아직 내 기록이 없어요</p>
+                  <p className="text-[15px] font-medium text-[#0f1e3a]">아직 내 기록이 없어요</p>
+                  <p className="mt-1 text-[13px] text-[#5f6f88]">공부 블록을 끝내고 3초 영상이나 한마디를 남겨 보세요</p>
                   <button type="button" onClick={() => setShowUpload(true)}
-                    className="mt-4 rounded-xl bg-blue-600 px-5 py-2 text-sm font-black text-white">
+                    className="mt-5 h-10 rounded-[10px] bg-[#2a6fe3] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#1f63d6]">
                     기록 남기기
                   </button>
                 </div>
@@ -879,16 +874,16 @@ export default function LogPage() {
                   {myData.items.map(log => {
                     const color = avatarColor(log.user_id);
                     return (
-                      <article key={log.id} className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+                      <article key={log.id} className="overflow-hidden rounded-2xl border border-[#0f1e3a]/8 bg-white">
                         <div className="flex items-center justify-between px-4 py-3">
                           <div className="flex items-center gap-2">
                             {log.schedule_title
-                              ? <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700">{log.schedule_title} 완료</span>
-                              : <span className="text-[11px] text-slate-400">{new Date(log.created_at).toLocaleDateString('ko-KR')}</span>
+                              ? <span className="text-[13px] text-[#44536b]">{displayTitle(log.schedule_title)} 완료</span>
+                              : <span className="font-mono text-[12px] tabular-nums text-[#5f6f88]">{new Date(log.created_at).toLocaleDateString('ko-KR')}</span>
                             }
                           </div>
                           <button type="button" onClick={() => handleDeleteMyLog(log.id)}
-                            className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-300 transition hover:bg-red-50 hover:text-red-400">
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#98a6ba] transition-colors hover:bg-[#fef2f2] hover:text-[#dc2626]">
                             <MaterialIcon icon="delete" size={16} color="currentColor" />
                           </button>
                         </div>
@@ -907,7 +902,7 @@ export default function LogPage() {
                                 <img src={photoUrl(log.photo_url)} alt="기록" className="h-full w-full object-cover" />
                                 {log.caption && (
                                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
-                                    <p className="text-xs font-bold text-white line-clamp-2">{log.caption}</p>
+                                    <p className="text-[12px] text-white line-clamp-2">{log.caption}</p>
                                   </div>
                                 )}
                               </>
@@ -916,7 +911,7 @@ export default function LogPage() {
                         )}
                         {!log.photo_url && log.caption && (
                           <div className="px-4 pb-3">
-                            <p className="text-sm font-bold leading-relaxed text-slate-950">{log.caption}</p>
+                            <p className="text-[14px] leading-[22px] text-[#0f1e3a]">{log.caption}</p>
                           </div>
                         )}
                       </article>
@@ -929,16 +924,16 @@ export default function LogPage() {
             <GroupFeed group={activeGroup} />
           ) : (
             /* 그룹 없을 때 — 참여 유도 카드만 */
-            <div className="mt-8 rounded-2xl border border-blue-100 bg-white p-6 text-center shadow-sm">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
-                <MaterialIcon icon="group" size={24} color="#93c5fd" />
+            <div className="mt-8 rounded-2xl border border-[#0f1e3a]/8 bg-white p-8 text-center">
+              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#eaf2ff]">
+                <MaterialIcon icon="group" size={18} color="#2a6fe3" />
               </div>
-              <p className="text-sm font-black text-slate-700">그룹에 참여해보세요</p>
-              <p className="mt-1 text-xs font-bold text-slate-400">그룹 안에서 서로의 기록을 확인할 수 있어요</p>
+              <p className="text-[15px] font-medium text-[#0f1e3a]">그룹에 참여해 보세요</p>
+              <p className="mt-1 text-[13px] text-[#5f6f88]">같은 그룹 사람들의 공부 기록을 서로 볼 수 있어요</p>
               <button type="button" onClick={() => setShowGroupSetup(true)}
-                className="mt-4 flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white mx-auto">
-                <MaterialIcon icon="group_add" size={14} color="#fff" />
-                그룹 만들기 / 참여
+                className="mx-auto mt-5 flex h-10 items-center gap-1.5 rounded-[10px] bg-[#2a6fe3] px-4 text-[14px] font-medium text-white transition-colors hover:bg-[#1f63d6]">
+                <MaterialIcon icon="group_add" size={16} color="#fff" />
+                그룹 만들기 · 참여
               </button>
             </div>
           )}

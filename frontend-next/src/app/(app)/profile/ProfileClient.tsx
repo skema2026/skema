@@ -116,7 +116,7 @@ export default function ProfileClient() {
       setUser(data);
       return data;
     } catch (error) {
-      toast.error(getErrorMessage(error, '계정 정보를 저장하지 못했습니다'));
+      toast.error(getErrorMessage(error, '계정 정보를 저장하지 못했어요'));
       return null;
     } finally {
       setAccountSaving(false);
@@ -125,7 +125,7 @@ export default function ProfileClient() {
 
   const saveProfile = async () => {
     if (profileForm.sleep_start === profileForm.sleep_end) {
-      toast.error('기상 시간과 취침 시간이 같을 수 없습니다');
+      toast.error('일어나는 시간과 자는 시간이 같을 수 없어요');
       return null;
     }
 
@@ -140,7 +140,7 @@ export default function ProfileClient() {
         semester_start_date: profileForm.semester_start_date || undefined,
       });
     } catch (error) {
-      toast.error(getErrorMessage(error, '프로필을 저장하지 못했습니다'));
+      toast.error(getErrorMessage(error, '프로필을 저장하지 못했어요'));
       return null;
     }
   };
@@ -150,7 +150,7 @@ export default function ProfileClient() {
     if (!account) return;
     const nextProfile = await saveProfile();
     if (!nextProfile) return;
-    toast.success('프로필이 저장되었습니다');
+    toast.success('저장했어요');
   };
 
   const handleLogout = () => {
@@ -163,100 +163,92 @@ export default function ProfileClient() {
       onSuccess: () => {
         logout();
         router.replace('/login');
-        toast.success('계정이 삭제되었습니다');
+        toast.success('계정을 삭제했어요');
       },
-      onError: () => toast.error('계정 삭제 중 오류가 발생했습니다'),
+      onError: () => toast.error('계정을 삭제하지 못했어요'),
     });
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fbff]">
-      <header className="sticky top-0 z-20 border-b border-blue-100 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+    <div className="min-h-screen bg-[#f5f8fd] text-[#0f1e3a]">
+      <header className="sticky top-0 z-20 border-b border-[#0f1e3a]/8 bg-white">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="flex items-center gap-2 rounded-xl border border-blue-100 bg-white px-3 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-blue-50"
+            className="flex h-9 items-center gap-2 rounded-lg px-2 text-[14px] text-[#44536b] transition-colors hover:bg-[#edf3fc]"
           >
-            <MaterialIcon icon="arrow_back" size={16} color="#2563eb" />
-            대시보드
+            <MaterialIcon icon="arrow_back" size={18} color="currentColor" />
+            <span className="text-[16px] font-semibold text-[#0f1e3a]">프로필</span>
           </button>
           <Button
             onClick={handleSaveAll}
             disabled={isSaving}
-            className="h-10 rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-lg shadow-blue-200 hover:bg-blue-700"
+            className="h-9 rounded-lg bg-[#2a6fe3] px-4 text-[14px] font-medium text-white hover:bg-[#1f63d6]"
           >
-            {isSaving ? '저장 중...' : '변경사항 저장'}
+            {isSaving ? '저장하는 중' : '저장'}
           </Button>
         </div>
       </header>
 
       <main className="mx-auto grid max-w-6xl gap-5 px-5 py-6 lg:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="space-y-4">
-          <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+          <section className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-5">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-black text-white shadow-lg shadow-blue-100">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#2a6fe3] text-[22px] font-medium text-white">
                 {fallback}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-xl font-black text-slate-950">{displayName}</p>
-                <p className="mt-1 truncate text-sm font-bold text-slate-500">{accountForm.email}</p>
+                <p className="truncate text-[18px] font-semibold text-[#0f1e3a]">{displayName}</p>
+                <p className="mt-0.5 truncate text-[13px] text-[#5f6f88]">{accountForm.email}</p>
               </div>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-2">
-              <div className="rounded-xl bg-blue-50 p-3">
-                <p className="text-xs font-black text-blue-600">기상 기준</p>
-                <p className="mt-1 text-lg font-black text-slate-950">{profileForm.sleep_end}</p>
+              <div className="rounded-xl bg-[#f5f8fd] p-3">
+                <p className="text-[13px] text-[#5f6f88]">일어나는 시간</p>
+                <p className="mt-1 font-mono text-[18px] font-medium tabular-nums text-[#0f1e3a]">{profileForm.sleep_end}</p>
               </div>
-              <div className="rounded-xl bg-blue-50 p-3">
-                <p className="text-xs font-black text-blue-600">취침 기준</p>
-                <p className="mt-1 text-lg font-black text-slate-950">{profileForm.sleep_start}</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50">
-                <MaterialIcon icon="schedule" size={22} color="#2563eb" />
-              </div>
-              <div>
-                <p className="text-sm font-black text-blue-600">개인화 기준</p>
-                <h2 className="mt-1 text-xl font-black text-slate-950">시간표가 이 설정을 기준으로 정리됩니다</h2>
-                <p className="mt-2 text-sm font-bold leading-6 text-slate-500">
-                  기상 시간은 일간·주간·월간 시간표의 시작 기준이고, 수면 시간에는 공부 블록과 다시 짜기가 일정을 넣지 않습니다.
-                </p>
+              <div className="rounded-xl bg-[#f5f8fd] p-3">
+                <p className="text-[13px] text-[#5f6f88]">자는 시간</p>
+                <p className="mt-1 font-mono text-[18px] font-medium tabular-nums text-[#0f1e3a]">{profileForm.sleep_start}</p>
               </div>
             </div>
           </section>
 
-          <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-black text-slate-950">계정</h2>
+          <section className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-5">
+            <h2 className="text-[15px] font-medium text-[#0f1e3a]">이 설정이 쓰이는 곳</h2>
+            <p className="mt-2 text-[14px] leading-[22px] text-[#44536b]">
+              일어나는 시간은 하루·주간·월간 시간표가 시작하는 시각이에요. 자는 시간에는 공부 블록도, 다시 짜기도 일정을 넣지 않아요
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-5">
+            <h2 className="text-[15px] font-medium text-[#0f1e3a]">계정</h2>
             <div className="mt-4 space-y-2">
               {user?.is_admin && (
                 <>
                   <button
                     type="button"
                     onClick={() => router.push('/admin/users')}
-                    className="flex w-full items-center justify-between rounded-xl border border-blue-100 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-blue-50"
+                    className="flex h-11 w-full items-center justify-between rounded-[10px] border border-[#0f1e3a]/10 px-4 text-[14px] text-[#0f1e3a] transition-colors hover:bg-[#edf3fc]"
                   >
                     관리자 회원 관리
-                    <MaterialIcon icon="chevron_right" size={16} color="#64748b" />
+                    <MaterialIcon icon="chevron_right" size={16} color="#5f6f88" />
                   </button>
                   <button
                     type="button"
                     onClick={() => router.push('/admin/login-logs')}
-                    className="flex w-full items-center justify-between rounded-xl border border-blue-100 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-blue-50"
+                    className="flex h-11 w-full items-center justify-between rounded-[10px] border border-[#0f1e3a]/10 px-4 text-[14px] text-[#0f1e3a] transition-colors hover:bg-[#edf3fc]"
                   >
                     관리자 로그인 로그
-                    <MaterialIcon icon="chevron_right" size={16} color="#64748b" />
+                    <MaterialIcon icon="chevron_right" size={16} color="#5f6f88" />
                   </button>
                 </>
               )}
               <button
                 type="button"
                 onClick={handleLogout}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-50"
+                className="h-11 w-full rounded-[10px] border border-[#0f1e3a]/10 px-4 text-[14px] text-[#0f1e3a] transition-colors hover:bg-[#edf3fc]"
               >
                 로그아웃
               </button>
@@ -264,18 +256,18 @@ export default function ProfileClient() {
                 <button
                   type="button"
                   onClick={() => setIsDeleteConfirm(true)}
-                  className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-700"
+                  className="h-11 w-full rounded-[10px] px-4 text-[14px] text-[#dc2626] transition-colors hover:bg-[#fef2f2]"
                 >
                   회원탈퇴
                 </button>
               ) : (
-                <div className="rounded-xl border border-red-300 bg-red-50 p-3">
-                  <p className="mb-2 text-xs font-black text-red-700">정말 탈퇴하시겠어요? 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
+                <div className="rounded-xl bg-[#fef2f2] p-4">
+                  <p className="mb-3 text-[13px] leading-[20px] text-[#b91c1c]">탈퇴하면 시간표·시험·기록이 모두 지워지고 되돌릴 수 없어요</p>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => setIsDeleteConfirm(false)}
-                      className="flex-1 rounded-lg border border-slate-200 bg-white py-2 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+                      className="h-10 flex-1 rounded-[10px] border border-[#0f1e3a]/10 bg-white text-[14px] text-[#0f1e3a] transition-colors hover:bg-[#edf3fc]"
                     >
                       취소
                     </button>
@@ -283,9 +275,9 @@ export default function ProfileClient() {
                       type="button"
                       onClick={handleDeleteAccount}
                       disabled={deleteAccount.isPending}
-                      className="flex-1 rounded-lg bg-red-600 py-2 text-xs font-black text-white transition hover:bg-red-700 disabled:opacity-50"
+                      className="h-10 flex-1 rounded-[10px] bg-[#dc2626] text-[14px] font-medium text-white transition-colors hover:bg-[#b91c1c] disabled:opacity-50"
                     >
-                      {deleteAccount.isPending ? '삭제 중...' : '탈퇴 확인'}
+                      {deleteAccount.isPending ? '탈퇴하는 중' : '탈퇴'}
                     </button>
                   </div>
                 </div>
@@ -295,52 +287,41 @@ export default function ProfileClient() {
         </aside>
 
         <div className="space-y-5">
-          <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600">
-                <MaterialIcon icon="person" size={22} color="#fff" />
-              </div>
-              <div>
-                <p className="text-sm font-black text-blue-600">프로필 관리</p>
-                <h1 className="text-2xl font-black text-slate-950">내 계정 정보</h1>
-              </div>
-            </div>
+          <section className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-5 sm:p-6">
+            <h1 className="text-[18px] font-semibold text-[#0f1e3a]">계정 정보</h1>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="profile-name" className="font-black text-slate-900">표시 이름</Label>
+                <Label htmlFor="profile-name" className="text-[13px] font-normal text-[#44536b]">표시 이름</Label>
                 <Input
                   id="profile-name"
                   value={accountForm.username}
                   onChange={(event) => setAccountForm({ ...accountForm, username: event.target.value })}
                   placeholder="이름 또는 닉네임"
-                  className="h-12 rounded-xl border-blue-100 bg-slate-50 px-4 text-base font-bold"
+                  className="h-11 rounded-[10px] border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] focus-visible:border-[#2a6fe3] focus-visible:ring-3 focus-visible:ring-[#2a6fe3]/15"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-email" className="font-black text-slate-900">이메일</Label>
+                <Label htmlFor="profile-email" className="text-[13px] font-normal text-[#44536b]">이메일</Label>
                 <Input
                   id="profile-email"
                   type="email"
                   value={accountForm.email}
                   onChange={(event) => setAccountForm({ ...accountForm, email: event.target.value })}
                   placeholder="email@example.com"
-                  className="h-12 rounded-xl border-blue-100 bg-slate-50 px-4 text-base font-bold"
+                  className="h-11 rounded-[10px] border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] focus-visible:border-[#2a6fe3] focus-visible:ring-3 focus-visible:ring-[#2a6fe3]/15"
                   aria-invalid={!emailValid}
                 />
               </div>
             </div>
           </section>
 
-          <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
+          <section className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-black text-blue-600">시간표 개인화</p>
-                <h2 className="text-2xl font-black text-slate-950">시간표가 참고할 생활 기준</h2>
-              </div>
-              <div className="rounded-full bg-blue-50 px-4 py-2 text-sm font-black text-blue-600">
+              <h2 className="text-[18px] font-semibold text-[#0f1e3a]">생활 기준</h2>
+              <span className="font-mono text-[13px] tabular-nums text-[#5f6f88]">
                 시간표 시작 {profileForm.sleep_end}
-              </div>
+              </span>
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -351,14 +332,14 @@ export default function ProfileClient() {
                     key={type.value}
                     type="button"
                     onClick={() => updateProfileDraft({ user_type: type.value })}
-                    className={`rounded-2xl border p-4 text-left transition ${
+                    className={`rounded-xl border p-4 text-left transition-colors ${
                       active
-                        ? 'border-blue-600 bg-blue-50 shadow-sm'
-                        : 'border-blue-100 bg-white hover:bg-blue-50'
+                        ? 'border-[#2a6fe3] bg-[#eaf2ff]'
+                        : 'border-[#0f1e3a]/10 bg-white hover:bg-[#f5f8fd]'
                     }`}
                   >
-                    <p className={`text-base font-black ${active ? 'text-blue-600' : 'text-slate-900'}`}>{type.label}</p>
-                    <p className="mt-1 text-xs font-bold leading-5 text-slate-500">{type.detail}</p>
+                    <p className={`text-[15px] font-medium ${active ? 'text-[#1f63d6]' : 'text-[#0f1e3a]'}`}>{type.label}</p>
+                    <p className="mt-1 text-[12px] leading-[18px] text-[#5f6f88]">{type.detail}</p>
                   </button>
                 );
               })}
@@ -366,7 +347,7 @@ export default function ProfileClient() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label className="font-black text-slate-900">직업 / 상태</Label>
+                <Label className="text-[13px] font-normal text-[#44536b]">직업·상태</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {OCCUPATIONS.map((occupation) => {
                     const active = occupation === '기타'
@@ -377,10 +358,10 @@ export default function ProfileClient() {
                         key={occupation}
                         type="button"
                         onClick={() => updateProfileDraft({ occupation })}
-                        className={`rounded-xl border px-3 py-3 text-sm font-black transition ${
+                        className={`h-10 rounded-[10px] border px-3 text-[14px] transition-colors ${
                           active
-                            ? 'border-blue-600 bg-blue-50 text-blue-600'
-                            : 'border-blue-100 bg-white text-slate-600 hover:bg-blue-50'
+                            ? 'border-[#2a6fe3] bg-[#eaf2ff] font-medium text-[#1f63d6]'
+                            : 'border-[#0f1e3a]/10 bg-white text-[#44536b] hover:bg-[#f5f8fd]'
                         }`}
                       >
                         {occupation}
@@ -393,58 +374,60 @@ export default function ProfileClient() {
                     value={profileForm.occupation === '기타' ? '' : profileForm.occupation}
                     onChange={(event) => updateProfileDraft({ occupation: event.target.value })}
                     placeholder="직접 입력"
-                    className="h-11 rounded-xl border-blue-100 bg-slate-50 px-4 font-bold"
+                    className="h-11 rounded-[10px] border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] focus-visible:border-[#2a6fe3] focus-visible:ring-3 focus-visible:ring-[#2a6fe3]/15"
                   />
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="wake-time" className="font-black text-slate-900">기상 시간</Label>
+                  <Label htmlFor="wake-time" className="text-[13px] font-normal text-[#44536b]">기상 시간</Label>
                   <Input
                     id="wake-time"
                     type="time"
                     step="300"
                     value={profileForm.sleep_end}
                     onChange={(event) => updateProfileDraft({ sleep_end: event.target.value })}
-                    className="h-12 rounded-xl border-blue-100 bg-slate-50 px-4 text-base font-black"
+                    className="h-11 rounded-[10px] border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] focus-visible:border-[#2a6fe3] focus-visible:ring-3 focus-visible:ring-[#2a6fe3]/15"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sleep-time" className="font-black text-slate-900">취침 시간</Label>
+                  <Label htmlFor="sleep-time" className="text-[13px] font-normal text-[#44536b]">취침 시간</Label>
                   <Input
                     id="sleep-time"
                     type="time"
                     step="300"
                     value={profileForm.sleep_start}
                     onChange={(event) => updateProfileDraft({ sleep_start: event.target.value })}
-                    className="h-12 rounded-xl border-blue-100 bg-slate-50 px-4 text-base font-black"
+                    className="h-11 rounded-[10px] border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] focus-visible:border-[#2a6fe3] focus-visible:ring-3 focus-visible:ring-[#2a6fe3]/15"
                   />
                 </div>
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="semester-start" className="font-black text-slate-900">학기 시작일</Label>
+                  <Label htmlFor="semester-start" className="text-[13px] font-normal text-[#44536b]">학기 시작일</Label>
                   <Input
                     id="semester-start"
                     type="date"
                     value={profileForm.semester_start_date}
                     onChange={(event) => updateProfileDraft({ semester_start_date: event.target.value })}
-                    className="h-12 rounded-xl border-blue-100 bg-slate-50 px-4 text-base font-black"
+                    className="h-11 rounded-[10px] border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] focus-visible:border-[#2a6fe3] focus-visible:ring-3 focus-visible:ring-[#2a6fe3]/15"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="mt-5 rounded-2xl border border-blue-100 bg-slate-50 p-4">
+            <div className="mt-6 rounded-xl bg-[#f5f8fd] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-base font-black text-slate-950">대학생 시간표 모드</p>
-                  <p className="mt-1 text-sm font-bold text-slate-500">강의실, 시험, 학기 반복 일정을 우선으로 보여줍니다.</p>
+                  <p className="text-[15px] font-medium text-[#0f1e3a]">대학생 시간표 모드</p>
+                  <p className="mt-0.5 text-[13px] text-[#5f6f88]">강의실, 시험, 학기 반복 일정을 먼저 보여 줘요</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => updateProfileDraft({ is_college_student: !profileForm.is_college_student })}
-                  className={`h-9 rounded-full px-4 text-sm font-black transition ${
-                    profileForm.is_college_student ? 'bg-blue-600 text-white' : 'bg-white text-slate-500'
+                  role="switch"
+                  aria-checked={profileForm.is_college_student}
+                  className={`h-9 rounded-lg px-4 text-[14px] transition-colors ${
+                    profileForm.is_college_student ? 'bg-[#2a6fe3] font-medium text-white' : 'border border-[#0f1e3a]/10 bg-white text-[#44536b]'
                   }`}
                 >
                   {profileForm.is_college_student ? '켜짐' : '꺼짐'}
@@ -453,13 +436,13 @@ export default function ProfileClient() {
             </div>
 
             <div className="mt-5 space-y-2">
-              <Label htmlFor="goal-tasks" className="font-black text-slate-900">나의 목표 메모</Label>
+              <Label htmlFor="goal-tasks" className="text-[13px] font-normal text-[#44536b]">목표 메모</Label>
               <Textarea
                 id="goal-tasks"
                 value={profileForm.goal_tasks}
                 onChange={(event) => updateProfileDraft({ goal_tasks: event.target.value })}
                 placeholder="예: 이번 학기 목표, 시험 전 주에는 복습 먼저"
-                className="min-h-28 rounded-xl border-blue-100 bg-slate-50 p-4 text-base font-bold leading-7"
+                className="min-h-28 rounded-[10px] border-[#0f1e3a]/10 bg-white p-3 text-[15px] leading-[24px] focus-visible:border-[#2a6fe3] focus-visible:ring-3 focus-visible:ring-[#2a6fe3]/15"
               />
             </div>
           </section>
