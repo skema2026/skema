@@ -1,0 +1,79 @@
+{
+ "sets": [
+  "개발용 14장 (조정에 쓴 캡처, 저장소에 없음)"
+ ],
+ "pipelines": {
+  "P0 위치만(OpenCV)": {
+   "blocks": 150,
+   "found": 150,
+   "time_ok": 150,
+   "name_ok": 0,
+   "name_chars": 1316,
+   "name_err": 1316,
+   "loc_total": 126,
+   "loc_ok": 0,
+   "extra": 0,
+   "images": 14,
+   "found_rate": 1.0,
+   "time_acc": 1.0,
+   "name_exact": 0.0,
+   "char_acc": 0.0,
+   "loc_acc": 0.0,
+   "sec_per_image": 0.92
+  },
+  "P1 범용 OCR 그대로": {
+   "blocks": 150,
+   "found": 150,
+   "time_ok": 150,
+   "name_ok": 17,
+   "name_chars": 1316,
+   "name_err": 840,
+   "loc_total": 126,
+   "loc_ok": 0,
+   "extra": 0,
+   "images": 14,
+   "found_rate": 1.0,
+   "time_acc": 1.0,
+   "name_exact": 0.1133,
+   "char_acc": 0.3617,
+   "loc_acc": 0.0,
+   "sec_per_image": 3.52
+  },
+  "P2 전처리+Tesseract(보정 끔)": {
+   "blocks": 150,
+   "found": 150,
+   "time_ok": 150,
+   "name_ok": 103,
+   "name_chars": 1316,
+   "name_err": 106,
+   "loc_total": 126,
+   "loc_ok": 115,
+   "extra": 0,
+   "images": 14,
+   "found_rate": 1.0,
+   "time_acc": 1.0,
+   "name_exact": 0.6867,
+   "char_acc": 0.9195,
+   "loc_acc": 0.9127,
+   "sec_per_image": 3.94
+  },
+  "P3 SKEMA 전체": {
+   "blocks": 150,
+   "found": 150,
+   "time_ok": 150,
+   "name_ok": 146,
+   "name_chars": 1316,
+   "name_err": 8,
+   "loc_total": 126,
+   "loc_ok": 125,
+   "extra": 0,
+   "images": 14,
+   "found_rate": 1.0,
+   "time_acc": 1.0,
+   "name_exact": 0.9733,
+   "char_acc": 0.9939,
+   "loc_acc": 0.9921,
+   "sec_per_image": 4.02
+  }
+ }
+}

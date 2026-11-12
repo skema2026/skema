@@ -121,7 +121,7 @@ cd backend && pip install -r requirements.txt && python -m pytest tests -q
 cd frontend-next && npm ci && npx tsc --noEmit && npx eslint src && npm run build
 ```
 
-백엔드 자동 테스트 **199개** (11/9 기준). 이 밖에 2개는 준비물이 있을 때만 실행합니다: 실제 캡처 정확도 측정(`ETA_FIXTURE_DIR`에 캡처와 정답 파일), R2 저장소 테스트(`moto` 패키지)
+백엔드 자동 테스트 **199개** (11/13 기준). 이 밖에 2개는 준비물이 있을 때만 실행합니다: 실제 캡처 정확도 측정(`ETA_FIXTURE_DIR`에 캡처와 정답 파일), R2 저장소 테스트(`moto` 패키지)
 
 | 영역 | 개수 | 확인하는 것 |
 | --- | --- | --- |
@@ -130,6 +130,8 @@ cd frontend-next && npm ci && npx tsc --noEmit && npx eslint src && npm run buil
 | `tests/security` | 48 | 비공개 기록, 소셜 로그인, 요청 제한, 이미지 검사, 푸시 주소, 공유 범위, 검색 |
 | `tests/notification` | 30 | 알림 시점, 알림을 누르면 이동할 화면 |
 | `tests/studylog` | 28 | 스터디 그룹·기록 |
+
+결과보고서의 측정(알고리즘 1만 개 시뮬레이션, 서버 부하, 시간표 인식 방식별 비교)은 [`backend/bench`](backend/bench/README.md)에 스크립트와 결과가 있습니다.
 
 운영 배포 방법은 [`docs/deploy.md`](docs/deploy.md)에 있습니다.
 
@@ -149,7 +151,8 @@ skema/
 │   │   ├── ai_chat/          AI 채팅·준비도 요약 API (화면에서는 #37에서 뺌)
 │   │   └── core/ · db/       설정, 보안(JWT), 요청 횟수 제한, 파일 저장소(로컬·R2), DB 세션
 │   ├── alembic/              DB 마이그레이션 (001~018)
-│   └── tests/                pytest (eta · schedule · security · notification · studylog)
+│   ├── tests/                pytest (eta · schedule · security · notification · studylog)
+│   └── bench/                결과보고서 측정 (알고리즘 시뮬레이션 · 부하 · 인식률 비교)
 ├── frontend-next/            Next.js 웹앱
 │   ├── src/app/              화면 (dashboard: 주간·하루·월간 / onboarding / report / log / notifications / profile / share / privacy / admin)
 │   ├── src/hooks · lib · store
