@@ -26,7 +26,7 @@ function usePublicProfile(userId: number) {
   });
 }
 
-const AVATAR_COLORS = ['#2563eb', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+const AVATAR_COLORS = ['#2a6fe3', '#4f46e5', '#0891b2', '#0d9488', '#7c3aed', '#4591fd'];
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -46,43 +46,44 @@ export default function PublicProfilePage() {
   const color = AVATAR_COLORS[uid % AVATAR_COLORS.length];
 
   return (
-    <div className="min-h-dvh bg-[#eaf1ff]">
-      <div className="mx-auto max-w-lg min-h-dvh bg-[#f7f9ff]">
+    <div className="min-h-dvh bg-[#f5f8fd]">
+      <div className="mx-auto min-h-dvh max-w-2xl">
 
         {/* 헤더 */}
-        <header className="sticky top-0 z-20 border-b border-blue-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
+        <header className="sticky top-0 z-20 border-b border-[#0f1e3a]/8 bg-white px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => router.back()}
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 transition hover:bg-slate-200">
-              <MaterialIcon icon="arrow_back" size={18} color="#475569" />
+              aria-label="뒤로"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#44536b] transition-colors hover:bg-[#edf3fc]">
+              <MaterialIcon icon="arrow_back" size={18} color="currentColor" />
             </button>
-            <h1 className="text-base font-black text-slate-950">프로필</h1>
+            <h1 className="text-[17px] font-semibold text-[#0f1e3a]">프로필</h1>
           </div>
         </header>
 
-        <main className="px-4 py-4">
+        <main className="px-4 py-5 sm:px-6">
           {isLoading && (
-            <div className="flex h-40 items-center justify-center text-sm text-slate-400">불러오는 중...</div>
+            <div className="flex h-40 items-center justify-center text-[14px] text-[#5f6f88]">불러오는 중</div>
           )}
           {isError && (
-            <div className="mt-8 rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
-              <p className="text-sm font-black text-slate-700">사용자를 찾을 수 없어요</p>
+            <div className="mt-8 rounded-2xl border border-[#0f1e3a]/8 bg-white p-8 text-center">
+              <p className="text-[14px] font-medium text-[#44536b]">사용자를 찾을 수 없어요</p>
             </div>
           )}
 
           {data && (
             <>
               {/* 프로필 카드 */}
-              <div className="mb-4 rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+              <div className="mb-4 rounded-2xl border border-[#0f1e3a]/8 bg-white p-5">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-2xl font-black text-white"
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-[22px] font-medium text-white"
                     style={{ background: color }}>
                     {data.username.slice(0, 1).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-lg font-black text-slate-950">{data.username}</p>
+                    <p className="text-[18px] font-semibold text-[#0f1e3a]">{data.username}</p>
                     {data.joined_at && (
-                      <p className="text-xs font-bold text-slate-400">
+                      <p className="mt-0.5 text-[13px] text-[#5f6f88]">
                         {new Date(data.joined_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} 가입
                       </p>
                     )}
@@ -92,15 +93,15 @@ export default function PublicProfilePage() {
                 {/* 스트릭 */}
                 {data.streak.current_streak > 0 && (
                   <div className="mt-4 grid grid-cols-2 gap-2">
-                    <div className="rounded-xl bg-blue-50 px-3 py-2.5 text-center">
-                      <p className={`text-xl font-black ${data.streak.today_checked ? 'text-blue-600' : 'text-slate-400'}`}>
-                        {data.streak.current_streak}
+                    <div className="rounded-xl bg-[#f5f8fd] p-3">
+                      <p className="text-[13px] text-[#5f6f88]">지금 연속</p>
+                      <p className={`mt-1 font-mono text-[20px] font-medium tabular-nums ${data.streak.today_checked ? 'text-[#1f63d6]' : 'text-[#0f1e3a]'}`}>
+                        {data.streak.current_streak}일
                       </p>
-                      <p className="text-[11px] font-black text-slate-400">현재 연속</p>
                     </div>
-                    <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-center">
-                      <p className="text-xl font-black text-slate-600">{data.streak.longest_streak}</p>
-                      <p className="text-[11px] font-black text-slate-400">최장 연속</p>
+                    <div className="rounded-xl bg-[#f5f8fd] p-3">
+                      <p className="text-[13px] text-[#5f6f88]">가장 길게</p>
+                      <p className="mt-1 font-mono text-[20px] font-medium tabular-nums text-[#0f1e3a]">{data.streak.longest_streak}일</p>
                     </div>
                   </div>
                 )}
@@ -109,12 +110,12 @@ export default function PublicProfilePage() {
               {/* 최근 기록 */}
               {data.logs.length > 0 && (
                 <div className="mb-4">
-                  <p className="mb-2 text-[11px] font-black text-slate-400">최근 기록</p>
+                  <p className="mb-2 text-[15px] font-medium text-[#0f1e3a]">최근 기록</p>
                   <div className="space-y-2">
                     {data.logs.map(log => (
-                      <div key={log.id} className="flex gap-0 overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+                      <div key={log.id} className="flex gap-0 overflow-hidden rounded-xl border border-[#0f1e3a]/8 bg-white">
                         {log.photo_url && (
-                          <div className="w-20 shrink-0 bg-slate-100" style={{ aspectRatio: '1/1' }}>
+                          <div className="w-20 shrink-0 bg-[#edf3fc]" style={{ aspectRatio: '1/1' }}>
                             {isVideoUrl(log.photo_url) ? (
                               <video src={mediaUrl(log.photo_url)} muted playsInline preload="metadata" className="h-full w-full object-cover" />
                             ) : (
@@ -124,10 +125,10 @@ export default function PublicProfilePage() {
                         )}
                         <div className="flex flex-col justify-between px-3 py-2.5">
                           {log.caption
-                            ? <p className="text-sm font-bold text-slate-950 line-clamp-2">{log.caption}</p>
+                            ? <p className="line-clamp-2 text-[14px] text-[#0f1e3a]">{log.caption}</p>
                             : <span />
                           }
-                          <p className="text-[11px] text-slate-400">{relTime(log.created_at)}</p>
+                          <p className="text-[12px] text-[#5f6f88]">{relTime(log.created_at)}</p>
                         </div>
                       </div>
                     ))}
@@ -136,8 +137,8 @@ export default function PublicProfilePage() {
               )}
 
               {data.logs.length === 0 && (
-                <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-sm">
-                  <p className="text-sm font-black text-slate-500">아직 공개된 활동이 없어요</p>
+                <div className="mt-4 rounded-2xl border border-[#0f1e3a]/8 bg-white p-8 text-center">
+                  <p className="text-[14px] font-medium text-[#5f6f88]">아직 공개된 활동이 없어요</p>
                 </div>
               )}
             </>

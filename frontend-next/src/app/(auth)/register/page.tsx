@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { toast } from 'sonner';
 import { useRegister } from '@/hooks/useAuth';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { authCss } from '../authStyles';
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 256 262" preserveAspectRatio="xMidYMid">
@@ -50,7 +51,7 @@ export default function RegisterPage() {
     registerMutation.mutate(
       { username: form.username.trim(), email: form.email.trim(), password: form.password },
       {
-        onSuccess: () => { toast.success('회원가입이 완료되었습니다. 로그인해주세요.'); router.push('/login'); },
+        onSuccess: () => { toast.success('가입했어요. 로그인해 주세요'); router.push('/login'); },
         onError: (err: unknown) => {
           const error = err as { response?: { status?: number; data?: { detail?: string } } };
           const detail = error?.response?.data?.detail ?? '';
@@ -59,7 +60,7 @@ export default function RegisterPage() {
             setErrors((prev) => ({ ...prev, email: '올바른 이메일 형식이 아닙니다' }));
             toast.error('올바른 이메일 형식이 아닙니다');
           }
-          else toast.error('회원가입 중 오류가 발생했습니다');
+          else toast.error('가입하지 못했어요. 잠시 후 다시 시도해 주세요');
         },
       }
     );
@@ -67,202 +68,7 @@ export default function RegisterPage() {
 
   return (
     <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; }
-
-        .rp-root {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          position: relative;
-          overflow-x: hidden;
-          overflow-y: auto;
-          background:
-          radial-gradient(circle at 18% 20%, rgba(56,189,248,0.18), transparent 32%),
-          radial-gradient(circle at 82% 18%, rgba(37,99,235,0.16), transparent 34%),
-          linear-gradient(135deg, rgba(248,251,255,0.86) 0%, rgba(234,244,255,0.82) 48%, rgba(219,234,254,0.78) 100%),
-          url('/register-bg.jpg') center / cover no-repeat fixed;
-          font-family: inherit;
-        }
-
-        .rp-overlay {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background:
-          linear-gradient(90deg, rgba(37,99,235,0.07) 1px, transparent 1px),
-          linear-gradient(rgba(14,165,233,0.06) 1px, transparent 1px);
-          background-size: 28px 28px;
-          mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.15));
-        }
-
-        /* ── Navbar ── */
-        .rp-nav {
-          position: relative; z-index: 20;
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 20px clamp(20px, 4vw, 56px);
-        }
-        .rp-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-        .rp-logo-box {
-          width: 34px; height: 34px; border-radius: 9px;
-          background: transparent;
-          display: flex; align-items: center; justify-content: center;
-          box-shadow: 0 10px 26px rgba(19,63,124,0.22);
-        }
-        .rp-logo-text { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: 0; }
-        .rp-nav-btn {
-          padding: 8px 24px; border-radius: 999px; font-size: 14px; font-weight: 600;
-          color: #2563eb; text-decoration: none;
-          border: 1px solid #bfd0ff;
-          background: rgba(255,255,255,0.92);
-          backdrop-filter: blur(14px);
-          box-shadow: 0 10px 30px rgba(15,23,42,0.07);
-          transition: background 0.2s, transform 0.2s;
-        }
-        .rp-nav-btn:hover { background: #eaf1ff; transform: translateY(-1px); }
-
-        /* ── Body ── */
-        .rp-body {
-          position: relative; z-index: 1;
-          flex: 1; display: flex; align-items: center;
-          padding: 0 clamp(20px, 4vw, 56px) 48px;
-          gap: 40px;
-          justify-content: center;
-        }
-
-        /* ── Left ── */
-        .rp-left { flex: 1; max-width: 560px; }
-        .rp-left h2 {
-          font-size: clamp(2rem, 3.2vw, 2.75rem);
-          font-weight: 800; line-height: 1.2;
-          color: #0f172a; letter-spacing: 0; margin: 0 0 14px;
-        }
-        .rp-left h2 em { font-style: normal; color: #0ea5e9; }
-        .rp-left p {
-          font-size: 15px; line-height: 1.8; color: #2d3a55;
-          margin: 0 0 28px; max-width: 380px;
-        }
-        .rp-feat { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
-        .rp-feat-icon {
-          width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
-          background: #fff;
-          border: 1px solid rgba(14,165,233,0.18);
-          box-shadow: 0 6px 0 rgba(14,165,233,0.08), 0 10px 24px rgba(15,23,42,0.08);
-          display: flex; align-items: center; justify-content: center;
-        }
-        .rp-feat-name { font-weight: 700; font-size: 14px; color: #0f172a; margin-bottom: 2px; }
-        .rp-feat-desc { font-size: 13px; color: #475569; }
-
-        /* ── Card ── */
-        .rp-card {
-          width: 100%; max-width: 420px; flex-shrink: 0;
-          background: rgba(255,255,255,0.58);
-          backdrop-filter: blur(28px) saturate(145%);
-          -webkit-backdrop-filter: blur(28px) saturate(145%);
-          border: 1px solid rgba(255,255,255,0.78);
-          border-radius: 24px;
-          box-shadow:
-            0 30px 90px rgba(15,23,42,0.16),
-            0 12px 36px rgba(15,23,42,0.08);
-            inset 0 1px 0 rgba(255,255,255,0.95);
-          padding: 34px 30px 28px;
-        }
-        .rp-card-title { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0 0 3px; }
-        .rp-card-sub   { font-size: 13px; color: #3f4b61; margin: 0 0 20px; }
-
-        /* Social */
-        .rp-soc {
-          width: 100%; height: 44px;
-          display: flex; align-items: center; justify-content: center; gap: 9px;
-          border-radius: 11px; border: none;
-          font-size: 14px; font-weight: 600; font-family: inherit;
-          cursor: pointer; margin-bottom: 7px;
-          transition: filter .15s, transform .1s;
-        }
-        .rp-soc:hover  { filter: brightness(1.07); transform: translateY(-1px); }
-        .rp-soc:active { transform: translateY(0); }
-        .rp-google { background: rgba(255,255,255,0.84); color: #1f2937; border: 1px solid rgba(255,255,255,0.7) !important; backdrop-filter: blur(6px); }
-        .rp-naver  { background: #03C75A; color: #fff; }
-        .rp-kakao  { background: #FEE500; color: #3C1E1E; }
-
-        /* Divider */
-        .rp-div { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
-        .rp-div-line { flex: 1; height: 1px; background: rgba(255,255,255,0.38); }
-        .rp-card .rp-div-line { background: rgba(15,23,42,0.12); }
-        .rp-div-txt  { font-size: 12px; color: rgba(30,40,70,0.52); white-space: nowrap; }
-
-        /* Fields */
-        .rp-field {
-          display: flex;
-          align-items: center;
-          background: rgba(255,255,255,0.68);
-          border: 1px solid rgba(191,219,254,0.9);
-          border-radius: 14px;
-          overflow: hidden;
-          margin-bottom: 7px;
-          transition: box-shadow .2s, border-color .2s, background .2s;
-        }
-        .rp-field:focus-within {
-          border-color: #2563eb;
-          box-shadow: 0 0 0 3px rgba(37,99,235,0.18);
-        }
-        .rp-field.err { border-color: rgba(220,38,38,0.55); }
-        .rp-label {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 0 11px;
-          min-width: 80px;
-          height: 46px;
-          border-right: 1px solid rgba(37,99,235,0.10);
-          background: rgba(239,246,255,0.72);
-          font-size: 13px;
-          font-weight: 700;
-          color: #0f172a;
-          flex-shrink: 0;
-        }
-        .rp-field input {
-          flex: 1; height: 46px; padding: 0 13px;
-          background: transparent; border: none; outline: none;
-          font-size: 13px; color: #0f172a; font-family: inherit;
-        }
-        .rp-field input::placeholder { color: rgba(50,65,100,0.42); }
-        .rp-err { font-size: 11px; color: #dc2626; margin: -3px 0 5px 4px; }
-
-        /* Submit */
-        .rp-submit {
-          width: 100%; height: 48px; margin-top: 8px;
-          border: none; border-radius: 11px;
-          font-size: 15px; font-weight: 700; font-family: inherit;
-          cursor: pointer; color: #fff;
-          background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-          box-shadow: 0 12px 28px rgba(26,77,178,0.24);
-          transition: filter .15s, transform .1s;
-        }
-        .rp-submit:hover:not(:disabled) { filter: brightness(1.09); transform: translateY(-1px); }
-        .rp-submit:active:not(:disabled) { transform: translateY(0); }
-        .rp-submit:disabled {
-          background: linear-gradient(90deg, #94a3b8 0%, #8fb8b4 100%);
-          box-shadow: none; cursor: not-allowed;
-        }
-
-        .rp-foot { margin-top: 14px; text-align: center; font-size: 13px; color: #334155; }
-        .rp-foot a { color: #2563eb; font-weight: 700; text-decoration: none; }
-        .rp-foot a:hover { text-decoration: underline; }
-
-        @media (max-width: 980px) {
-          .rp-left { display: none; }
-          .rp-body  { justify-content: center; padding: 0 16px 40px; }
-          .rp-nav   { padding: 18px 24px; }
-          .rp-card  { max-width: 100%; }
-        }
-        @media (max-width: 480px) {
-          .rp-card { padding: 26px 18px 22px; border-radius: 16px; }
-          .rp-label { min-width: 82px; font-size: 12px; padding: 0 9px; }
-          .rp-logo-text { font-size: 16px; }
-          .rp-nav-btn { padding: 8px 14px; }
-        }
-      `}</style>
+      <style>{authCss('rp')}</style>
 
       <div className="rp-root">
         <div className="rp-overlay" />
@@ -286,19 +92,18 @@ export default function RegisterPage() {
         <div className="rp-body">
           {/* Left branding */}
           <div className="rp-left">
-            <h2>밀려도 다시 짜 주는<br />나만의 <em>스마트 시간표</em></h2>
-            <p style={{ fontSize: '15px', lineHeight: 1.8, color: '#2d3a55', margin: '0 0 24px', maxWidth: '380px' }}>
-              시험 일정과 기존 수업을 분석해 빈 시간에<br />
-              최적의 학습 계획을 자동으로 만들어드립니다.
+            <h2>하루 밀려도<br /><em>다시 짜 주는</em> 시간표</h2>
+            <p>
+              에타 시간표 캡처 한 장으로 수업을 넣고, 시험 날짜를 넣으면 수업 사이 빈 시간에 공부 블록이 들어갑니다.
             </p>
             {[
-              { icon: 'calendar_month', title: '시험 기반 자동 배치',   desc: '시험 날짜를 등록하고 학습 빈도를 설정하면 빈 시간에 공부 블록을 자동으로 넣어드립니다.' },
-              { icon: 'autorenew',      title: '밀린 공부는 다시 짜기', desc: '못 한 공부는 버튼 한 번으로 시험 전날까지 빈 시간에 다시 배치합니다.' },
-              { icon: 'bar_chart',      title: '주간 수행률 리포트',     desc: '완료한 일정을 시각화해 학습 패턴을 파악할 수 있습니다.' },
+              { icon: 'calendar_month', title: '시험 공부 자동 배치',   desc: '시험 전날까지 빈 30분 칸에 공부 블록을 넣어요. 주에 며칠, 하루 몇 시간인지 고를 수 있어요' },
+              { icon: 'autorenew',      title: '밀린 공부는 다시 짜기', desc: '못 한 블록만 남은 빈 시간으로 옮겨요. 수업과 시험은 그대로 둡니다' },
+              { icon: 'bar_chart',      title: '주간 리포트',     desc: '이번 주에 끝낸 블록과 못 한 블록을 요일별로 보여 줘요' },
             ].map((f) => (
               <div className="rp-feat" key={f.title}>
                 <div className="rp-feat-icon">
-                  <MaterialIcon icon={f.icon} size={20} color="#2563eb" />
+                  <MaterialIcon icon={f.icon} size={18} color="currentColor" />
                 </div>
                 <div>
                   <div className="rp-feat-name">{f.title}</div>
@@ -311,7 +116,7 @@ export default function RegisterPage() {
           {/* Glass card */}
           <div className="rp-card">
             <div className="rp-card-title">계정 만들기</div>
-            <div className="rp-card-sub">SKEMA와 함께 스마트한 시간 관리를 시작하세요</div>
+            <div className="rp-card-sub">가입하면 온보딩에서 시간표와 시험을 바로 넣어요</div>
 
             <button className="rp-soc rp-google" onClick={() => handleSocialLogin('google')}>
               <GoogleIcon /> Google로 시작하기
@@ -338,35 +143,35 @@ export default function RegisterPage() {
 
             <form onSubmit={handleSubmit} noValidate>
               <div className={`rp-field${errors.username ? ' err' : ''}`}>
-                <div className="rp-label"><MaterialIcon icon="person" size={14} color="#334155" />아이디</div>
+                <div className="rp-label"><MaterialIcon icon="person" size={16} color="currentColor" />아이디</div>
                 <input type="text" autoComplete="username" placeholder="아이디 (3자 이상)" value={form.username}
                   onChange={(e) => setForm({ ...form, username: e.target.value })} />
               </div>
               {errors.username && <div className="rp-err">{errors.username}</div>}
 
               <div className={`rp-field${errors.email ? ' err' : ''}`}>
-                <div className="rp-label"><MaterialIcon icon="mail" size={14} color="#334155" />이메일</div>
+                <div className="rp-label"><MaterialIcon icon="mail" size={16} color="currentColor" />이메일</div>
                 <input type="text" inputMode="email" autoComplete="email" placeholder="이메일 주소" value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })} />
               </div>
               {errors.email && <div className="rp-err">{errors.email}</div>}
 
               <div className={`rp-field${errors.password ? ' err' : ''}`}>
-                <div className="rp-label"><MaterialIcon icon="lock" size={14} color="#334155" />비밀번호</div>
+                <div className="rp-label"><MaterialIcon icon="lock" size={16} color="currentColor" />비밀번호</div>
                 <input type="password" autoComplete="new-password" placeholder="비밀번호 (6자 이상)" value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })} />
               </div>
               {errors.password && <div className="rp-err">{errors.password}</div>}
 
               <div className={`rp-field${errors.confirmPassword ? ' err' : ''}`}>
-                <div className="rp-label"><MaterialIcon icon="lock" size={14} color="#334155" />비밀번호 확인</div>
+                <div className="rp-label"><MaterialIcon icon="lock" size={16} color="currentColor" />비밀번호 확인</div>
                 <input type="password" autoComplete="new-password" placeholder="비밀번호를 다시 입력하세요" value={form.confirmPassword}
                   onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} />
               </div>
               {errors.confirmPassword && <div className="rp-err">{errors.confirmPassword}</div>}
 
               <button type="submit" className="rp-submit" disabled={registerMutation.isPending}>
-                {registerMutation.isPending ? '처리 중...' : '가입하기'}
+                {registerMutation.isPending ? '가입 중' : '가입하기'}
               </button>
             </form>
 

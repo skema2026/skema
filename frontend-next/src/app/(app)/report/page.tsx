@@ -8,12 +8,13 @@ import { timeToMinutes } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import type { Schedule } from '@/types';
 
+// 색은 대시보드 블록 색과 같게 (수업 = 로고 하늘색, 공부 = 인디고)
 const TYPE_META = [
-  { type: 'class',      label: '수업',     color: '#4F46E5', icon: '📚' },
-  { type: 'study',      label: '자율학습',  color: '#059669', icon: '✏️' },
-  { type: 'assignment', label: '과제',     color: '#F97316', icon: '📋' },
-  { type: 'activity',   label: '활동',     color: '#A855F7', icon: '🎯' },
-  { type: 'personal',   label: '개인',     color: '#E11D48', icon: '👤' },
+  { type: 'class',      label: '수업',     color: '#4591fd' },
+  { type: 'study',      label: '공부',     color: '#4f46e5' },
+  { type: 'assignment', label: '과제',     color: '#d97706' },
+  { type: 'activity',   label: '활동',     color: '#ec4899' },
+  { type: 'personal',   label: '개인',     color: '#ec4899' },
 ];
 
 const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
@@ -62,7 +63,7 @@ function computeWeekStats(schedules: Schedule[], monday: Date) {
   const allMins = days.reduce((s, d) => s + d.mins, 0);
   const overallPct = allTotal > 0 ? Math.round((allDone / allTotal) * 100) : null;
 
-  const typeStats = TYPE_META.map(({ type, label, color, icon }) => {
+  const typeStats = TYPE_META.map(({ type, label, color }) => {
     const typeSch = schedules.filter((s) => {
       if (s.schedule_type !== type) return false;
       const dayIdx = s.date
@@ -76,7 +77,7 @@ function computeWeekStats(schedules: Schedule[], monday: Date) {
     const done = typeSch.filter((s) => s.is_completed).length;
     const total = typeSch.length;
     const mins = typeSch.reduce((sum, s) => sum + Math.max(0, timeToMinutes(s.end_time) - timeToMinutes(s.start_time)), 0);
-    return { type, label, color, icon, done, total, mins };
+    return { type, label, color, done, total, mins };
   }).filter((t) => t.total > 0);
 
   return { days, allDone, allTotal, allMins, overallPct, typeStats };
@@ -99,195 +100,168 @@ export default function ReportPage() {
   const { days, allDone, allTotal, allMins, overallPct, typeStats } = computeWeekStats(schedules, monday);
   const isCurrentWeek = weekOffset === 0;
 
-  const overallColor =
-    overallPct === null ? '#94a3b8'
-    : overallPct >= 80 ? '#059669'
-    : overallPct >= 50 ? '#d97706'
-    : '#dc2626';
+  const fmtMins = (m: number) => {
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    return h > 0 ? `${h}시간${r > 0 ? ` ${r}분` : ''}` : `${r}분`;
+  };
+
+  const insights: string[] = [];
+  const bestDay = days.filter((d) => d.pct !== null).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))[0];
+  if (bestDay && (bestDay.pct ?? 0) >= 80) insights.push(`${bestDay.label}요일 수행률이 ${bestDay.pct}%로 가장 높아요`);
+  if (overallPct !== null && overallPct >= 80) insights.push('이번 주 전체 수행률이 80%를 넘었어요');
+  else if (overallPct !== null && overallPct < 40 && allTotal > 0) insights.push('못 한 블록이 많아요. 하루 보기의 다시 짜기로 빈 시간에 옮길 수 있어요');
+  const zeroDays = days.filter((d) => d.total > 0 && d.done === 0);
+  if (zeroDays.length > 0) insights.push(`${zeroDays.map((d) => d.label).join('·')}요일은 완료한 일정이 없어요`);
+  if (insights.length === 0) insights.push('일정을 완료로 표시하면 여기에 한 주 흐름이 정리돼요');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#f8fbff' }}>
-      {/* 헤더 */}
-      <header style={{ height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', borderBottom: '1px solid #ebeef1', background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(16px)', position: 'sticky', top: 0, zIndex: 30, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div className="flex min-h-screen flex-col bg-[#f5f8fd] text-[#0f1e3a]">
+      <header className="sticky top-0 z-30 border-b border-[#0f1e3a]/8 bg-white">
+        <div className="mx-auto flex h-14 max-w-[720px] items-center gap-3 px-4">
           <button
             onClick={() => router.push('/dashboard')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: 13, fontWeight: 600, padding: '6px 10px', borderRadius: 10 }}
+            aria-label="대시보드로"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#44536b] transition-colors hover:bg-[#edf3fc]"
           >
-            <MaterialIcon icon="arrow_back" size={18} color="#64748b" />
-            대시보드
+            <MaterialIcon icon="arrow_back" size={18} color="currentColor" />
           </button>
-          <div style={{ width: 1, height: 18, background: '#e2e8f0' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #4F46E5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MaterialIcon icon="bar_chart" size={15} color="#fff" filled />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 800, color: '#181c1e' }}>주간 수행률 리포트</span>
-          </div>
+          <h1 className="text-[16px] font-semibold">주간 리포트</h1>
         </div>
       </header>
 
-      <div style={{ flex: 1, maxWidth: 720, width: '100%', margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* 주간 네비게이션 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: 16, padding: '12px 16px', border: '1px solid #ebeef1' }}>
-          <button
-            onClick={() => setWeekOffset((w) => w - 1)}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '1px solid #e2e8f0', borderRadius: 10, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: '#3f4b61', cursor: 'pointer' }}
-          >
-            <MaterialIcon icon="chevron_left" size={16} color="#3f4b61" />
-            이전 주
-          </button>
-
-          <div style={{ textAlign: 'center' }}>
-            {isCurrentWeek && (
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#4F46E5', letterSpacing: 1, marginBottom: 2 }}>이번 주</div>
-            )}
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#181c1e' }}>{formatWeekRange(monday)}</div>
+      <main className="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-4 px-4 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[13px] text-[#5f6f88]">{isCurrentWeek ? '이번 주' : `${-weekOffset}주 전`}</p>
+            <p className="mt-0.5 text-[15px] font-medium">{formatWeekRange(monday)}</p>
           </div>
-
-          <button
-            onClick={() => setWeekOffset((w) => w + 1)}
-            disabled={weekOffset >= 0}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '1px solid #e2e8f0', borderRadius: 10, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: weekOffset >= 0 ? '#d1d5db' : '#3f4b61', cursor: weekOffset >= 0 ? 'not-allowed' : 'pointer' }}
-          >
-            다음 주
-            <MaterialIcon icon="chevron_right" size={16} color={weekOffset >= 0 ? '#d1d5db' : '#3f4b61'} />
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setWeekOffset((w) => w - 1)}
+              aria-label="이전 주"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#0f1e3a]/10 bg-white text-[#44536b] transition-colors hover:bg-[#edf3fc]"
+            >
+              <MaterialIcon icon="chevron_left" size={18} color="currentColor" />
+            </button>
+            <button
+              onClick={() => setWeekOffset((w) => w + 1)}
+              disabled={weekOffset >= 0}
+              aria-label="다음 주"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#0f1e3a]/10 bg-white text-[#44536b] transition-colors hover:bg-[#edf3fc] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <MaterialIcon icon="chevron_right" size={18} color="currentColor" />
+            </button>
+          </div>
         </div>
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 60 }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid #e2e8f0', borderTopColor: '#4F46E5', animation: 'spin 0.8s linear infinite' }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <div className="flex justify-center pt-16">
+            <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-[#e1eaf6] border-t-[#2a6fe3]" />
           </div>
         ) : (
           <>
-            {/* 전체 요약 */}
-            <div style={{ background: '#fff', borderRadius: 16, padding: '20px 20px', border: '1px solid #ebeef1', display: 'flex', alignItems: 'center', gap: 20 }}>
-              <div style={{ flexShrink: 0, width: 80, height: 80, borderRadius: '50%', border: `5px solid ${overallColor}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `${overallColor}10` }}>
-                <span style={{ fontSize: 22, fontWeight: 900, color: overallColor, lineHeight: 1 }}>
-                  {overallPct !== null ? `${overallPct}%` : '-'}
-                </span>
-                <span style={{ fontSize: 10, color: overallColor, fontWeight: 600, marginTop: 2 }}>완료율</span>
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 15, fontWeight: 800, color: '#181c1e', marginBottom: 4 }}>
-                  {allTotal > 0 ? `${allDone}개 완료 / ${allTotal}개 전체` : '이번 주 일정 없음'}
+            {/* 요약: 숫자 세 개 */}
+            <section className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-[#0f1e3a]/8 bg-[#0f1e3a]/8">
+              <div className="bg-white p-5">
+                <p className="text-[13px] text-[#5f6f88]">완료율</p>
+                <p className="mt-2 font-mono text-[28px] font-medium tabular-nums text-[#1f63d6]">
+                  {overallPct !== null ? `${overallPct}%` : '–'}
                 </p>
-                <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
-                  {allMins > 0 ? `총 ${Math.floor(allMins / 60)}시간 ${allMins % 60 > 0 ? `${allMins % 60}분` : ''} 계획` : ''}
-                </p>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {[
-                    { label: '완료', value: allDone, color: '#059669', bg: '#d1fae5' },
-                    { label: '미완료', value: allTotal - allDone, color: '#dc2626', bg: '#fee2e2' },
-                    { label: '총 계획 시간', value: `${Math.floor(allMins / 60)}h ${allMins % 60}m`, color: '#4F46E5', bg: '#ede9fe' },
-                  ].map(({ label, value, color, bg }) => (
-                    <div key={label} style={{ padding: '4px 10px', borderRadius: 20, background: bg, display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color }}>{value}</span>
-                      <span style={{ fontSize: 11, color, opacity: 0.8 }}>{label}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
-            </div>
+              <div className="bg-white p-5">
+                <p className="text-[13px] text-[#5f6f88]">완료</p>
+                <p className="mt-2 font-mono text-[28px] font-medium tabular-nums">
+                  {allDone}<span className="text-[15px] text-[#5f6f88]"> / {allTotal}</span>
+                </p>
+              </div>
+              <div className="bg-white p-5">
+                <p className="text-[13px] text-[#5f6f88]">계획한 시간</p>
+                <p className="mt-2 text-[20px] font-medium tabular-nums leading-[34px]">{allMins > 0 ? fmtMins(allMins) : '–'}</p>
+              </div>
+            </section>
 
-            {/* 요일별 수행률 */}
-            <div style={{ background: '#fff', borderRadius: 16, padding: '20px', border: '1px solid #ebeef1' }}>
-              <p style={{ fontSize: 14, fontWeight: 800, color: '#181c1e', marginBottom: 16 }}>요일별 수행률</p>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
+            {/* 요일별 수행률: 오늘만 파랑 */}
+            <section className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-5">
+              <p className="text-[15px] font-medium">요일별 수행률</p>
+              <div className="mt-5 flex h-[148px] items-end gap-2">
                 {days.map(({ label, pct, isToday, done, total, mins }) => {
-                  const barH = pct !== null ? Math.max(pct * 0.9, 4) : 0;
-                  const barColor = isToday ? '#4F46E5' : '#c3d0ff';
+                  const barH = pct !== null ? Math.max(pct, 3) : 0;
                   return (
-                    <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                      <span style={{ fontSize: 10, color: pct !== null ? '#3f4b61' : '#cbd5e1', fontWeight: 600 }}>
-                        {pct !== null ? `${pct}%` : total > 0 ? `0%` : '-'}
+                    <div key={label} className="flex flex-1 flex-col items-center gap-1.5">
+                      <span className={`font-mono text-[11px] tabular-nums ${pct !== null ? 'text-[#44536b]' : 'text-[#98a6ba]'}`}>
+                        {pct !== null ? `${pct}%` : '–'}
                       </span>
                       <div
-                        title={total > 0 ? `${done}/${total}개 · ${Math.floor(mins / 60)}h${mins % 60}m` : '일정 없음'}
-                        style={{ width: '100%', height: 90, background: '#f1f4f7', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'flex-end', cursor: total > 0 ? 'default' : 'default' }}
+                        title={total > 0 ? `${done}/${total}개 · ${fmtMins(mins)}` : '일정 없음'}
+                        className="flex h-[88px] w-full items-end overflow-hidden rounded-md bg-[#f5f8fd]"
                       >
                         {pct !== null && (
-                          <div style={{ width: '100%', height: `${barH}%`, background: barColor, borderRadius: 8, transition: 'height 0.5s' }} />
+                          <div
+                            className="w-full rounded-md"
+                            style={{ height: `${barH}%`, background: isToday ? '#2a6fe3' : '#bcd8fe' }}
+                          />
                         )}
                       </div>
-                      <span style={{ fontSize: 12, fontWeight: isToday ? 800 : 500, color: isToday ? '#4F46E5' : '#3f4b61' }}>{label}</span>
-                      {total > 0 && (
-                        <span style={{ fontSize: 9, color: '#94a3b8' }}>{done}/{total}</span>
-                      )}
+                      <span className={`text-[12px] ${isToday ? 'font-medium text-[#1f63d6]' : 'text-[#44536b]'}`}>{label}</span>
+                      <span className="font-mono text-[11px] tabular-nums text-[#98a6ba]">{total > 0 ? `${done}/${total}` : ' '}</span>
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </section>
 
-            {/* 유형별 분석 */}
+            {/* 유형별 */}
             {typeStats.length > 0 ? (
-              <div style={{ background: '#fff', borderRadius: 16, padding: '20px', border: '1px solid #ebeef1' }}>
-                <p style={{ fontSize: 14, fontWeight: 800, color: '#181c1e', marginBottom: 16 }}>유형별 분석</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {typeStats.map(({ type, label, color, icon, done, total, mins }) => {
+              <section className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-5">
+                <p className="text-[15px] font-medium">유형별</p>
+                <ul className="mt-4 space-y-4">
+                  {typeStats.map(({ type, label, color, done, total, mins }) => {
                     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                    const hrs = Math.floor(mins / 60);
-                    const rem = mins % 60;
-                    const timeStr = hrs > 0 ? `${hrs}시간${rem > 0 ? ` ${rem}분` : ''}` : `${rem}분`;
                     return (
-                      <div key={type}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <span style={{ fontSize: 16 }}>{icon}</span>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#181c1e' }}>{label}</span>
-                            <span style={{ fontSize: 11, color: '#94a3b8' }}>· {total}개 · {timeStr}</span>
+                      <li key={type}>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
+                            <span className="text-[14px]">{label}</span>
+                            <span className="truncate text-[12px] text-[#5f6f88]">{total}개 · {fmtMins(mins)}</span>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 13, fontWeight: 800, color }}>{pct}%</span>
-                            <span style={{ fontSize: 11, color: '#94a3b8' }}>{done}/{total}</span>
-                          </div>
+                          <span className="shrink-0 font-mono text-[13px] tabular-nums text-[#44536b]">
+                            {pct}% <span className="text-[#98a6ba]">{done}/{total}</span>
+                          </span>
                         </div>
-                        <div style={{ height: 10, borderRadius: 99, background: '#f1f4f7', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 99, transition: 'width 0.6s' }} />
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#edf3fc]">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
                         </div>
-                      </div>
+                      </li>
                     );
                   })}
-                </div>
-              </div>
+                </ul>
+              </section>
             ) : allTotal === 0 ? (
-              <div style={{ background: '#fff', borderRadius: 16, padding: '40px 20px', border: '1px solid #ebeef1', textAlign: 'center' }}>
-                <MaterialIcon icon="event_busy" size={36} color="#d1d5db" />
-                <p style={{ fontSize: 14, color: '#94a3b8', marginTop: 12, fontWeight: 600 }}>이 주의 일정이 없습니다</p>
-                <p style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>대시보드에서 일정을 추가해보세요</p>
-              </div>
+              <section className="rounded-2xl border border-[#0f1e3a]/8 bg-white px-5 py-10 text-center">
+                <MaterialIcon icon="event_busy" size={24} color="#98a6ba" />
+                <p className="mt-3 text-[15px] font-medium">이 주에는 일정이 없어요</p>
+                <p className="mt-1 text-[13px] text-[#5f6f88]">시간표 화면에서 일정을 추가할 수 있어요</p>
+              </section>
             ) : null}
 
-            {/* 패턴 인사이트 */}
             {allTotal > 0 && (
-              <div style={{ background: 'linear-gradient(135deg, #ede9fe, #dbeafe)', borderRadius: 16, padding: '16px 20px', border: '1px solid #c4b5fd' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <MaterialIcon icon="lightbulb" size={16} color="#7c3aed" filled />
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#4c1d95' }}>학습 패턴 인사이트</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {(() => {
-                    const insights: string[] = [];
-                    const bestDay = days.filter((d) => d.pct !== null).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))[0];
-                    if (bestDay && (bestDay.pct ?? 0) >= 80) insights.push(`${bestDay.label}요일 수행률이 ${bestDay.pct}%로 가장 높아요 🎉`);
-                    if (overallPct !== null && overallPct >= 80) insights.push('이번 주 전체 수행률이 80% 이상입니다. 훌륭해요! 🏆');
-                    else if (overallPct !== null && overallPct < 40 && allTotal > 0) insights.push('미완료 일정이 많아요. 하루 타임라인의 \'다시 짜기\'로 빈 시간에 옮겨 볼까요?');
-                    const zeroDays = days.filter((d) => d.total > 0 && d.done === 0);
-                    if (zeroDays.length > 0) insights.push(`${zeroDays.map((d) => d.label).join('·')}요일 일정을 하나도 완료하지 못했어요.`);
-                    if (insights.length === 0) insights.push('일정을 완료 표시하면 여기에 인사이트가 나타납니다.');
-                    return insights.map((text, i) => (
-                      <p key={i} style={{ fontSize: 12, color: '#4c1d95', lineHeight: 1.6 }}>· {text}</p>
-                    ));
-                  })()}
-                </div>
-              </div>
+              <section className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-5">
+                <p className="text-[15px] font-medium">이번 주 돌아보기</p>
+                <ul className="mt-3 space-y-2">
+                  {insights.map((text) => (
+                    <li key={text} className="flex gap-2 text-[14px] leading-[22px] text-[#44536b]">
+                      <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#2a6fe3]" />
+                      {text}
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }

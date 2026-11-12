@@ -67,7 +67,7 @@ export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-white px-4 py-12 text-slate-900 sm:px-6">
       <article className="mx-auto max-w-3xl">
-        <Link href="/" className="text-sm font-bold text-[#2563eb]">← SKEMA</Link>
+        <Link href="/" className="text-sm font-bold text-[#2a6fe3]">← SKEMA</Link>
         <h1 className="mt-4 text-3xl font-extrabold text-slate-950">개인정보처리방침</h1>
         <p className="mt-2 text-sm text-slate-500">시행일: {EFFECTIVE_DATE}</p>
         <p className="mt-6 text-sm leading-7 text-slate-700">
@@ -105,7 +105,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="7. 문의">
-          <p>개인정보 관련 문의: <a className="font-bold text-[#2563eb]" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> (SKEMA팀)</p>
+          <p>개인정보 관련 문의: <a className="font-bold text-[#2a6fe3]" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> (SKEMA팀)</p>
         </Section>
 
         <Section title="8. 방침 변경">
