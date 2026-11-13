@@ -65,7 +65,7 @@ SKEMA는 이 두 가지, **"하루를 한눈에"** 와 **"밀려도 다시 맞�
 
 - **직접 구현한 핵심 모듈**(파란 테두리): 시간표 인식기(OpenCV + Tesseract + 보정 규칙), 일정 계산 엔진(빈 시간 계산 → 공부 블록 배치 → 다시 짜기)
 - 알림은 서버 안의 스케줄러(APScheduler)가 확인해 브라우저 푸시 서비스로 보내고, 휴대폰·PC의 서비스워커가 표시합니다.
-- 시간표 인식·공부 블록 배치·다시 짜기는 외부 AI API 없이 동작합니다. 위치 파서가 격자를 아예 찾지 못한 이미지에 한해, 서버에 OpenAI 키가 있으면 예비 경로로 읽습니다 (결과는 '검토 필요'로 표시). <!-- TODO(팀 확인): 예비 경로를 남길지, 막고 이 문장을 지울지 -->
+- 시간표 인식·공부 블록 배치·다시 짜기는 외부 AI API 없이 동작합니다.
 - 원본 그림(포스터용 벡터): [`SVG`](docs/images/system-architecture.svg) · [`PDF`](docs/images/system-architecture.pdf)
 
 자세한 구성과 데이터 흐름은 [`docs/architecture.md`](docs/architecture.md), DB 구조는 [`docs/erd.md`](docs/erd.md)에 있습니다.
