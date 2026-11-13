@@ -3,7 +3,7 @@
   <!--
     unslop 기준 (11/10): 종이 플래너 톤, 강조색은 파랑 하나(직접 구현한 모듈에만), 굵기 400~600,
     4px 격자, 그림자·검정 띠 없음, 형광펜 밑줄은 '다시 짜기' 한 곳.
-    점선 = 조건부 경로(OpenAI 예비: 위치 파서가 격자를 못 찾은 캡처 + 서버에 키가 있을 때). 막기로 하면 OpenAI 상자와 점선 화살표만 지운다.
+    외부 AI(OpenAI)는 쓰지 않는다 (11/13 결정, 예비 경로 상자·점선 화살표 삭제).
     정확도 숫자는 처음 보는 캡처 5장 기준 (11/13 측정, backend/bench). 바뀌면 인식기 상자 아래 두 줄만 바꾼다.
     PNG(2배, 3600px)·PDF는 이 SVG를 Pretendard 글꼴이 있는 Chromium으로 렌더링해 만든다. 글꼴이 없으면 글자 폭이 달라질 수 있다.
   -->
@@ -58,9 +58,9 @@
   <text x="752" y="204" class="zT">Railway</text>
   <text x="752" y="228" class="zS">백엔드 · DB (Docker, 인스턴스 1대)</text>
 
-  <rect x="1448" y="168" width="304" height="560" rx="16" class="zone"/>
+  <rect x="1448" y="168" width="304" height="400" rx="16" class="zone"/>
   <text x="1472" y="204" class="zT">외부 서비스</text>
-  <text x="1472" y="228" class="zS">로그인 · 영상 저장 · 예비 인식</text>
+  <text x="1472" y="228" class="zS">로그인 · 영상 저장</text>
 
   <!-- ── 사용자 기기 ── -->
   <rect x="72" y="248" width="252" height="136" rx="12" class="box"/>
@@ -151,7 +151,7 @@
   <!-- 보안 -->
   <rect x="752" y="1000" width="632" height="112" rx="12" class="box"/>
   <text x="776" y="1036" font-size="17" font-weight="600" fill="#1f1b16">보안</text>
-  <text x="776" y="1066" class="s">JWT 인증 · 소셜 로그인 state 검증 · 로그인·AI·인식 요청 횟수 제한</text>
+  <text x="776" y="1066" class="s">JWT 인증 · 소셜 로그인 state 검증 · 로그인·인식 요청 횟수 제한</text>
   <text x="776" y="1092" class="s">업로드 이미지 사전 검사 · 비공개 기록·공유 범위 제한 · 회귀 테스트</text>
 
   <!-- ── 외부 서비스 ── -->
@@ -165,11 +165,6 @@
   <text x="1600" y="490" text-anchor="middle" class="s">스터디 인증 영상 (비공개)</text>
   <text x="1600" y="516" text-anchor="middle" class="m">1시간 서명 주소로 재생</text>
 
-
-  <rect x="1472" y="568" width="256" height="136" rx="12" fill="#fdfbf7" stroke="#b9b0a3" stroke-width="1.5" stroke-dasharray="6 5"/>
-  <text x="1600" y="612" text-anchor="middle" class="t">OpenAI (예비)</text>
-  <text x="1600" y="642" text-anchor="middle" class="s">격자를 못 찾은 캡처만</text>
-  <text x="1600" y="668" text-anchor="middle" class="m">서버에 키가 있을 때 · '검토 필요' 표시</text>
 
   <!-- ── 대표 흐름 ── -->
   <rect x="48" y="1024" width="640" height="112" rx="16" class="zone"/>
@@ -200,8 +195,6 @@
     <line x1="1384" y1="304" x2="1470" y2="304" marker-end="url(#arr)"/>
     <!-- API → R2 -->
     <path d="M1384,340 C1428,340 1426,476 1470,476" marker-end="url(#arr)"/>
-    <!-- API(시간표 인식) → OpenAI 예비 경로: 조건부라 점선 -->
-    <path d="M1384,350 C1440,350 1414,636 1470,636" stroke-dasharray="6 5" marker-end="url(#arr)"/>
     <!-- API → 인식기 / 엔진 -->
     <line x1="906" y1="360" x2="906" y2="406" marker-end="url(#arr)"/>
     <line x1="1230" y1="360" x2="1230" y2="406" marker-end="url(#arr)"/>
