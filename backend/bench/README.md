@@ -78,7 +78,7 @@ cd backend
 ETA_TESSDATA_DIR=/opt/tessdata OMP_THREAD_LIMIT=1 python bench/ocr/bench_ocr.py <세트폴더> --out result.json -v
 ```
 
-**처음 보는 캡처 5장 결과 (발표 수치)** — 개발에 쓰지 않은 에타 캡처 5장, 블록 56개. 정답 시간은 캡처 격자선에 맞춰 블록 위치를 직접 잼 ()
+**처음 보는 캡처 5장 결과 (발표 수치)** — 개발에 쓰지 않은 에타 캡처 5장, 블록 56개. 정답 시간은 캡처 격자선에 맞춰 블록 위치를 직접 잼 (`results/ocr_unseen5_summary.json`)
 
 | 방식 | 블록 찾음 | 시간 | 과목명 (글자 단위) | 강의실 | 처리 시간 |
 | --- | --- | --- | --- | --- | --- |
