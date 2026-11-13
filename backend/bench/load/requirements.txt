@@ -1,0 +1,3 @@
+# 부하 테스트에만 필요 (서버 requirements.txt와 별도)
+locust==2.31.8
+requests

@@ -1,0 +1,6 @@
+# 로컬 테스트 DB에서 만든 계정·토큰과 Locust 원본 결과
+load/accounts.json
+load/tokens.json
+load/run*/
+ocr/*/img/
+ocr/*/truth.py
