@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { displayTitle } from '@/lib/utils';
 import type { Schedule, User } from '@/types';
 
 export function DashboardStyles() {
@@ -89,7 +90,7 @@ export function NotificationBanner({ notification, onOpen, onDismiss }: Notifica
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 500, fontSize: 14, color: '#0f1e3a' }}>곧 시작해요</div>
-        <div style={{ fontSize: 13, color: '#44536b', marginTop: 2 }}>{notification.title} — {notification.start_time}</div>
+        <div style={{ fontSize: 13, color: '#44536b', marginTop: 2 }}>{displayTitle(notification.title)} — {notification.start_time}</div>
       </div>
       <button
         type="button"

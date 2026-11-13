@@ -26,7 +26,7 @@ import { scheduleVisibleIn } from "@/lib/scheduleViewScope";
 import { getDisplayColor } from "@/lib/scheduleColor";
 import { useNotificationPrefs } from "@/hooks/usePushNotifications";
 import { useMyGroups } from "@/hooks/useGroups";
-import { minutesToTime, timeToMinutes } from "@/lib/utils";
+import { displayTitle, minutesToTime, timeToMinutes } from "@/lib/utils";
 import MaterialIcon from "@/components/common/MaterialIcon";
 import {
   ExamSchedule,
@@ -532,7 +532,7 @@ export default function DashboardClient({
             label: "겹친 일정",
             value: `${todayConflictSchedules.length}개`,
             detail: todayConflictSchedules
-              .map(({ schedule }) => schedule.title)
+              .map(({ schedule }) => displayTitle(schedule.title))
               .join(", "),
             tone: "red",
           },
@@ -545,7 +545,7 @@ export default function DashboardClient({
             label: "지나간 미완료",
             value: `${overdueSchedules.length}개`,
             detail: overdueSchedules
-              .map((schedule) => schedule.title)
+              .map((schedule) => displayTitle(schedule.title))
               .slice(0, 2)
               .join(", "),
             tone: "amber",

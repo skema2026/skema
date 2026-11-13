@@ -155,7 +155,7 @@ export default function DayTimeline({
                 <button
                   type="button"
                   onClick={() => onToggleComplete(schedule)}
-                  aria-label={`${schedule.title} 완료 여부`}
+                  aria-label={`${displayTitle(schedule.title)} 완료 여부`}
                   aria-pressed={Boolean(schedule.is_completed)}
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors ${
                     schedule.is_completed
