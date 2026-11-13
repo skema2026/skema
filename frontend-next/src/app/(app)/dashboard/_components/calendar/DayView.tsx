@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import DayTimeline from "./DayTimeline";
 import MaterialIcon from "@/components/common/MaterialIcon";
+import { displayTitle } from "@/lib/utils";
 import type { ExamSchedule, Schedule, UserProfile } from "@/types";
 
 type DayViewProps = {
@@ -109,7 +110,7 @@ function ScheduleList({
           >
             <button
               type="button"
-              aria-label={`${schedule.title} 완료 여부`}
+              aria-label={`${displayTitle(schedule.title)} 완료 여부`}
               aria-pressed={isDone}
               onClick={() =>
                 toggleComplete.mutate({
@@ -145,7 +146,7 @@ function ScheduleList({
                     isDone ? "text-slate-400 line-through" : "text-slate-900"
                   }`}
                 >
-                  {schedule.title}
+                  {displayTitle(schedule.title)}
                 </span>
                 <span
                   className={`rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold ${
@@ -262,7 +263,7 @@ function DailyReport({
               겹치는 일정
             </p>
             <p className="mt-1 text-xs font-medium text-red-700">
-              {dayConflictSchedules.map(({ schedule }) => schedule.title).join(", ")}
+              {dayConflictSchedules.map(({ schedule }) => displayTitle(schedule.title)).join(", ")}
             </p>
           </div>
         )}
