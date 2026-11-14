@@ -51,6 +51,8 @@ function toCreatePayload(schedule: ScheduleCreateInput) {
     is_completed: schedule.is_completed,
     schedule_type: schedule.schedule_type,
     view_scope: schedule.view_scope,
+    // 일정 추가 화면에서 고른 시험 (준비도에 반영). 없으면 보내지 않음
+    linked_exam_id: schedule.linked_exam_id ?? undefined,
   };
 }
 
