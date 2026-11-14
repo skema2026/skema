@@ -7,7 +7,7 @@
 | | |
 | --- | --- |
 | 🌐 서비스 | https://skema-dku.vercel.app (PC 브라우저, 휴대폰은 '홈 화면에 추가'로 앱처럼 사용) |
-| 🎬 시연 영상 | 준비 중 (11/16 제출 전 유튜브 링크 추가) <!-- TODO: 유튜브 링크 --> |
+| 🎬 시연 영상 | https://www.youtube.com/watch?v=_OOcehtEkM8 (2분 13초) |
 | 🖼️ 포스터 | 준비 중 → [`docs/poster/`](docs/poster/) <!-- TODO: SKEMA_poster.pdf --> |
 | 📘 결과보고서 | 준비 중 → [`docs/report/`](docs/report/) <!-- TODO: SKEMA_report.pdf --> |
 | 📑 API 문서 | https://backend-production-e565.up.railway.app/docs (Swagger) |
