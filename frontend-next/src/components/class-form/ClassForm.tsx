@@ -19,6 +19,7 @@ import { useCreateSchedule, useDeleteSchedule, useUpdateSchedule } from '@/hooks
 import {
   DAY_NAMES_FULL,
   cn,
+  displayTitle,
 } from '@/lib/utils';
 import { ALL_SCHEDULE_COLORS, getAutoColor } from '@/lib/scheduleColor';
 import { dateStringToRecurringDay, recurringDayToIndex, indexToRecurringDay } from '@/lib/recurringDay';
@@ -154,6 +155,12 @@ export function ClassForm() {
     };
   }, [isClassFormOpen]);
 
+  // 겹침 안내는 폼 맨 아래에 있어 휴대폰에서는 화면 밖일 수 있다 → 생기면 그 위치로 스크롤 (11/14 테스트)
+  const conflictRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (errors.conflict) conflictRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [errors.conflict]);
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!form.title.trim()) newErrors.title = '제목을 입력해주세요';
@@ -164,6 +171,8 @@ export function ClassForm() {
     if (scopeToTargets(form.view_scope).length === 0) newErrors.view_scope = '표시 위치를 선택해주세요';
     if (form.start_time >= form.end_time) newErrors.end_time = '종료 시간은 시작 시간 이후여야 합니다';
     setErrors(newErrors);
+    const first = Object.values(newErrors)[0];
+    if (first) toast.error(first); // 입력 칸이 화면 밖이어도 무엇이 문제인지 보이게
     return Object.keys(newErrors).length === 0;
   };
 
@@ -174,10 +183,9 @@ export function ClassForm() {
     const allSchedules = qc.getQueryData<Schedule[]>(['schedules']) ?? [];
     const conflicting = findConflict(form, isRecurring, selectedDays, allSchedules, editingSchedule?.id);
     if (conflicting) {
-      setErrors((prev) => ({
-        ...prev,
-        conflict: `"${conflicting.title}"과(와) 시간이 겹칩니다 (${conflicting.start_time}–${conflicting.end_time})`,
-      }));
+      const message = `"${displayTitle(conflicting.title)}"과(와) 시간이 겹칩니다 (${conflicting.start_time}–${conflicting.end_time})`;
+      setErrors((prev) => ({ ...prev, conflict: message }));
+      toast.error(message);
       return;
     }
 
@@ -514,7 +522,7 @@ export function ClassForm() {
           )}
 
           {errors.conflict && (
-            <p className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] leading-[20px] text-[#b91c1c]">{errors.conflict}</p>
+            <p ref={conflictRef} role="alert" className="rounded-xl bg-[#fef2f2] px-4 py-3 text-[13px] leading-[20px] text-[#b91c1c]">{errors.conflict}</p>
           )}
 
           </div>
