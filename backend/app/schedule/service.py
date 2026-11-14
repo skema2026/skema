@@ -138,8 +138,19 @@ def _check_no_conflict(
             )
 
 
+def _check_linked_exam(db: Session, user_id: int, exam_id: int | None) -> None:
+    """연결하려는 시험이 내 시험인지 확인한다 (11/14).
+
+    일정 추가·수정 화면에서 시험을 골라 준비도에 넣을 수 있게 되면서, 남의 시험 ID로
+    연결하지 못하도록 막는다. None(연결 해제)은 그대로 허용.
+    """
+    if exam_id is not None:
+        get_exam_or_404(db, exam_id, user_id)
+
+
 def create_schedule(db: Session, user_id: int, data: ScheduleCreate) -> list[Schedule]:
     """days에 포함된 각 요일마다 수업 1개씩 생성."""
+    _check_linked_exam(db, user_id, data.linked_exam_id)
     created = []
     base = data.model_dump(exclude={"days", "day_of_week", "title", "color"})
 
@@ -156,6 +167,8 @@ def create_schedule(db: Session, user_id: int, data: ScheduleCreate) -> list[Sch
 def update_schedule(db: Session, schedule_id: int, user_id: int, data: ScheduleUpdate) -> Schedule:
     schedule = get_schedule_or_404(db, schedule_id, user_id)
     updates = data.model_dump(exclude_unset=True, exclude={"title", "day_of_week", "color"})
+    if "linked_exam_id" in updates:
+        _check_linked_exam(db, user_id, updates["linked_exam_id"])
 
     if "recurring_day" in updates and updates["recurring_day"] is not None:
         updates["recurring_day"] = DayOfWeek(updates["recurring_day"])
