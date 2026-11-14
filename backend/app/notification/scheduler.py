@@ -39,6 +39,25 @@ def _kst_today() -> date:
     return datetime.now(KST).date()
 
 
+def _start_reminder_since(now: datetime, diff: int, reminder_min: int) -> datetime:
+    """'곧 시작' 중복 확인을 시작할 시각 = 시작 시각 - 지금 설정(분) - 여유 2분.
+
+    알림 설정을 30분 전 → 10분 전으로 바꾸면, 30분 전 설정으로 이미 보낸 알림은
+    이 시각보다 앞이라 중복으로 치지 않고 10분 전에 한 번 더 보낸다.
+    같은 설정 안에서는 5분 뒤 확인 때도 이 시각 이후 기록이 있어 다시 안 보낸다.
+    """
+    start = now.replace(second=0, microsecond=0) + timedelta(minutes=diff)
+    return start - timedelta(minutes=reminder_min + 2)
+
+
+def _ends_after_last_tick(schedule) -> bool:
+    """그날 마지막 확인(23:55) 때까지 안 끝나는 일정(예: 23:59에 끝나는 블록).
+
+    '끝난 뒤' 판단(end < now)이 그날 안에 한 번도 참이 안 되므로, 다음 날 00:00 확인 때 따로 본다.
+    """
+    return time_to_minutes(schedule.end_time) >= 1440 - REMINDER_INTERVAL_MINUTES
+
+
 def _reminder_kind(schedule, now_min: int, reminder_min: int) -> tuple[str, int] | None:
     """오늘 일정 하나에 대해 보낼 리마인더 종류를 정한다.
 
@@ -125,11 +144,13 @@ def _push(
     related_id: int | None = None,
     send_push: bool = True,
     url: str = "/dashboard",
+    since: datetime | None = None,
 ):
     """알림 1건 저장. url은 푸시 알림을 눌렀을 때 열 화면.
     중복 방지 기준:
       - related_id 있음 → (type, related_id, 오늘) — 같은 일정에 하루 1번
       - related_id 없음 → (type, title, 오늘) — 동기부여·리포트 등
+    since(KST)를 주면 오늘 중에서도 그 시각 이후에 보낸 알림만 중복으로 본다.
     """
     from app.notification.models import Notification
     from app.notification.service import send_push_to_user
@@ -140,6 +161,8 @@ def _push(
 
     # Seoul 자정 → UTC 변환 (DB는 UTC 저장)
     kst_midnight = datetime.now(ZoneInfo("Asia/Seoul")).replace(hour=0, minute=0, second=0, microsecond=0)
+    if since is not None and since > kst_midnight:
+        kst_midnight = since
     today_start = kst_midnight.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
 
     q = db.query(Notification).filter(
@@ -250,6 +273,9 @@ def job_reminders():
         today_str = now.strftime("%Y-%m-%d")
         today_dow = now.weekday()  # 0=Mon, 6=Sun — Schedule.day_of_week와 동일 기준
         now_min = now.hour * 60 + now.minute
+        yesterday = now - timedelta(days=1)
+        yesterday_str = yesterday.strftime("%Y-%m-%d")
+        yesterday_dow = yesterday.weekday()
 
         users = db.query(User).filter(User.is_active == True).all()  # noqa: E712
         for user in users:
@@ -272,6 +298,7 @@ def job_reminders():
                         f"{kind[1]}분 후 [{s.start_time}~{s.end_time}] 일정이 시작됩니다.",
                         related_id=s.id,
                         url=day_timeline_url(today_str),
+                        since=_start_reminder_since(now, kind[1], reminder_min),
                     )
                 else:
                     _push(
@@ -280,6 +307,25 @@ def job_reminders():
                         incomplete_body(s),
                         related_id=s.id,
                         url=day_timeline_url(today_str),
+                    )
+
+            # 자정 직후 첫 확인: 어제 23:55 이후에 끝난 일정(23:59 끝 블록 등)의 미완료 알림
+            if now_min < REMINDER_INTERVAL_MINUTES:
+                for s in schedules:
+                    is_yesterday = (s.date == yesterday_str) if s.date else (s.day_of_week == yesterday_dow)
+                    if (
+                        not is_yesterday
+                        or s.is_completed
+                        or s.schedule_type in _NO_INCOMPLETE_REMINDER_TYPES
+                        or not _ends_after_last_tick(s)
+                    ):
+                        continue
+                    _push(
+                        db, user.id, "reminder_incomplete",
+                        f"미완료: {s.title}",
+                        incomplete_body(s),
+                        related_id=s.id,
+                        url=day_timeline_url(yesterday_str),
                     )
 
         db.commit()
