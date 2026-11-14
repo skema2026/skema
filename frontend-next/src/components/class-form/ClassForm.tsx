@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUIStore } from '@/store/uiStore';
 import { useCreateSchedule, useDeleteSchedule, useUpdateSchedule } from '@/hooks/useSchedules';
+import { useExams } from '@/hooks/useExams';
 import {
   DAY_NAMES_FULL,
   cn,
@@ -48,7 +49,15 @@ const defaultForm = {
   color: '#6366F1',
   is_completed: false,
   view_scope: 'all' as ScheduleViewScope,
+  linked_exam_id: null as number | null,
 };
+
+// 시험 준비도에 넣을 수 있는 일정: 공부·과제 유형의 특정 날짜 일정 (공부 블록과 같은 조건)
+const EXAM_LINKABLE_TYPES: Schedule['schedule_type'][] = ['study', 'assignment'];
+
+function todayKST(): string {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+}
 
 const VIEW_SCOPE_OPTIONS: { value: ScheduleViewTarget; label: string; desc: string; icon: string }[] = [
   { value: 'day', label: '일간', desc: '하루 화면', icon: 'today' },
@@ -92,6 +101,7 @@ export function ClassForm() {
   const createSchedule = useCreateSchedule();
   const updateSchedule = useUpdateSchedule();
   const deleteSchedule = useDeleteSchedule();
+  const { data: exams = [] } = useExams();
   const qc = useQueryClient();
 
   const [form, setForm] = useState(defaultForm);
@@ -119,6 +129,7 @@ export function ClassForm() {
         color: editingSchedule.color,
         is_completed: editingSchedule.is_completed,
         view_scope: editingSchedule.view_scope ?? 'all',
+        linked_exam_id: editingSchedule.linked_exam_id ?? null,
       });
       setSelectedDays([editingSchedule.recurring_day]);
     } else {
@@ -154,6 +165,14 @@ export function ClassForm() {
     };
   }, [isClassFormOpen]);
 
+  const isLinkableType = EXAM_LINKABLE_TYPES.includes(form.schedule_type);
+  const canLinkExam = isLinkableType && !isRecurring;
+  const linkedExam = exams.find((exam) => exam.id === form.linked_exam_id) ?? null;
+  // 고를 수 있는 시험: 지나지 않은 시험 + (수정 중이면) 이미 연결된 시험
+  const examOptions = exams
+    .filter((exam) => exam.exam_date >= todayKST() || exam.id === form.linked_exam_id)
+    .sort((a, b) => a.exam_date.localeCompare(b.exam_date));
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!form.title.trim()) newErrors.title = '제목을 입력해주세요';
@@ -163,6 +182,9 @@ export function ClassForm() {
     if (!form.end_time) newErrors.end_time = '종료 시간을 입력해주세요';
     if (scopeToTargets(form.view_scope).length === 0) newErrors.view_scope = '표시 위치를 선택해주세요';
     if (form.start_time >= form.end_time) newErrors.end_time = '종료 시간은 시작 시간 이후여야 합니다';
+    if (canLinkExam && linkedExam && form.date && form.date > linkedExam.exam_date) {
+      newErrors.linked_exam_id = '시험 날짜 이후의 일정은 연결할 수 없어요';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -194,6 +216,8 @@ export function ClassForm() {
       priority: editingSchedule?.priority ?? 0,
       is_completed: form.is_completed,
       view_scope: form.view_scope,
+      // 공부·과제의 특정 날짜 일정만 시험에 연결 (그 외로 바꾸면 연결 해제)
+      linked_exam_id: canLinkExam ? form.linked_exam_id : null,
     };
 
     if (editingSchedule) {
@@ -461,6 +485,63 @@ export function ClassForm() {
               {errors.end_time && <p className="text-[12px] text-[#dc2626]">{errors.end_time}</p>}
             </div>
           </div>
+
+          {/* 시험 연결 → 준비도에 반영 (공부·과제 유형일 때만) */}
+          {isLinkableType && (
+            <div className="space-y-1.5">
+              <Label htmlFor="linked_exam" className="text-[13px] font-normal text-[#44536b]">
+                시험 준비도에 넣기 · 선택
+              </Label>
+              {isRecurring ? (
+                <p className="rounded-[10px] bg-[#f5f8fd] px-3 py-2.5 text-[13px] leading-[19px] text-[#5f6f88]">
+                  매주 반복 일정은 시험에 연결할 수 없어요. <b className="font-medium text-[#44536b]">특정 날짜</b>로 바꾸면 고를 수 있어요.
+                </p>
+              ) : examOptions.length === 0 ? (
+                <p className="rounded-[10px] bg-[#f5f8fd] px-3 py-2.5 text-[13px] leading-[19px] text-[#5f6f88]">
+                  다가오는 시험이 없어요. 사이드바의 [시험 추가]로 먼저 시험을 넣어 주세요.
+                </p>
+              ) : (
+                <>
+                  <select
+                    id="linked_exam"
+                    value={form.linked_exam_id ?? ''}
+                    onChange={(e) => {
+                      const id = e.target.value ? Number(e.target.value) : null;
+                      const exam = exams.find((x) => x.id === id);
+                      setForm((f) => {
+                        // 제목이 비어 있으면 '과목 공부'로 채워 줌
+                        const title = !f.title.trim() && exam ? `${exam.subject || exam.title} 공부` : f.title;
+                        const color = isAutoColor && title.trim() ? getAutoColor(title) : f.color;
+                        return { ...f, linked_exam_id: id, title, color };
+                      });
+                      setErrors((prev) => ({ ...prev, linked_exam_id: '' }));
+                    }}
+                    className={cn(
+                      fieldClassName,
+                      'w-full appearance-none border outline-none',
+                      errors.linked_exam_id && 'border-red-500',
+                    )}
+                  >
+                    <option value="">연결 안 함</option>
+                    {examOptions.map((exam) => (
+                      <option key={exam.id} value={exam.id}>
+                        {exam.title} · {exam.exam_date.slice(5).replace('-', '/')}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.linked_exam_id ? (
+                    <p className="text-[12px] text-[#dc2626]">{errors.linked_exam_id}</p>
+                  ) : (
+                    <p className="text-[12px] text-[#5f6f88]">
+                      {linkedExam
+                        ? '완료하면 이 시험의 준비도가 올라가요. 다시 짜기에서도 시험 전날까지 옮겨져요.'
+                        : '시험을 고르면 이 일정을 끝냈을 때 준비도에 반영돼요.'}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* Location */}
           <div className="space-y-1.5">
