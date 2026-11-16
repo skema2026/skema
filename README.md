@@ -9,7 +9,7 @@
 | 🌐 서비스 | https://skema-dku.vercel.app (PC 브라우저, 휴대폰은 '홈 화면에 추가'로 앱처럼 사용) |
 | 🎬 시연 영상 | https://www.youtube.com/watch?v=_OOcehtEkM8 (2분 13초) |
 | 🖼️ 포스터 | [PDF](docs/poster/SKEMA_poster.pdf) · [PNG](docs/poster/SKEMA_poster.png) (90×140cm) |
-| 📘 결과보고서 | [`docs/report/`](docs/report/SKEMA_report.pdf) |
+| 📘 결과보고서 | [PDF](docs/report/SKEMA_report.pdf) |
 | 📑 API 문서 | https://backend-production-e565.up.railway.app/docs (Swagger) |
 | 📂 개발 문서 | [`docs/`](docs/README.md) |
 | 🗺️ 로드맵 | [노션 공개 로드맵](https://pyrite-spice-b15.notion.site/3e6529d680e1805bb40df494059293eb?v=3e6529d680e1807da366000c6a9bae9e) (9/26 방향 결정 → 11/27 전시, 47개 항목·담당·상태) |
