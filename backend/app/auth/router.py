@@ -246,6 +246,28 @@ def oauth_authorize(provider: str):
     return response
 
 
+def _log_social(
+    db: Session,
+    request: Request,
+    provider: str,
+    *,
+    success: bool,
+    user_id: int | None = None,
+    identifier: str = "",
+    failure_reason: str | None = None,
+) -> None:
+    service.record_social_login(
+        db,
+        provider=provider,
+        user_id=user_id,
+        identifier=identifier,
+        success=success,
+        failure_reason=failure_reason,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+
+
 @router.get("/auth/{provider}/callback")
 def oauth_callback(
     provider: str,
@@ -259,12 +281,14 @@ def oauth_callback(
         raise HTTPException(status_code=404, detail="지원하지 않는 OAuth 공급자입니다.")
 
     if error or not code:
+        _log_social(db, request, provider, success=False, failure_reason="oauth_denied")
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_denied")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
 
     expected_state = request.cookies.get(f"oauth_state_{provider}", "")
     if not state:
+        _log_social(db, request, provider, success=False, failure_reason="oauth_state_invalid")
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
@@ -273,10 +297,12 @@ def oauth_callback(
     if not expected_state or not secrets.compare_digest(state, expected_state):
         if not expected_state:
             logger.warning("oauth_state_%s cookie missing – rejecting callback", provider)
+        _log_social(db, request, provider, success=False, failure_reason="oauth_state_invalid")
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_state_invalid")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
 
+    email = None
     try:
         social_id, email, display_name, kakao_at, kakao_rt, email_verified = service.exchange_oauth_code(
             provider, code, state
@@ -288,22 +314,30 @@ def oauth_callback(
             email_verified=email_verified,
         )
         token = create_access_token(user.id)
+        # 11/19: 소셜 로그인도 관리자 로그인 로그에 남긴다 (이메일이 없으면 공급자:고유번호)
+        _log_social(
+            db, request, provider, success=True, user_id=user.id,
+            identifier=user.email or email or f"{provider}:{social_id}",
+        )
         # 11/7: 토큰을 쿼리(?token=)가 아니라 fragment(#token=)로 넘긴다.
         # fragment는 서버로 전송되지 않아 Vercel 접근 로그·Referer에 토큰이 남지 않는다.
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login#token={token}")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
     except service.SocialEmailExists:
+        _log_social(db, request, provider, success=False, identifier=email or "", failure_reason="oauth_email_exists")
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_email_exists")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
     except ValueError:
         logger.exception("OAuth value error provider=%s", provider)
+        _log_social(db, request, provider, success=False, identifier=email or "", failure_reason="oauth_failed")
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_failed")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response
     except Exception:
         logger.exception("OAuth unexpected error provider=%s", provider)
+        _log_social(db, request, provider, success=False, identifier=email or "", failure_reason="oauth_failed")
         response = RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=oauth_failed")
         response.delete_cookie(key=f"oauth_state_{provider}")
         return response

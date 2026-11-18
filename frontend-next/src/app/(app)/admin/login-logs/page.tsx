@@ -7,9 +7,15 @@ import { useAuthStore } from '@/store/authStore';
 import { LoginLog } from '@/types';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
-const methodLabel = (method: LoginLog['login_method']) => (
-  method === 'email' ? '이메일' : '아이디'
-);
+const METHOD_LABELS: Record<LoginLog['login_method'], string> = {
+  email: '이메일',
+  username: '아이디',
+  kakao: '카카오',
+  naver: '네이버',
+  google: '구글',
+};
+
+const methodLabel = (method: LoginLog['login_method']) => METHOD_LABELS[method] ?? method;
 
 const formatDate = (value: string) => {
   const date = new Date(value);

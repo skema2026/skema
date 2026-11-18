@@ -105,6 +105,33 @@ def _record_login_attempt(
         logger.exception("failed to write login log")
 
 
+def record_social_login(
+    db: Session,
+    *,
+    provider: str,
+    user_id: int | None,
+    identifier: str,
+    success: bool,
+    failure_reason: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> None:
+    """소셜 로그인(카카오·네이버·구글) 시도도 이메일 로그인과 같은 login_logs에 남긴다 (11/19).
+
+    login_method에는 공급자 이름(kakao·naver·google)을 넣는다. 기록이 실패해도 로그인은 막지 않는다.
+    """
+    _record_login_attempt(
+        db,
+        user_id=user_id,
+        identifier=identifier or provider,
+        method=provider,
+        success=success,
+        failure_reason=failure_reason,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+
 def login(
     db: Session,
     email: str,

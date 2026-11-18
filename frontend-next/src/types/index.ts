@@ -120,7 +120,7 @@ export type LoginLog = {
   id: number;
   user_id: number | null;
   login_identifier: string;
-  login_method: 'email' | 'username';
+  login_method: 'email' | 'username' | 'kakao' | 'naver' | 'google';
   success: boolean;
   failure_reason?: string | null;
   ip_address?: string | null;
