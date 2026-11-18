@@ -14,9 +14,11 @@ import {
 import { api } from '@/lib/api';
 import { ScheduleKindToggle, toEtaKind, type EtaScheduleKind } from '@/components/timetable/ScheduleKindToggle';
 import { apiErrorMessage } from '@/lib/apiError';
+import { normalizeTimeString } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
 
 interface ParsedEntry {
+  _id: string;                     // 화면에서 줄을 구분하는 값 (저장하지 않음)
   subject_name: string;
   day_of_week: number;
   start_time: string;
@@ -27,6 +29,14 @@ interface ParsedEntry {
 }
 
 const DAY_KO = ['월', '화', '수', '목', '금', '토', '일'];
+
+// 넓은 화면의 칸 배치: 과목명 · 종류 · 요일 · 시작 · 종료 · 강의실 · 지우기
+const ROW_GRID = 'sm:grid-cols-[minmax(0,2fr)_96px_88px_124px_124px_minmax(0,1fr)_32px]';
+const FIELD =
+  'h-9 w-full rounded-lg border border-[#dfe7f3] bg-[#f5f8fd] px-2 text-base text-[#0f1e3a] outline-none focus:border-[#2a6fe3] sm:text-[14px]';
+
+const isEntryValid = (e: ParsedEntry) =>
+  Boolean(e.subject_name.trim()) && Boolean(e.start_time) && Boolean(e.end_time) && e.start_time < e.end_time;
 
 interface Props {
   open: boolean;
@@ -83,7 +93,16 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
         source?: string;
         schedule_type?: string;
       }>;
-      setEntries(parsed.map((e) => ({ ...e, location: e.location ?? '', schedule_type: toEtaKind(e.schedule_type) })));
+      setEntries(
+        parsed.map((e, i) => ({
+          ...e,
+          _id: `eta-${Date.now()}-${i}`,
+          start_time: normalizeTimeString(e.start_time) || e.start_time,
+          end_time: normalizeTimeString(e.end_time) || e.end_time,
+          location: e.location ?? '',
+          schedule_type: toEtaKind(e.schedule_type),
+        })),
+      );
       if (parsed.length === 0) toast('시간표를 읽지 못했어요. 다른 캡처로 해 보세요');
     } catch (err) {
       toast.error(apiErrorMessage(err, '시간표를 읽지 못했어요'));
@@ -91,6 +110,26 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
       setParsing(false);
     }
   };
+
+  // 11/19: 인식이 틀린 칸을 이 창에서 바로 고치고, 빠진 수업은 추가하고, 잘못 읽은 줄은 지운다
+  const updateEntry = <K extends keyof ParsedEntry>(id: string, key: K, value: ParsedEntry[K]) =>
+    setEntries((prev) => prev.map((x) => (x._id === id ? { ...x, [key]: value } : x)));
+  const removeEntry = (id: string) => setEntries((prev) => prev.filter((x) => x._id !== id));
+  const addEntry = () =>
+    setEntries((prev) => [
+      ...prev,
+      {
+        _id: `new-${Date.now()}`,
+        subject_name: '',
+        day_of_week: 0,
+        start_time: '09:00',
+        end_time: '10:30',
+        location: '',
+        source: 'manual',
+        schedule_type: 'class',
+      },
+    ]);
+  const invalidCount = entries.filter((e) => !isEntryValid(e)).length;
 
   const handleSave = () => {
     if (existingEtaCount > 0) {
@@ -107,9 +146,7 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
       if (existingEtaCount > 0) {
         await api.delete('/eta/schedules');
       }
-      const valid = entries.filter(
-        (e) => e.subject_name.trim() && e.start_time && e.end_time && e.start_time < e.end_time,
-      );
+      const valid = entries.filter(isEntryValid);
       if (valid.length > 0) {
         await api.post('/eta/save-schedules', {
           entries: valid.map(({ subject_name, day_of_week, start_time, end_time, location, source, schedule_type }) => ({
@@ -149,7 +186,8 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
   return (
     <>
       <Dialog open={open && !confirmOpen && !resetOpen} onOpenChange={(o) => !o && handleClose()}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        {/* 11/19: 기본 대화창 폭(sm:max-w-sm, 384px)이 그대로 적용돼 좁았다 → 넓게 */}
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>시간표 수정</DialogTitle>
           </DialogHeader>
@@ -176,7 +214,7 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
             >
               {previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={previewUrl} alt="preview" className="max-h-36 rounded-lg object-contain" />
+                <img src={previewUrl} alt="올린 시간표 캡처" className="max-h-64 rounded-lg object-contain" />
               ) : (
                 <>
                   <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-[#2a6fe3]">
@@ -198,31 +236,104 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
               </div>
             )}
 
-            {entries.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-[12px] text-[#5f6f88]">
-                  {entries.length}개 인식 · 알바·스터디 같은 개인 일정은 &lsquo;개인&rsquo;으로 골라 주세요
+            {hasFile && !parsing && (
+              <div className="space-y-2">
+                <p className="text-[12px] leading-[18px] text-[#5f6f88]">
+                  {entries.length}개 읽음 · 틀린 칸은 눌러서 고치고, 빠진 수업은 아래에서 추가해 주세요.
+                  알바·스터디 같은 개인 일정은 &lsquo;개인&rsquo;으로 골라 주세요
                 </p>
                 <div className="overflow-hidden rounded-xl border border-[#0f1e3a]/8">
-                  {entries.map((e, i) => (
-                    <div
-                      key={i}
-                      className="flex h-11 items-center gap-2 border-b border-[#0f1e3a]/8 px-3 text-[14px] last:border-b-0"
-                    >
-                      <span className="w-4 text-center font-medium text-[#1f63d6]">{DAY_KO[e.day_of_week]}</span>
-                      <span className="flex-1 truncate text-[#0f1e3a]">{e.subject_name}</span>
-                      <span className="font-mono text-[12px] tabular-nums text-[#5f6f88]">{e.start_time}–{e.end_time}</span>
-                      <div className="w-24 shrink-0">
+                  <div
+                    className={`hidden gap-2 border-b border-[#0f1e3a]/8 bg-[#f5f8fd] px-3 py-2 text-[12px] font-medium text-[#44536b] sm:grid ${ROW_GRID}`}
+                  >
+                    <span>과목명</span>
+                    <span>종류</span>
+                    <span>요일</span>
+                    <span>시작</span>
+                    <span>종료</span>
+                    <span>강의실</span>
+                    <span />
+                  </div>
+                  {entries.length === 0 && (
+                    <p className="px-4 py-6 text-center text-[13px] text-[#5f6f88]">
+                      읽은 수업이 없어요. 아래 &lsquo;수업 추가&rsquo;로 직접 넣어 주세요
+                    </p>
+                  )}
+                  <div className="divide-y divide-[#0f1e3a]/8">
+                    {entries.map((e) => (
+                      <div key={e._id} className={`grid grid-cols-2 items-center gap-2 px-3 py-3 sm:py-2 ${ROW_GRID}`}>
+                        <input
+                          type="text"
+                          value={e.subject_name}
+                          onChange={(ev) => updateEntry(e._id, 'subject_name', ev.target.value)}
+                          placeholder="과목명"
+                          aria-label="과목명"
+                          className={`${FIELD} col-span-2 sm:col-span-1 ${e.subject_name.trim() ? '' : 'border-[#fecaca]'}`}
+                        />
                         <ScheduleKindToggle
                           value={e.schedule_type}
-                          onChange={(v) =>
-                            setEntries((prev) => prev.map((x, j) => (j === i ? { ...x, schedule_type: v } : x)))
-                          }
+                          onChange={(v) => updateEntry(e._id, 'schedule_type', v)}
                         />
+                        <select
+                          value={e.day_of_week}
+                          onChange={(ev) => updateEntry(e._id, 'day_of_week', Number(ev.target.value))}
+                          aria-label="요일"
+                          className={FIELD}
+                        >
+                          {DAY_KO.map((d, i) => (
+                            <option key={d} value={i}>{d}요일</option>
+                          ))}
+                        </select>
+                        <input
+                          type="time"
+                          step="300"
+                          value={e.start_time}
+                          onChange={(ev) => updateEntry(e._id, 'start_time', ev.target.value)}
+                          aria-label="시작 시간"
+                          className={FIELD}
+                        />
+                        <input
+                          type="time"
+                          step="300"
+                          value={e.end_time}
+                          onChange={(ev) => updateEntry(e._id, 'end_time', ev.target.value)}
+                          aria-label="종료 시간"
+                          className={`${FIELD} ${e.start_time && e.end_time && e.start_time >= e.end_time ? 'border-[#fecaca]' : ''}`}
+                        />
+                        <input
+                          type="text"
+                          value={e.location}
+                          onChange={(ev) => updateEntry(e._id, 'location', ev.target.value)}
+                          placeholder="강의실"
+                          aria-label="강의실"
+                          className={FIELD}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeEntry(e._id)}
+                          aria-label={`${e.subject_name || '이 줄'} 지우기`}
+                          className="flex h-9 items-center justify-center gap-1 rounded-lg bg-[#fef2f2] text-[13px] text-[#dc2626] hover:bg-[#fee2e2] sm:w-8"
+                        >
+                          <MaterialIcon icon="delete" size={14} color="currentColor" />
+                          <span className="sm:hidden">지우기</span>
+                        </button>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={addEntry}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#bcd8fe] py-2.5 text-[13px] font-medium text-[#2a6fe3] hover:bg-[#eaf2ff]"
+                >
+                  <MaterialIcon icon="add" size={14} color="currentColor" />
+                  수업 추가
+                </button>
+                {invalidCount > 0 && (
+                  <p className="text-[12px] text-[#dc2626]">
+                    과목명이 비었거나 끝나는 시간이 시작보다 빠른 줄이 {invalidCount}개 있어요. 고치거나 지워 주세요
+                  </p>
+                )}
               </div>
             )}
 
@@ -249,7 +360,7 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
             <Button variant="outline" onClick={handleClose}>취소</Button>
             <Button
               onClick={handleSave}
-              disabled={entries.length === 0 || parsing || saving}
+              disabled={entries.length === 0 || invalidCount > 0 || parsing || saving}
               className="bg-[#2a6fe3] text-white hover:bg-[#1f63d6]"
             >
               {saving ? '저장하는 중' : '저장'}
@@ -293,6 +404,9 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
             </p>
             <p className="rounded-xl bg-[#f5f8fd] px-4 py-3 text-[13px] text-[#44536b]">
               직접 넣은 일정, 시험, 공부 블록과 완료 기록은 그대로 남아요
+            </p>
+            <p className="text-[12px] leading-[18px] text-[#5f6f88]">
+              이제 대학생이 아니라면 프로필에서 &lsquo;대학생 시간표 모드&rsquo;를 끄면 시간표 등록 안내가 더 이상 뜨지 않아요
             </p>
           </div>
           <DialogFooter>
