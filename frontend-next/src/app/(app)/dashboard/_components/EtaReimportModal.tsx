@@ -41,6 +41,9 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // 11/19: 시간표 초기화 (에타에서 가져온 수업·일정만 지운다)
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [hasFile, setHasFile] = useState(false);
 
@@ -51,6 +54,8 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
     setParsing(false);
     setSaving(false);
     setConfirmOpen(false);
+    setResetOpen(false);
+    setResetting(false);
   };
 
   const handleClose = () => {
@@ -128,13 +133,29 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
     }
   };
 
+  const doReset = async () => {
+    setResetting(true);
+    try {
+      await api.delete('/eta/schedules');
+      toast.success('시간표를 비웠어요');
+      qc.invalidateQueries({ queryKey: ['schedules'] });
+      handleClose();
+    } catch (err) {
+      toast.error(apiErrorMessage(err, '시간표를 비우지 못했어요. 다시 시도해 주세요'));
+      setResetting(false);
+    }
+  };
+
   return (
     <>
-      <Dialog open={open && !confirmOpen} onOpenChange={(o) => !o && handleClose()}>
+      <Dialog open={open && !confirmOpen && !resetOpen} onOpenChange={(o) => !o && handleClose()}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>시간표 다시 가져오기</DialogTitle>
+            <DialogTitle>시간표 수정</DialogTitle>
           </DialogHeader>
+          <p className="-mt-2 text-[13px] text-[#5f6f88]">
+            다른 학기 캡처를 올리면 지금 수업을 새 시간표로 바꿔요
+          </p>
 
           <div className="space-y-4">
             <input
@@ -204,6 +225,24 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
                 </div>
               </div>
             )}
+
+            {existingEtaCount > 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[#0f1e3a]/8 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-[14px] font-medium text-[#0f1e3a]">시간표 초기화</p>
+                  <p className="text-[12px] text-[#5f6f88]">에타에서 가져온 수업·일정 {existingEtaCount}개를 모두 지워요</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setResetOpen(true)}
+                  disabled={parsing || saving}
+                  className="shrink-0 border-[#fecaca] text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#b91c1c]"
+                >
+                  <MaterialIcon icon="delete" size={14} color="currentColor" />
+                  초기화
+                </Button>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -237,6 +276,29 @@ export function EtaReimportModal({ open, onClose, existingEtaCount }: Props) {
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>취소</Button>
             <Button onClick={doSave} disabled={saving} className="bg-[#dc2626] text-white hover:bg-[#b91c1c]">
               {saving ? '저장하는 중' : '지우고 새로 저장'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resetOpen} onOpenChange={(o) => !o && !resetting && setResetOpen(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>시간표 초기화</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-[14px] leading-[22px] text-[#44536b]">
+              에타에서 가져온 수업·일정{' '}
+              <span className="font-medium text-[#0f1e3a]">{existingEtaCount}개</span>를 모두 지울까요? 되돌릴 수 없어요.
+            </p>
+            <p className="rounded-xl bg-[#f5f8fd] px-4 py-3 text-[13px] text-[#44536b]">
+              직접 넣은 일정, 시험, 공부 블록과 완료 기록은 그대로 남아요
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetOpen(false)} disabled={resetting}>취소</Button>
+            <Button onClick={doReset} disabled={resetting} className="bg-[#dc2626] text-white hover:bg-[#b91c1c]">
+              {resetting ? '지우는 중' : '초기화'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -221,11 +221,11 @@ export function DashboardHeader({
         <button
           type="button"
           onClick={onUploadTimetable}
-          title="시간표 업로드"
+          title="시간표 수정 (다른 학기 시간표 올리기·초기화)"
           className="skema-btn-secondary"
         >
-          <MaterialIcon icon="upload_file" size={16} color="currentColor" />
-          <span className="hide-mobile">시간표 업로드</span>
+          <MaterialIcon icon="edit_calendar" size={16} color="currentColor" />
+          <span className="hide-mobile">시간표 수정</span>
         </button>
         <button
           type="button"
