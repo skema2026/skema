@@ -561,6 +561,19 @@ export default function OnboardingPage() {
             });
           } catch { /* 개별 일정 등록 실패 시 무시 */ }
         }
+
+        // 11/19: 일반 유형도 시험을 넣었으면 대학생과 똑같이 공부 블록을 자동 배치한다.
+        // (채팅에서는 공부 설정을 묻지 않으므로 기본값: 시험 14일 전부터, 주 3일, 하루 2시간)
+        if (savedExamIds.length > 0) {
+          try {
+            await api.post<StudyBlocksGenerateResult>('/study-blocks/generate', {
+              exam_ids: savedExamIds,
+              start_days_before: studyStartDays,
+              days_per_week: studyDaysPerWeek,
+              minutes_per_day: Math.max(30, Math.round(studyHoursPerSession * 60)),
+            });
+          } catch { /* 공부 블록 배치 실패 시 온보딩은 계속 진행 */ }
+        }
       }
 
       setPhase('done');
