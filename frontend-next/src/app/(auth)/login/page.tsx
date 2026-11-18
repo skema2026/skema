@@ -61,7 +61,8 @@ export default function LoginPage() {
       setToken(token);
       toast.success('로그인했어요');
       window.history.replaceState({}, '', '/login');
-      router.push('/onboarding');
+      // 11/19: 대시보드로 보낸다. 온보딩을 안 끝낸 계정은 대시보드가 /onboarding으로 보낸다.
+      router.push('/dashboard');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -82,7 +83,7 @@ export default function LoginPage() {
     ev.preventDefault();
     if (!validate()) return;
     loginMutation.mutate({ email: form.username, password: form.password }, {
-      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인했어요'); router.push('/onboarding'); },
+      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인했어요'); router.push('/dashboard'); },
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };
         if (error?.response?.status === 401) toast.error('아이디나 비밀번호가 맞지 않아요');

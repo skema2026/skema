@@ -345,14 +345,14 @@ export default function OnboardingPage() {
   const router = useRouter();
   const updateProfile = useUpdateProfile();
   const { data: profile } = useProfile();
+  // 지금 이 화면에서 온보딩을 끝내는 중이면(저장·공부 블록 배치 중) 대시보드로 먼저 보내지 않는다
+  const finishingRef = useRef(false);
 
+  // 11/19: 이미 온보딩을 끝낸 계정은 언제 들어와도 대시보드로 보낸다.
+  // (예전에는 sessionStorage 표시가 남아 있으면 같은 탭에서 다시 로그인했을 때 온보딩 화면에 머물렀다)
   useEffect(() => {
-    if (!profile?.onboarding_completed) return;
-    const flag = sessionStorage.getItem('skema_onboarding_done');
-    if (!flag) {
-      sessionStorage.setItem('skema_onboarding_done', '1');
-      router.push('/dashboard');
-    }
+    if (!profile?.onboarding_completed || finishingRef.current) return;
+    router.replace('/dashboard');
   }, [profile?.onboarding_completed, router]);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -464,6 +464,7 @@ export default function OnboardingPage() {
     finalAnswers: Record<string, string>,
     directSleep?: { sleep_start: string; sleep_end: string }
   ) => {
+    finishingRef.current = true;
     setPhase('generating');
     for (let i = 0; i < GENERATING_STEPS.length; i++) {
       setGeneratingStep(i);
