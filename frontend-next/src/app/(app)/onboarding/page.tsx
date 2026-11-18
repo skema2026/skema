@@ -578,7 +578,8 @@ export default function OnboardingPage() {
       }
 
       setPhase('done');
-      setTimeout(() => router.push('/dashboard'), 1800);
+      // replace: 대시보드에서 뒤로 가기를 눌러도 온보딩으로 돌아오지 않게 (11/19)
+      setTimeout(() => router.replace('/dashboard'), 1800);
     } catch {
       toast.error('\uc124\uc815 \uc800\uc7a5 \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4');
       setPhase('sleep');
@@ -649,8 +650,8 @@ export default function OnboardingPage() {
     updateProfile.mutate(
       { onboarding_completed: true, is_college_student: isCollegeStudent ?? false },
       {
-        onSuccess: () => router.push('/dashboard'),
-        onError: () => router.push('/dashboard'),
+        onSuccess: () => router.replace('/dashboard'),
+        onError: () => router.replace('/dashboard'),
       }
     );
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/authStore';
 import MaterialIcon from '@/components/common/MaterialIcon';
 import { authCss } from '../authStyles';
 import { apiErrorMessage } from '@/lib/apiError';
+import { api } from '@/lib/api';
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 256 262" preserveAspectRatio="xMidYMid">
@@ -33,8 +34,22 @@ const EyeOffIcon = () => (
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setToken } = useAuthStore();
+  const { setToken, token: savedToken, _hasHydrated } = useAuthStore();
   const loginMutation = useLogin();
+  const sessionCheckedRef = useRef(false);
+
+  // 11/19: 이미 로그인된 상태로 로그인 화면에 오면(뒤로 가기 등) 토큰이 살아 있는지 확인하고 대시보드로 보낸다.
+  // 토큰이 만료됐으면 /users/me가 401 → api.ts가 토큰을 지우고 로그인 화면에 남는다.
+  useEffect(() => {
+    if (!_hasHydrated || sessionCheckedRef.current) return;
+    sessionCheckedRef.current = true;
+    if (!savedToken) return;
+    const hasNewToken =
+      window.location.hash.includes('token=') || new URLSearchParams(window.location.search).has('token');
+    if (hasNewToken) return; // 소셜 로그인으로 막 돌아온 경우는 아래 effect가 처리
+    api.get('/users/me').then(() => router.replace('/dashboard')).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_hasHydrated, savedToken]);
 
   const [form, setForm] = useState({ username: '', password: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -62,7 +77,8 @@ export default function LoginPage() {
       toast.success('로그인했어요');
       window.history.replaceState({}, '', '/login');
       // 11/19: 대시보드로 보낸다. 온보딩을 안 끝낸 계정은 대시보드가 /onboarding으로 보낸다.
-      router.push('/dashboard');
+      // replace: 뒤로 가기를 눌러도 로그인 화면으로 돌아오지 않게
+      router.replace('/dashboard');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -83,7 +99,7 @@ export default function LoginPage() {
     ev.preventDefault();
     if (!validate()) return;
     loginMutation.mutate({ email: form.username, password: form.password }, {
-      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인했어요'); router.push('/dashboard'); },
+      onSuccess: (data) => { setToken(data.access_token); toast.success('로그인했어요'); router.replace('/dashboard'); },
       onError: (err: unknown) => {
         const error = err as { response?: { status?: number } };
         if (error?.response?.status === 401) toast.error('아이디나 비밀번호가 맞지 않아요');
