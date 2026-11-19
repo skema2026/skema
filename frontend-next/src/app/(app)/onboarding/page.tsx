@@ -13,7 +13,6 @@ import type { RecurringDay, StudyBlocksGenerateResult } from '@/types';
 import { apiErrorMessage } from '@/lib/apiError';
 
 type Phase = 'college-check' | 'eta-upload' | 'eta-review' | 'external-exam' | 'personal-schedule' | 'type-select' | 'sleep' | 'chat' | 'generating' | 'done';
-type Message = { role: 'ai' | 'user'; text: string };
 
 interface EtaEntry {
   _id: string;
@@ -53,293 +52,12 @@ const USER_TYPES = [
 ];
 // 대학생은 타입 선택 없이 항상 student
 
-const CHAT_STEPS_COLLEGE = [
-  {
-    key: 'goal_tasks',
-    question: `어떤 목표로, 어떤 과목을 공부하고 계세요?`,
-    hint: '목표 과목/내용을 입력해주세요',
-    quick: ['예시 보기'],
-    examples: {
-      '예시 보기': `이렇게 적어 주면 돼요\n· 수능준비, 대학입시, 영어\n· 수학, 영어`,
-    },
-  },
-  {
-    key: 'sleep',
-    question: `보통 몇 시에 자고 몇 시에 일어나세요?`,
-    hint: '예) 밤 11시 취침, 아침 7시 기상',
-    quick: ['23시 취침, 7시 기상', '24시 취침, 8시 기상', '1시 취침, 8시 기상'],
-  },
-]
-// CHAT_STEPS when NOT a college student (no eta, so include fixed schedule question)
-const CHAT_STEPS_NON_COLLEGE = [
-  {
-    key: 'goal_tasks',
-    question: `어떤 목표로, 어떤 과목을 공부하고 계세요?`,
-    hint: '목표 과목/내용을 입력해주세요',
-    quick: ['예시 보기'],
-    examples: {
-      '예시 보기': `이렇게 적어 주면 돼요\n· 수능준비, 대학입시, 영어\n· 정보처리기사, 자격증\n· 수학, 영어`,
-    },
-  },
-  {
-    key: 'schedule',
-    question: `매주 반복되는 일정이 있나요?
-업무나 학원 수업처럼요.
-
-예) 화수목 9시~11시 어학원 수업
-예) 화목 14시~16시 영어
-
-없으면 아래 "없음"을 눌러주세요`,
-    hint: '정기 일정을 입력해주세요',
-    quick: ['없음'],
-  },
-  {
-    key: 'exam',
-    question: `다가오는 시험 일정이 있나요?
-
-예) 4월 15일 중간고사
-예) 5월 20일 발표 시험
-
-없으면 아래 "없음"을 눌러주세요`,
-    hint: '시험 일정을 입력해주세요',
-    quick: ['없음'],
-  },
-  {
-    key: 'sleep',
-    question: `보통 몇 시에 자고 몇 시에 일어나세요?`,
-    hint: '예) 밤 11시 취침, 아침 7시 기상',
-    quick: ['23시 취침, 7시 기상', '24시 취침, 8시 기상', '1시 취침, 8시 기상'],
-  },
-]
-
 const GENERATING_STEPS = [
   '입력한 내용을 정리하는 중',
   '비어 있는 시간을 찾는 중',
   '시험 날짜에 맞춰 공부 블록을 놓는 중',
   '거의 다 됐어요',
 ];
-
-/**
- * 온보딩에서 사용자가 자유 텍스트로 입력한 시험 일정을 파싱한다.
- * POST /exam-schedules 배열 형태에 적합한 구조로 변환.
- *
- * 입력 예시:
- *   "4월 15일 중간고사 영어"
- *   "5/20 발표"
- *   "2026-06-10 기말고사"
- *   줄바꿈 / 쉼표 구분자 지원
- */
-function _parseExamText(raw: string): Array<{ title: string; exam_date: string; subject?: string }> {
-  if (!raw || raw.trim() === '없음') return [];
-
-  const thisYear = new Date().getFullYear();
-  const results: Array<{ title: string; exam_date: string; subject?: string }> = [];
-
-  // 줄바꿈 / 쉼표로 분리
-  const lines = raw.split(/[\n,]/).map((l) => l.trim()).filter(Boolean);
-
-  for (const line of lines) {
-    let examDate = '';
-    let title = line;
-
-    // ISO: 2026-06-10
-    const isoM = line.match(/(\d{4}-\d{2}-\d{2})/);
-    if (isoM) {
-      examDate = isoM[1];
-      title = line.replace(isoM[0], '').trim();
-    } else {
-      // "4월 15일" or "4/15" or "4.15"
-      const koM = line.match(/(\d{1,2})[월\/.][ ]?(\d{1,2})일?/);
-      if (koM) {
-        const month = koM[1].padStart(2, '0');
-        const day = koM[2].padStart(2, '0');
-        examDate = `${thisYear}-${month}-${day}`;
-        title = line.replace(koM[0], '').trim();
-      }
-    }
-
-    if (!examDate || !title) continue;
-
-    // 제목 정리 (앞뒤 비문자 제거)
-    title = title.replace(/^[\s\-·]+|[\s\-·]+$/g, '').trim();
-    if (!title) title = '시험';
-
-    results.push({ title, exam_date: examDate, subject: title });
-  }
-
-  return results;
-}
-
-const _DAY_CH_TO_RD: Record<string, RecurringDay> = {
-  '월': 'MON', '화': 'TUE', '수': 'WED', '목': 'THU', '금': 'FRI', '토': 'SAT', '일': 'SUN',
-};
-const _ALL_DAYS: RecurringDay[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-
-/** "없음" 계열 응답 판별 */
-function _isNoneAnswer(text: string): boolean {
-  return /^(없음|없어요|없습니다|없다|없|아니요|아니오|아뇨|해당없음|x|-)$/i.test(text.trim());
-}
-
-/**
- * 자유 텍스트에서 시각 토큰을 모두 추출한다. ("HH:MM" 배열)
- * 오전/오후/밤/아침 등 한국어 시간대 표현을 24시간제로 변환.
- *   "밤 11시" → "23:00"   "오후 2시반" → "14:30"   "9~11" → ["09:00","11:00"]
- */
-function _parseTimeTokens(text: string): string[] {
-  const out: string[] = [];
-  const re = /(오전|오후|아침|점심|저녁|밤|새벽|낮|정오|자정)?\s*(\d{1,2})\s*(?::\s*(\d{2})|시\s*(반|\d{1,2}\s*분)?)?/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const period = m[1];
-    let h = parseInt(m[2], 10);
-    let min = 0;
-    if (m[3]) min = parseInt(m[3], 10);
-    else if (m[4]) min = /반/.test(m[4]) ? 30 : (parseInt(m[4], 10) || 0);
-
-    if (period === '오후' || period === '저녁' || period === '밤' || period === '낮' || period === '점심') {
-      if (h < 12) h += 12;
-    } else if (period === '오전' || period === '아침' || period === '새벽') {
-      if (h === 12) h = 0;
-    } else if (period === '자정') h = 0;
-    else if (period === '정오') h = 12;
-
-    if (h === 24) h = 0;
-    if (h > 23 || min > 59) continue;
-    out.push(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
-  }
-  return out;
-}
-
-/** 취침~기상 수면 시간(시간 단위, 자정 넘김 처리) */
-function _sleepHours(start: string, end: string): number {
-  const toMin = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
-  let dur = toMin(end) - toMin(start);
-  if (dur <= 0) dur += 24 * 60;
-  return Math.round((dur / 60) * 10) / 10;
-}
-
-/** 요일 영역에서 반복 요일 추출. 공백/쉼표 구분 토큰이 "전부 요일 글자"일 때만 인정 → "수영" 오인식 방지 */
-function _extractDays(region: string): RecurringDay[] {
-  if (/매일/.test(region)) return [..._ALL_DAYS];
-  if (/평일/.test(region)) return ['MON', 'TUE', 'WED', 'THU', 'FRI'];
-  if (/주말/.test(region)) return ['SAT', 'SUN'];
-  const days: RecurringDay[] = [];
-  for (const rawTok of region.split(/[\s,]+/)) {
-    const tok = rawTok.replace(/(요일|요|마다)$/, '');
-    if (!tok || ![...tok].every((ch) => ch in _DAY_CH_TO_RD)) continue;
-    for (const ch of tok) {
-      const d = _DAY_CH_TO_RD[ch];
-      if (d && !days.includes(d)) days.push(d);
-    }
-  }
-  return days;
-}
-
-/**
- * 정기 일정 자유 텍스트 → PersonalSchedule[].
- * 한 줄 = 한 일정. 요일과 시작·종료 시각을 모두 인식해야 채택, 아니면 그 줄은 버린다.
- *   "화수목 9시~11시 어학원 수업" → 화·수·목 09:00~11:00 "어학원 수업"
- */
-function _parseScheduleText(raw: string): PersonalSchedule[] {
-  if (!raw || _isNoneAnswer(raw)) return [];
-  const toMin = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
-  const results: PersonalSchedule[] = [];
-  raw.split(/\n/).map((l) => l.trim()).filter(Boolean).forEach((line, i) => {
-    const times = _parseTimeTokens(line);
-    if (times.length < 2) return;
-    const days = _extractDays(line);   // 요일이 시각 앞/뒤 어디 있든 인식 (토큰 기반이라 "수영"의 '수' 오인식 없음)
-    if (days.length === 0) return;
-
-    // "오후 9시~11시"처럼 종료 시각에 시간대 표현이 빠져 시작보다 빠르면 오후(+12)로 보정
-    const start = times[0];
-    let end = times[1];
-    if (toMin(end) <= toMin(start)) {
-      const [eh, em] = end.split(':').map(Number);
-      if (eh + 12 <= 23 && (eh + 12) * 60 + em > toMin(start)) {
-        end = `${String(eh + 12).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
-      }
-    }
-
-    // 제목: 요일·시각·연결어 토큰을 제거한 나머지 단어들 (요일 앞/뒤 어디에 있든 보존)
-    const title = line.split(/[\s,]+/).map((w) => {
-      if (/^(평일|매일|주말|주중)$/.test(w)) return '';                            // 요일 키워드
-      const stripped = w.replace(/(요일|요|마다)$/, '');
-      if (stripped && [...stripped].every((c) => c in _DAY_CH_TO_RD)) return '';   // 순수 요일 토큰
-      return w
-        .replace(/(오전|오후|아침|점심|저녁|밤|새벽|낮|정오|자정)/g, '')
-        .replace(/\d{1,2}\s*(?::\s*\d{2}|시\s*(?:반|\d{1,2}\s*분)?)?/g, '')
-        .replace(/[~\-–]/g, '')
-        .replace(/(에서|부터|까지)/g, '')
-        .trim();
-    }).filter(Boolean).join(' ') || '일정';
-
-    results.push({
-      _id: `ps-${Date.now()}-${i}`,
-      title,
-      recurring_day: days[0],
-      days,
-      start_time: start,
-      end_time: end,
-      is_recurring: true,
-      date: '',
-    });
-  });
-  return results;
-}
-
-type StepResult =
-  | { ok: true; schedules?: PersonalSchedule[]; exams?: ExternalExam[]; confirm?: string }
-  | { ok: false; error: string };
-
-/**
- * 비대학생 온보딩 채팅의 단계별 답변 검증·파싱.
- * 제대로 인식하지 못하면 ok:false + 안내 문구를 돌려주어 같은 단계에서 다시 묻도록 한다.
- */
-function _validateStep(key: string, text: string): StepResult {
-  const t = text.trim();
-
-  if (key === 'goal_tasks') {
-    if (t.length < 2) {
-      return { ok: false, error: '조금 더 자세히 알려 주세요\n예) 정보처리기사, 자격증\n예) 수학, 영어' };
-    }
-    return { ok: true };
-  }
-
-  if (key === 'schedule') {
-    if (_isNoneAnswer(t)) return { ok: true, schedules: [] };
-    const parsed = _parseScheduleText(t);
-    if (parsed.length === 0) {
-      return { ok: false, error: '요일과 시간을 같이 적어 주면 정확하게 넣어 드려요\n예) 화수목 9시~11시 어학원 수업\n없으면 아래 "없음"을 눌러주세요' };
-    }
-    const fmt = parsed.map((s) => `· ${s.days.map((d) => DAY_LABELS[recurringDayToIndex(d)]).join('·')} ${s.start_time}~${s.end_time} ${s.title}`).join('\n');
-    return { ok: true, schedules: parsed, confirm: `이렇게 등록해 둘게요\n${fmt}` };
-  }
-
-  if (key === 'exam') {
-    if (_isNoneAnswer(t)) return { ok: true, exams: [] };
-    const parsed = _parseExamText(t);
-    if (parsed.length === 0) {
-      return { ok: false, error: '날짜와 시험 이름을 같이 적어 주세요\n예) 4월 15일 중간고사\n없으면 아래 "없음"을 눌러주세요' };
-    }
-    const exams: ExternalExam[] = parsed.map((e, i) => ({ _id: `ex-${Date.now()}-${i}`, name: e.title, date: e.exam_date }));
-    const fmt = exams.map((e) => `· ${e.date} ${e.name}`).join('\n');
-    return { ok: true, exams, confirm: `이렇게 등록해 둘게요\n${fmt}` };
-  }
-
-  if (key === 'sleep') {
-    const toks = _parseTimeTokens(t);
-    if (toks.length < 2) {
-      return { ok: false, error: '자는 시간과 일어나는 시간을 둘 다 알려 주세요\n예) 밤 11시 취침, 아침 7시 기상' };
-    }
-    const dur = _sleepHours(toks[0], toks[1]);
-    const durLabel = dur % 1 === 0 ? `${dur}` : dur.toFixed(1);
-    // 수면이 짧아도 되묻지 않고 그대로 반영 — 짧을 때만 가볍게 알려줌
-    const note = dur < 6 ? `\n잠이 짧은 편이라 공부 블록은 무리하지 않게 넣을게요` : '';
-    return { ok: true, confirm: `반영했어요${note}` };
-  }
-
-  return { ok: true };
-}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -386,20 +104,8 @@ export default function OnboardingPage() {
   const [scheduleDraft, setScheduleDraft] = useState<Omit<PersonalSchedule, '_id'>>({ title: '', recurring_day: 'MON', days: ['MON'], start_time: '09:00', end_time: '10:00', is_recurring: true, date: '' });
   const [sleepStart, setSleepStart] = useState('23:00');
   const [sleepEnd, setSleepEnd] = useState('07:00');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [stepIdx, setStepIdx] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [isProcessing, setIsProcessing] = useState(false);
   const [generatingStep, setGeneratingStep] = useState(0);
   const [showEtaOverwriteConfirm, setShowEtaOverwriteConfirm] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  const activeSteps = isCollegeStudent ? CHAT_STEPS_COLLEGE : CHAT_STEPS_NON_COLLEGE;
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
 
   // ETA 이미지 분석 (공통 로직 — upload/review 양쪽에서 호출 가능)
@@ -452,14 +158,6 @@ export default function OnboardingPage() {
     toast.success('다시 읽었어요');
   };
 
-  const parseTime = (text: string) => {
-    const toks = _parseTimeTokens(text);
-    return {
-      sleep_start: toks[0] ?? '23:00',
-      sleep_end: toks[1] ?? '07:00',
-    };
-  };
-
   const finishOnboarding = async (
     finalAnswers: Record<string, string>,
     directSleep?: { sleep_start: string; sleep_end: string }
@@ -472,7 +170,7 @@ export default function OnboardingPage() {
     }
 
     try {
-      const sleepTimes = directSleep ?? parseTime(finalAnswers.sleep || '');
+      const sleepTimes = directSleep ?? { sleep_start: sleepStart, sleep_end: sleepEnd };
       const effectiveType = selectedType || (isCollegeStudent ? 'student' : 'other');
       await updateProfile.mutateAsync({
         user_type: effectiveType,
@@ -591,59 +289,9 @@ export default function OnboardingPage() {
     setPhase('external-exam');
   };
 
-  /** 대학생 온보딩: personal-schedule 완료 후 chat 진입 */
+  /** personal-schedule 완료 후 수면 시간 단계로 */
   const handleCollegeStartChat = () => {
     setPhase('sleep');
-  };
-
-  const handleSend = async (text?: string) => {
-    const userText = (text ?? input).trim();
-    if (!userText || isProcessing) return;
-
-    setInput('');
-    setMessages((prev) => [...prev, { role: 'user', text: userText }]);
-
-    const step = activeSteps[stepIdx];
-    const result = _validateStep(step.key, userText);
-
-    // \ub2f5\uc744 \uc81c\ub300\ub85c \uc778\uc2dd\ud558\uc9c0 \ubabb\ud558\uba74 \ub2e4\uc74c \ub2e8\uacc4\ub85c \ub118\uc5b4\uac00\uc9c0 \uc54a\uace0 \uac19\uc740 \ub2e8\uacc4\uc5d0\uc11c \ub2e4\uc2dc \ubb3b\ub294\ub2e4
-    if (!result.ok) {
-      setIsProcessing(true);
-      setTimeout(() => {
-        setMessages((prev) => [...prev, { role: 'ai', text: result.error }]);
-        setIsProcessing(false);
-      }, 400);
-      return;
-    }
-
-    // \ud30c\uc2f1 \uacb0\uacfc\ub97c \uc628\ubcf4\ub529 \uc800\uc7a5\uc5d0 \uc4f0\uc774\ub294 \uc0c1\ud0dc\uc5d0 \ubc18\uc601 (\ube44\ub300\ud559\uc0dd: finishOnboarding\uc774 \uc774 \ubc30\uc5f4\uc744 \uc800\uc7a5)
-    if (result.schedules?.length) setPersonalSchedules((prev) => [...prev, ...result.schedules!]);
-    if (result.exams?.length) setExternalExams((prev) => [...prev, ...result.exams!]);
-
-    const newAnswers = { ...answers, [step.key]: userText };
-    setAnswers(newAnswers);
-    const nextIdx = stepIdx + 1;
-    const confirmMsg: Message[] = result.confirm ? [{ role: 'ai', text: result.confirm }] : [];
-
-    if (nextIdx < activeSteps.length) {
-      setStepIdx(nextIdx);
-      setIsProcessing(true);
-      setTimeout(() => {
-        setMessages((prev) => [...prev, ...confirmMsg, { role: 'ai', text: activeSteps[nextIdx].question }]);
-        setIsProcessing(false);
-      }, 500);
-    } else {
-      setIsProcessing(true);
-      setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          ...confirmMsg,
-          { role: 'ai', text: '시간표를 만드는 중이에요' },
-        ]);
-        setIsProcessing(false);
-        finishOnboarding(newAnswers);
-      }, 500);
-    }
   };
 
   const handleSkip = () => {
@@ -695,10 +343,10 @@ export default function OnboardingPage() {
 
             <button
               onClick={() => {
+                // 11/19: 채팅 대신 입력칸 화면으로 (유형 → 시험 → 반복 일정 → 수면 시간)
                 setIsCollegeStudent(false);
-                setStepIdx(0);
-                setMessages([{ role: 'ai', text: CHAT_STEPS_NON_COLLEGE[0].question }]);
-                setPhase('chat');
+                setSelectedType('');
+                setPhase('type-select');
               }}
               className="flex flex-col items-center gap-3 p-6 rounded-2xl border transition-colors active:scale-[0.98]"
               style={{ background: '#fff', borderColor: '#dfe7f3' }}
@@ -1339,16 +987,16 @@ export default function OnboardingPage() {
               <MaterialIcon icon="arrow_back" size={18} color="#44536b" />
             </button>
             <div>
-              <h2 className="font-semibold text-lg" style={{ color: '#0f1e3a' }}>추가 시험 입력</h2>
-              <p className="text-xs" style={{ color: '#44536b' }}>{isCollegeStudent ? '3단계 / 5단계' : '1단계 / 3단계'}</p>
+              <h2 className="font-semibold text-lg" style={{ color: '#0f1e3a' }}>{isCollegeStudent ? '추가 시험 입력' : '시험 입력'}</h2>
+              <p className="text-xs" style={{ color: '#44536b' }}>{isCollegeStudent ? '3단계 / 5단계' : '2단계 / 4단계'}</p>
             </div>
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#dfe7f3' }}>
-            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '60%' : '33%', background: '#2a6fe3' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '60%' : '50%', background: '#2a6fe3' }} />
           </div>
 
           <p className="text-sm font-medium mb-4" style={{ color: '#44536b' }}>
-            별도로 준비 중인 시험이 있나요?{' '}
+            {isCollegeStudent ? '별도로 준비 중인 시험이 있나요?' : '준비 중인 시험이 있나요?'}{' '}
             <span style={{ color: '#5f6f88', fontWeight: 400 }}>없으면 건너뛰어도 됩니다</span>
           </p>
 
@@ -1517,15 +1165,15 @@ export default function OnboardingPage() {
             </button>
             <div>
               <h2 className="font-semibold text-lg" style={{ color: '#0f1e3a' }}>개인 일정 입력</h2>
-              <p className="text-xs" style={{ color: '#44536b' }}>{isCollegeStudent ? '4단계 / 5단계' : '2단계 / 3단계'}</p>
+              <p className="text-xs" style={{ color: '#44536b' }}>{isCollegeStudent ? '4단계 / 5단계' : '3단계 / 4단계'}</p>
             </div>
           </div>
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#dfe7f3' }}>
-            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '80%' : '66%', background: '#2a6fe3' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '80%' : '75%', background: '#2a6fe3' }} />
           </div>
 
           <p className="text-sm font-medium mb-4" style={{ color: '#44536b' }}>
-            학업 외에 중요한 일정이 있나요?{' '}
+            {isCollegeStudent ? '학업 외에 중요한 일정이 있나요?' : '매주 반복되는 일정이 있나요? (학원·업무·운동 등)'}{' '}
             <span style={{ color: '#5f6f88', fontWeight: 400 }}>없으면 건너뛰어도 됩니다</span>
           </p>
 
@@ -1663,14 +1311,14 @@ export default function OnboardingPage() {
             <div>
               <h1 className="font-semibold text-lg" style={{ color: '#0f1e3a' }}>나에게 맞는 유형 선택</h1>
               <p className="text-xs" style={{ color: '#44536b' }}>
-                {isCollegeStudent ? '2단계 / 2단계' : '1단계'}
+                {isCollegeStudent ? '2단계 / 2단계' : '1단계 / 4단계'}
               </p>
             </div>
           </div>
 
           {/* Progress */}
           <div className="w-full h-1.5 rounded-full mb-6" style={{ background: '#dfe7f3' }}>
-            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '100%' : '50%', background: '#2a6fe3' }} />
+            <div className="h-full rounded-full" style={{ width: isCollegeStudent ? '100%' : '25%', background: '#2a6fe3' }} />
           </div>
 
           {isCollegeStudent && etaEntries.length > 0 && (
@@ -1703,11 +1351,11 @@ export default function OnboardingPage() {
           </div>
 
           <button
-            onClick={handleSkip}
+            onClick={() => { setSelectedType(''); setPhase('external-exam'); }}
             className="w-full py-3 text-sm font-medium rounded-xl border transition-colors"
             style={{ color: '#44536b', borderColor: '#dfe7f3' }}
           >
-            건너뛰기 (나중에 설정에서 변경 가능)
+            건너뛰기
           </button>
         </div>
       </div>
@@ -1735,7 +1383,7 @@ export default function OnboardingPage() {
             </button>
             <div>
               <h2 className="font-semibold text-lg" style={{ color: '#0f1e3a' }}>수면 시간 설정</h2>
-              <p className="text-xs" style={{ color: '#44536b' }}>{isCollegeStudent ? '5단계 / 5단계' : '3단계 / 3단계'}</p>
+              <p className="text-xs" style={{ color: '#44536b' }}>{isCollegeStudent ? '5단계 / 5단계' : '4단계 / 4단계'}</p>
             </div>
           </div>
 
@@ -1824,137 +1472,5 @@ export default function OnboardingPage() {
     );
   }
 
-  // 채팅 화면
-  const currentStep = activeSteps[stepIdx];
-  const progress = (stepIdx / activeSteps.length) * 100;
-
-  return (
-    <div className="skema-onboarding-screen min-h-screen flex flex-col items-center justify-center overflow-y-auto p-4">
-      <div className="w-full max-w-lg flex flex-col" style={{ height: '85vh' }}>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setMessages([]);
-                setStepIdx(0);
-                setAnswers({});
-                setPhase(isCollegeStudent ? 'personal-schedule' : 'college-check');
-              }}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#edf3fc] transition-colors"
-            >
-              <MaterialIcon icon="arrow_back" size={18} color="#44536b" />
-            </button>
-            <div>
-              <p className="font-medium text-sm" style={{ color: '#0f1e3a' }}>
-                {isCollegeStudent ? '학습 목표 설정' : '기본 정보 입력'}
-              </p>
-              <p className="text-xs" style={{ color: '#44536b' }}>{stepIdx + 1} / {activeSteps.length} 단계</p>
-            </div>
-          </div>
-          <button
-            onClick={handleSkip}
-            className="text-[13px] px-3 py-1.5 rounded-lg border transition-colors"
-            style={{ color: '#44536b', borderColor: '#dfe7f3' }}
-          >
-            건너뛰기
-          </button>
-        </div>
-
-        {/* Progress bar */}
-        <div className="w-full h-1.5 rounded-full mb-4" style={{ background: '#dfe7f3' }}>
-          <div
-            className="h-full rounded-full transition-colors duration-500"
-            style={{ width: `${progress}%`, background: '#2a6fe3' }}
-          />
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto space-y-3 pr-1 mb-4">
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.role === 'ai' && (
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium mr-2 mt-1 flex-shrink-0 text-white" style={{ background: '#2a6fe3' }}>
-                  S
-                </div>
-              )}
-              <div
-                className="max-w-[80%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed"
-                style={
-                  msg.role === 'user'
-                    ? { background: '#2a6fe3', color: '#fff', borderTopRightRadius: 4 }
-                    : { background: '#fff', color: '#0f1e3a', borderTopLeftRadius: 4, border: '1px solid #dfe7f3' }
-                }
-              >
-                {msg.text}
-              </div>
-            </div>
-          ))}
-          {isProcessing && (
-            <div className="flex justify-start">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium mr-2 mt-1 flex-shrink-0 text-white" style={{ background: '#2a6fe3' }}>S</div>
-              <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ background: '#fff', border: '1px solid #dfe7f3' }}>
-                <div className="flex gap-1">
-                  {[0, 150, 300].map((d) => (
-                    <span key={d} className="w-2 h-2 rounded-full bg-[#cfdbec] animate-pulse" style={{ animationDelay: `${d}ms` }} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-
-        {/* Quick replies */}
-        {!isProcessing && currentStep?.quick && (
-          <div className="flex flex-wrap gap-2 mb-3">
-            {currentStep.quick.map((q) => (
-              <button
-                key={q}
-                onClick={() => {
-                  const exampleText = (currentStep as { examples?: Record<string, string> }).examples?.[q];
-                  if (exampleText) {
-                    setMessages((prev) => [
-                      ...prev,
-                      { role: 'user', text: q },
-                      { role: 'ai', text: exampleText },
-                    ]);
-                  } else {
-                    handleSend(q);
-                  }
-                }}
-                className="px-3 py-1.5 text-xs rounded-full font-medium transition-colors border hover:border-[#bcd8fe] hover:text-[#1f63d6]"
-                style={{ borderColor: '#bcd8fe', color: '#2a6fe3', background: '#eaf2ff' }}
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Input */}
-        <div className="flex gap-2">
-          <input
-            className="flex-1 px-4 py-3 text-sm border rounded-xl outline-none transition-colors"
-            style={{ borderColor: '#dfe7f3', background: '#fff' }}
-            onFocus={(e) => e.target.style.borderColor = '#2a6fe3'}
-            onBlur={(e) => e.target.style.borderColor = '#dfe7f3'}
-            placeholder={currentStep?.hint || '입력'}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            disabled={isProcessing}
-          />
-          <button
-            onClick={() => handleSend()}
-            disabled={!input.trim() || isProcessing}
-            className="px-5 py-3 rounded-xl text-sm font-medium text-white transition-colors"
-            style={{ background: (!input.trim() || isProcessing) ? '#bcd8fe' : '#2a6fe3' }}
-          >
-            <MaterialIcon icon="send" size={22} color="#fff" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }
