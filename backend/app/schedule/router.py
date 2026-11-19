@@ -9,6 +9,7 @@ from app.schedule.schemas import (
     EventCreate, EventResponse, EventUpdate,
     ExamScheduleCreate, ExamScheduleResponse, ExamScheduleUpdate,
     RescheduleApplyRequest,
+    RescheduleRelocateRequest,
     ScheduleCreate, ScheduleResponse, ScheduleUpdate,
     StudyBlocksGenerateRequest,
 )
@@ -87,6 +88,16 @@ def reschedule_apply(
 ):
     """미리보기의 moves를 그대로 받아 적용. 전부 되거나 전부 안 된다."""
     return reschedule.apply(db, current_user.id, data.moves)
+
+
+@router.post("/reschedule/relocate", status_code=status.HTTP_200_OK)
+def reschedule_relocate(
+    data: RescheduleRelocateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """직접 넣은 일정과 겹친 자동 공부 블록을 다른 빈 시간으로 바로 옮긴다 (11/19)."""
+    return reschedule.relocate(db, current_user.id, data.schedule_ids)
 
 
 # ── 시험 공부 블록 배치 (#12) ──────────────────────────────────────────────────

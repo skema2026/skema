@@ -31,6 +31,7 @@ import {
 } from '@/lib/scheduleViewScope';
 import { RecurringDay, Schedule, ScheduleViewScope } from '@/types';
 import MaterialIcon from '@/components/common/MaterialIcon';
+import { api } from '@/lib/api';
 
 const SCHEDULE_TYPE_OPTIONS = [
   { value: 'class',      label: '수업',      icon: 'school' },
@@ -71,13 +72,42 @@ function timesOverlap(s1: string, e1: string, s2: string, e2: string): boolean {
   return s1 < e2 && s2 < e1;
 }
 
-function findConflict(
+function nowHHMM_KST(): string {
+  return new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' });
+}
+
+// 11/19: SKEMA가 자동으로 넣은 공부·과제 블록인가 (사용자가 직접 넣은 일정이 아님)
+function isAutoBlock(s: Schedule): boolean {
+  return s.schedule_source === 'ai_generated' && (s.schedule_type === 'study' || s.schedule_type === 'assignment') && !!s.date;
+}
+
+// 아직 시작 전이고 완료 안 한 자동 블록 → 사용자 일정과 겹치면 옮기거나 지울 수 있다
+function isUpcomingAutoBlock(s: Schedule): boolean {
+  if (!isAutoBlock(s) || s.is_completed || !s.date) return false;
+  const today = todayKST();
+  return s.date > today || (s.date === today && s.start_time >= nowHHMM_KST());
+}
+
+const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+function blockWhen(s: Schedule): string {
+  if (!s.date) return `${s.start_time}–${s.end_time}`;
+  const [, m, d] = s.date.split('-').map(Number);
+  const wd = WEEKDAY_KO[new Date(`${s.date}T00:00:00`).getDay()];
+  return `${m}/${d}(${wd}) ${s.start_time}–${s.end_time}`;
+}
+
+interface RelocateResult {
+  summary: { target: number; moved: number; unplaced: number };
+}
+
+function findConflicts(
   form: typeof defaultForm,
   isRecurring: boolean,
   selectedDays: RecurringDay[],
   schedules: Schedule[],
   excludeId?: number,
-): Schedule | null {
+): Schedule[] {
+  const found: Schedule[] = [];
   for (const s of schedules) {
     if (s.id === excludeId) continue;
     if (!timesOverlap(form.start_time, form.end_time, s.start_time, s.end_time)) continue;
@@ -92,9 +122,9 @@ function findConflict(
     // 특정날짜 vs 특정날짜면 날짜도 정확히 일치해야 함
     if (!isRecurring && form.date && s.date && form.date !== s.date) continue;
 
-    return s;
+    found.push(s);
   }
-  return null;
+  return found;
 }
 
 export function ClassForm() {
@@ -112,6 +142,9 @@ export function ClassForm() {
   const [isAutoColor, setIsAutoColor] = useState(true);
   // true = 매주 반복(요일 기반), false = 특정 날짜 1회
   const [isRecurring, setIsRecurring] = useState(true);
+  // 11/19: 저장하려는 일정과 겹친 자동 공부 블록 → 옮길지·지울지 묻는 창
+  const [pendingAutoBlocks, setPendingAutoBlocks] = useState<Schedule[] | null>(null);
+  const [resolvingBlocks, setResolvingBlocks] = useState(false);
 
   useEffect(() => {
     if (editingSchedule) {
@@ -198,59 +231,101 @@ export function ClassForm() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const buildPayload = () => ({
+    title: form.title,
+    schedule_type: form.schedule_type,
+    recurring_day: isRecurring ? selectedDays[0] : form.recurring_day,
+    days: isRecurring ? selectedDays : undefined,
+    date: isRecurring ? undefined : (form.date || undefined),
+    start_time: form.start_time,
+    end_time: form.end_time,
+    location: form.location || undefined,
+    color: form.color,
+    priority: editingSchedule?.priority ?? 0,
+    is_completed: form.is_completed,
+    view_scope: form.view_scope,
+    // 공부·과제의 특정 날짜 일정만 시험에 연결 (그 외로 바꾸면 연결 해제)
+    linked_exam_id: canLinkExam ? form.linked_exam_id : null,
+  });
+
+  /** 일정을 저장하고 성공 문구를 돌려준다. 실패하면 throw */
+  const persistSchedule = async (): Promise<string> => {
+    const payload = buildPayload();
+    if (editingSchedule) {
+      await updateSchedule.mutateAsync({ id: editingSchedule.id, ...payload });
+      return '일정을 수정했어요';
+    }
+    const created = await createSchedule.mutateAsync(payload);
+    return created.length > 1 ? `일정 ${created.length}개를 추가했어요` : '일정을 추가했어요';
+  };
+
+  const saveFailedMessage = editingSchedule ? '일정을 수정하지 못했어요' : '일정을 추가하지 못했어요';
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
     const allSchedules = qc.getQueryData<Schedule[]>(['schedules']) ?? [];
-    const conflicting = findConflict(form, isRecurring, selectedDays, allSchedules, editingSchedule?.id);
-    if (conflicting) {
-      const message = `"${displayTitle(conflicting.title)}"과(와) 시간이 겹칩니다 (${conflicting.start_time}–${conflicting.end_time})`;
+    // 지난 자동 블록은 기록일 뿐이라 겹쳐도 막지 않는다
+    const conflicts = findConflicts(form, isRecurring, selectedDays, allSchedules, editingSchedule?.id)
+      .filter((c) => !isAutoBlock(c) || isUpcomingAutoBlock(c));
+    const blocking = conflicts.find((c) => !isUpcomingAutoBlock(c));
+    if (blocking) {
+      const message = `"${displayTitle(blocking.title)}"과(와) 시간이 겹칩니다 (${blocking.start_time}–${blocking.end_time})`;
       setErrors((prev) => ({ ...prev, conflict: message }));
       toast.error(message);
       return;
     }
+    const autoBlocks = conflicts.filter(isUpcomingAutoBlock);
+    if (autoBlocks.length > 0) {
+      // 자동으로 넣은 공부 블록과만 겹침 → 막지 않고 옮길지·지울지 묻는다 (11/19)
+      setErrors((prev) => ({ ...prev, conflict: '' }));
+      setPendingAutoBlocks(autoBlocks);
+      return;
+    }
 
-    const payload = {
-      title: form.title,
-      schedule_type: form.schedule_type,
-      recurring_day: isRecurring ? selectedDays[0] : form.recurring_day,
-      days: isRecurring ? selectedDays : undefined,
-      date: isRecurring ? undefined : (form.date || undefined),
-      start_time: form.start_time,
-      end_time: form.end_time,
-      location: form.location || undefined,
-      color: form.color,
-      priority: editingSchedule?.priority ?? 0,
-      is_completed: form.is_completed,
-      view_scope: form.view_scope,
-      // 공부·과제의 특정 날짜 일정만 시험에 연결 (그 외로 바꾸면 연결 해제)
-      linked_exam_id: canLinkExam ? form.linked_exam_id : null,
-    };
-
-    if (editingSchedule) {
-      updateSchedule.mutate(
-        { id: editingSchedule.id, ...payload },
-        {
-          onSuccess: () => {
-            toast.success('일정을 수정했어요');
-            closeClassForm();
-          },
-          onError: () => toast.error('일정을 수정하지 못했어요'),
-        }
-      );
-    } else {
-      createSchedule.mutate(payload, {
-        onSuccess: (created) => {
-          toast.success(created.length > 1 ? `일정 ${created.length}개를 추가했어요` : '일정을 추가했어요');
-          closeClassForm();
-        },
-        onError: () => toast.error('일정을 추가하지 못했어요'),
-      });
+    try {
+      toast.success(await persistSchedule());
+      closeClassForm();
+    } catch {
+      toast.error(saveFailedMessage);
     }
   };
 
-  const isPending = createSchedule.isPending || updateSchedule.isPending || deleteSchedule.isPending;
+  const resolveAutoBlocks = async (mode: 'move' | 'delete') => {
+    const blocks = pendingAutoBlocks ?? [];
+    setResolvingBlocks(true);
+    let savedMessage: string;
+    try {
+      savedMessage = await persistSchedule();
+    } catch {
+      toast.error(saveFailedMessage);
+      setResolvingBlocks(false);
+      setPendingAutoBlocks(null);
+      return;
+    }
+    try {
+      if (mode === 'move') {
+        const { data } = await api.post<RelocateResult>('/reschedule/relocate', { schedule_ids: blocks.map((b) => b.id) });
+        const { moved, unplaced } = data.summary;
+        toast.success(moved > 0 ? `${savedMessage}. 공부 블록 ${moved}개는 다른 빈 시간으로 옮겼어요` : savedMessage);
+        if (unplaced > 0) {
+          toast.warning(`시험 전까지 빈 시간이 없어 공부 블록 ${unplaced}개는 그대로 뒀어요`);
+        }
+      } else {
+        await Promise.all(blocks.map((b) => api.delete(`/schedules/${b.id}`)));
+        toast.success(`${savedMessage}. 겹친 공부 블록 ${blocks.length}개는 지웠어요`);
+      }
+    } catch {
+      toast.error('일정은 저장했지만 공부 블록을 정리하지 못했어요. 블록을 직접 옮기거나 지워 주세요');
+    }
+    qc.invalidateQueries({ queryKey: ['schedules'] });
+    setResolvingBlocks(false);
+    setPendingAutoBlocks(null);
+    closeClassForm();
+  };
+
+  const isPending = createSchedule.isPending || updateSchedule.isPending || deleteSchedule.isPending || resolvingBlocks;
   const fieldClassName = 'h-11 rounded-[10px] border-[#0f1e3a]/10 bg-white px-3 text-[15px] text-[#0f1e3a] placeholder:text-[#98a6ba] focus-visible:border-[#2a6fe3] focus-visible:ring-3 focus-visible:ring-[#2a6fe3]/15 focus-visible:ring-offset-0';
   const selectedViewTargets = scopeToTargets(form.view_scope);
 
@@ -266,7 +341,8 @@ export function ClassForm() {
   };
 
   return (
-    <Dialog open={isClassFormOpen} onOpenChange={(open) => !open && closeClassForm()}>
+    <>
+    <Dialog open={isClassFormOpen && !pendingAutoBlocks} onOpenChange={(open) => !open && closeClassForm()}>
       <DialogContent className="max-h-[88vh] w-[calc(100vw-2rem)] max-w-[520px] gap-0 overflow-hidden bg-white p-0 sm:max-w-[520px]">
         <DialogHeader className="border-b border-[#0f1e3a]/8 px-5 py-4 text-left sm:px-6">
           <DialogTitle>{editingSchedule ? '일정 수정' : '일정 추가'}</DialogTitle>
@@ -634,5 +710,65 @@ export function ClassForm() {
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* 11/19: 자동 공부 블록과 겹칠 때 묻는 창 */}
+    <Dialog
+      open={isClassFormOpen && !!pendingAutoBlocks}
+      onOpenChange={(open) => !open && !resolvingBlocks && setPendingAutoBlocks(null)}
+    >
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-[440px] bg-white sm:max-w-[440px]">
+        <DialogHeader className="text-left">
+          <DialogTitle>공부 블록과 시간이 겹쳐요</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-[14px] leading-[22px] text-[#44536b]">
+            이 시간에 SKEMA가 자동으로 넣은 공부 블록이 있어요. 일정을 넣고, 공부 블록은 어떻게 할까요?
+          </p>
+          <ul className="space-y-1.5 rounded-xl bg-[#f5f8fd] px-4 py-3">
+            {(pendingAutoBlocks ?? []).slice(0, 3).map((b) => (
+              <li key={b.id} className="flex items-baseline justify-between gap-3 text-[13px]">
+                <span className="truncate font-medium text-[#0f1e3a]">{displayTitle(b.title)}</span>
+                <span className="shrink-0 tabular-nums text-[#5f6f88]">{blockWhen(b)}</span>
+              </li>
+            ))}
+            {(pendingAutoBlocks?.length ?? 0) > 3 && (
+              <li className="text-[12px] text-[#5f6f88]">외 {(pendingAutoBlocks?.length ?? 0) - 3}개</li>
+            )}
+          </ul>
+          <p className="text-[12px] leading-[18px] text-[#5f6f88]">
+            옮기면 시험 전날까지 남은 빈 시간에 다시 넣어서 공부 시간은 그대로예요
+          </p>
+        </div>
+        <div className="mt-2 flex flex-col gap-2">
+          <Button
+            type="button"
+            onClick={() => resolveAutoBlocks('move')}
+            disabled={resolvingBlocks}
+            className="h-11 rounded-[10px] bg-[#2a6fe3] text-[14px] font-medium text-white hover:bg-[#1f63d6]"
+          >
+            {resolvingBlocks ? '처리하는 중' : '다른 빈 시간으로 옮기기 (추천)'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => resolveAutoBlocks('delete')}
+            disabled={resolvingBlocks}
+            className="h-11 rounded-[10px] border-[#fecaca] text-[14px] text-[#dc2626] hover:bg-[#fef2f2] hover:text-[#b91c1c]"
+          >
+            공부 블록 지우기
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setPendingAutoBlocks(null)}
+            disabled={resolvingBlocks}
+            className="h-10 rounded-[10px] text-[14px] text-[#44536b]"
+          >
+            취소
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

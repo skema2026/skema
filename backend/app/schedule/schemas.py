@@ -1,7 +1,7 @@
 import re
 from datetime import date as Date, datetime
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 _COLOR_RE = re.compile(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
@@ -367,6 +367,11 @@ class RescheduleMove(BaseModel):
 
 class RescheduleApplyRequest(BaseModel):
     moves: list[RescheduleMove]
+
+
+class RescheduleRelocateRequest(BaseModel):
+    """직접 넣은 일정과 겹친 자동 공부 블록을 옮길 때 (11/19)"""
+    schedule_ids: list[int] = Field(min_length=1, max_length=100)
 
 
 # ── 시험 공부 블록 배치 (#12) ──────────────────────────────────────────────────

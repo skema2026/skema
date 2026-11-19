@@ -35,6 +35,8 @@ from app.schedule.free_slots import (
 from app.schedule.models import DayOfWeek, ExamSchedule, INT_TO_DAY, Schedule
 
 TARGET_TYPES = ("study", "assignment")
+# 자동으로 넣은 공부 블록 (study_blocks.STUDY_SOURCE와 같은 값, 순환 import를 피하려고 따로 둠)
+AUTO_SOURCE = "ai_generated"
 # 시험과 연결 안 된 블록은 오늘부터 이 날수 안에서만 자리를 찾는다 (오늘 포함)
 NO_EXAM_RANGE_DAYS = 7
 # 긴 블록을 여러 자리로 나눠 넣을지. False면 연속된 한 자리에만 넣는다.
@@ -264,18 +266,36 @@ def apply(db: Session, user_id: int, moves: list, now: datetime | None = None) -
                     raise _conflict("SLOT_TAKEN", "그 시간에 다른 일정이 생겼어요. 미리보기를 다시 불러와 주세요.")
                 used.add((d, slot))
 
+    plan = [
+        (m.schedule_id, [(seg.date, seg.start_time, seg.end_time) for seg in m.to])
+        for m in moves
+    ]
+    updated_ids, created_ids = _write_moves(db, user_id, rows, plan)
+    db.commit()
+    return {"applied": len(updated_ids), "updated_ids": updated_ids, "created_ids": created_ids}
+
+
+def _write_moves(
+    db: Session,
+    user_id: int,
+    rows: dict[int, Schedule],
+    plan: list[tuple[int, list[tuple[str, str, str]]]],
+) -> tuple[list[int], list[int]]:
+    """plan = [(schedule_id, [(date, start, end), ...])]. 첫 조각은 원래 행을 옮기고 나머지는 새 행.
+
+    commit은 부르는 쪽에서 한다 (전부 되거나 전부 안 되게).
+    """
     updated_ids: list[int] = []
-    created_ids: list[int] = []
     new_rows: list[Schedule] = []
-    for m in moves:
-        src = rows[m.schedule_id]
-        segments = sorted(m.to, key=lambda seg: (seg.date, seg.start_time))
+    for schedule_id, segs in plan:
+        src = rows[schedule_id]
+        segments = sorted(segs)
         if not segments:
             continue
-        first_seg, rest = segments[0], segments[1:]
-        _move(src, first_seg.date, first_seg.start_time, first_seg.end_time)
+        (first_date, first_start, first_end), rest = segments[0], segments[1:]
+        _move(src, first_date, first_start, first_end)
         updated_ids.append(src.id)
-        for seg in rest:
+        for seg_date, seg_start, seg_end in rest:
             row = Schedule(
                 user_id=user_id,
                 course_name=src.course_name,
@@ -288,19 +308,76 @@ def apply(db: Session, user_id: int, moves: list, now: datetime | None = None) -
                 linked_exam_id=src.linked_exam_id,
                 original_generated_title=src.original_generated_title,
                 view_scope=src.view_scope,
-                recurring_day=_dow_enum(seg.date),
-                date=seg.date,
-                start_time=seg.start_time,
-                end_time=seg.end_time,
+                recurring_day=_dow_enum(seg_date),
+                date=seg_date,
+                start_time=seg_start,
+                end_time=seg_end,
                 is_completed=False,
             )
             db.add(row)
             new_rows.append(row)
 
     db.flush()
-    created_ids = [r.id for r in new_rows]
-    db.commit()
-    return {"applied": len(updated_ids), "updated_ids": updated_ids, "created_ids": created_ids}
+    return updated_ids, [r.id for r in new_rows]
+
+
+# ── 직접 넣은 일정과 겹친 자동 블록 옮기기 (11/19) ─────────────────────────────
+
+def _is_upcoming_auto_block(s: Schedule, now: datetime) -> bool:
+    """아직 시작 안 한, 자동으로 넣은 공부·과제 블록인가."""
+    if s.schedule_source != AUTO_SOURCE:
+        return False
+    if (s.schedule_type or "class") not in TARGET_TYPES:
+        return False
+    if s.is_completed or s.deleted_by_user or not s.date:
+        return False
+    today = now.date().isoformat()
+    if s.date > today:
+        return True
+    return s.date == today and time_to_minutes(s.start_time, default=0) >= minutes_of(now)
+
+
+def relocate(db: Session, user_id: int, schedule_ids: list[int], now: datetime | None = None) -> dict:
+    """사용자가 직접 넣은 일정과 겹친 자동 공부 블록을 다른 빈 시간으로 옮긴다.
+
+    화면은 새 일정을 먼저 저장한 뒤 이걸 부른다 → 새 일정이 이미 '찬 칸'이라 그 자리는 피한다.
+    다시 짜기와 같은 규칙(30분 칸, 수면 제외, 시험 전날까지, 같은 날은 저녁 우선)으로 바로 적용한다.
+    자리가 없으면 그 블록은 그대로 두고 unplaced로 알려 준다. 전부 되거나 전부 안 된다.
+    """
+    now = now or kst_now()
+    today = now.date()
+    ids = list(dict.fromkeys(schedule_ids))
+
+    rows = {
+        s.id: s
+        for s in db.query(Schedule).filter(Schedule.user_id == user_id, Schedule.id.in_(ids)).all()
+    } if ids else {}
+    for sid in ids:
+        if sid not in rows:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": "NOT_FOUND", "message": f"일정 {sid}을 찾을 수 없습니다."})
+        if not _is_upcoming_auto_block(rows[sid], now):
+            raise _conflict("NOT_AUTO_BLOCK", "자동으로 넣은, 아직 시작 전인 공부 블록만 옮길 수 있어요.")
+
+    targets = _to_targets(db, user_id, [rows[i] for i in ids], today)
+    moves: list[dict] = []
+    unplaced: list[dict] = []
+    if targets:
+        last = max(max(t.deadline for t in targets), today)
+        free = load_free_slots(db, user_id, today, last, now=now, exclude_schedule_ids=set(ids))
+        moves, unplaced = plan_moves(targets, free, today)
+        plan = [
+            (m["schedule_id"], [(seg["date"], seg["start_time"], seg["end_time"]) for seg in m["to"]])
+            for m in moves
+        ]
+        _write_moves(db, user_id, rows, plan)
+        db.commit()
+
+    return {
+        "moved": moves,
+        "unplaced": unplaced,
+        "warning": WARNING_NO_SLOT if unplaced else None,
+        "summary": {"target": len(targets), "moved": len(moves), "unplaced": len(unplaced)},
+    }
 
 
 def _dow_enum(date_str: str) -> DayOfWeek:
