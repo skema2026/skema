@@ -358,16 +358,16 @@ function UploadModal({
       // 그룹 선택: 그룹마다 1번씩 업로드 (내 기록에도 자동으로 뜸)
       const targets = groupIds.length > 0 ? groupIds : [undefined];
       await Promise.all(targets.map(gid => create.mutateAsync(makeForm(gid))));
-      toast.success('기록을 남겼어요');
+      toast.success('공부 인증을 남겼어요');
       onClose();
-    } catch { toast.error('기록을 올리지 못했어요'); }
+    } catch { toast.error('공부 인증을 올리지 못했어요'); }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#0f1e3a]/30 sm:items-center">
       <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-[0_12px_32px_rgba(15,30,58,0.12)] sm:rounded-2xl">
         <div className="mb-4 flex items-center gap-3">
-          <p className="flex-1 text-[17px] font-semibold text-[#0f1e3a]">기록 남기기</p>
+          <p className="flex-1 text-[17px] font-semibold text-[#0f1e3a]">인증 남기기</p>
           <button type="button" onClick={onClose} aria-label="닫기" className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5f6f88] transition-colors hover:bg-[#edf3fc]">
             <MaterialIcon icon="close" size={18} color="currentColor" />
           </button>
@@ -408,7 +408,7 @@ function UploadModal({
               })}
             </div>
             {groupIds.length === 0 && (
-              <p className="mt-1 text-[11px] text-[#5f6f88]">그룹 미선택 → 내 기록에만 저장</p>
+              <p className="mt-1 text-[11px] text-[#5f6f88]">그룹 미선택 → 내 인증에만 저장</p>
             )}
           </div>
         )}
@@ -509,7 +509,7 @@ function UploadModal({
           disabled={create.isPending || recordState === 'recording' || recordState === 'requesting'}
           className="h-11 w-full rounded-[10px] bg-[#2a6fe3] text-[15px] font-medium text-white transition-colors hover:bg-[#1f63d6] disabled:opacity-40"
         >
-          {create.isPending ? '등록하는 중' : '기록 남기기'}
+          {create.isPending ? '등록하는 중' : '인증 남기기'}
         </button>
       </div>
     </div>
@@ -633,7 +633,7 @@ function MemberCard({
         </>
       ) : (
         <div className="flex h-10 items-center justify-center">
-          <p className="text-[12px] text-[#98a6ba]">아직 기록을 올리지 않았어요</p>
+          <p className="text-[12px] text-[#98a6ba]">아직 인증을 올리지 않았어요</p>
         </div>
       )}
     </div>
@@ -655,7 +655,7 @@ function GroupFeed({
   const [showInfo, setShowInfo] = useState(false);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('이 기록을 삭제할까요?')) return;
+    if (!confirm('이 인증을 삭제할까요?')) return;
     try { await deleteLog.mutateAsync(id); toast.success('삭제했어요'); }
     catch { toast.error('삭제하지 못했어요'); }
   };
@@ -767,7 +767,7 @@ export default function LogPage() {
   const hasGroups = groups.length > 0;
 
   const handleDeleteMyLog = async (id: number) => {
-    if (!confirm('이 기록을 삭제할까요?')) return;
+    if (!confirm('이 인증을 삭제할까요?')) return;
     try { await deleteLog.mutateAsync(id); toast.success('삭제했어요'); }
     catch { toast.error('삭제하지 못했어요'); }
   };
@@ -788,7 +788,7 @@ export default function LogPage() {
               >
                 <MaterialIcon icon="arrow_back" size={18} color="currentColor" />
               </button>
-              <h1 className="text-[17px] font-semibold text-[#0f1e3a]">기록</h1>
+              <h1 className="text-[17px] font-semibold text-[#0f1e3a]">공부 인증</h1>
             </div>
             <div className="flex items-center gap-2">
               {streak && streak.current_streak > 0 && (
@@ -802,7 +802,7 @@ export default function LogPage() {
                 className="flex h-9 items-center gap-1.5 rounded-lg bg-[#2a6fe3] px-3 text-[14px] font-medium text-white transition-colors hover:bg-[#1f63d6]"
               >
                 <MaterialIcon icon="add" size={16} color="#fff" />
-                기록하기
+                인증하기
               </button>
             </div>
           </div>
@@ -820,7 +820,7 @@ export default function LogPage() {
               }`}
             >
               <MaterialIcon icon="person" size={16} color={mainTab === 'me' ? '#fff' : 'currentColor'} />
-              내 기록
+              내 인증
             </button>
 
             {/* 그룹 탭들 */}
@@ -862,11 +862,11 @@ export default function LogPage() {
                   <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#eaf2ff]">
                     <MaterialIcon icon="edit_note" size={18} color="#2a6fe3" />
                   </div>
-                  <p className="text-[15px] font-medium text-[#0f1e3a]">아직 내 기록이 없어요</p>
+                  <p className="text-[15px] font-medium text-[#0f1e3a]">아직 내 인증이 없어요</p>
                   <p className="mt-1 text-[13px] text-[#5f6f88]">공부 블록을 끝내고 3초 영상이나 한마디를 남겨 보세요</p>
                   <button type="button" onClick={() => setShowUpload(true)}
                     className="mt-5 h-10 rounded-[10px] bg-[#2a6fe3] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#1f63d6]">
-                    기록 남기기
+                    인증 남기기
                   </button>
                 </div>
               ) : (
@@ -899,7 +899,7 @@ export default function LogPage() {
                               />
                             ) : (
                               <>
-                                <img src={photoUrl(log.photo_url)} alt="기록" className="h-full w-full object-cover" />
+                                <img src={photoUrl(log.photo_url)} alt="공부 인증" className="h-full w-full object-cover" />
                                 {log.caption && (
                                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
                                     <p className="text-[12px] text-white line-clamp-2">{log.caption}</p>
@@ -929,7 +929,7 @@ export default function LogPage() {
                 <MaterialIcon icon="group" size={18} color="#2a6fe3" />
               </div>
               <p className="text-[15px] font-medium text-[#0f1e3a]">그룹에 참여해 보세요</p>
-              <p className="mt-1 text-[13px] text-[#5f6f88]">같은 그룹 사람들의 공부 기록을 서로 볼 수 있어요</p>
+              <p className="mt-1 text-[13px] text-[#5f6f88]">같은 그룹 사람들의 공부 인증을 서로 볼 수 있어요</p>
               <button type="button" onClick={() => setShowGroupSetup(true)}
                 className="mx-auto mt-5 flex h-10 items-center gap-1.5 rounded-[10px] bg-[#2a6fe3] px-4 text-[14px] font-medium text-white transition-colors hover:bg-[#1f63d6]">
                 <MaterialIcon icon="group_add" size={16} color="#fff" />

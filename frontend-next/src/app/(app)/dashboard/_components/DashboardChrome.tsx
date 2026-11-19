@@ -201,11 +201,11 @@ export function DashboardHeader({
         <button
           type="button"
           onClick={onOpenSetlog}
-          title="기록"
+          title="공부 인증"
           className="skema-btn-secondary"
         >
           <MaterialIcon icon="photo_camera" size={16} color="currentColor" />
-          <span className="hide-mobile">기록</span>
+          <span className="hide-mobile">공부 인증</span>
         </button>
 
         <button

@@ -110,7 +110,7 @@ export default function PublicProfilePage() {
               {/* 최근 기록 */}
               {data.logs.length > 0 && (
                 <div className="mb-4">
-                  <p className="mb-2 text-[15px] font-medium text-[#0f1e3a]">최근 기록</p>
+                  <p className="mb-2 text-[15px] font-medium text-[#0f1e3a]">최근 공부 인증</p>
                   <div className="space-y-2">
                     {data.logs.map(log => (
                       <div key={log.id} className="flex gap-0 overflow-hidden rounded-xl border border-[#0f1e3a]/8 bg-white">
@@ -119,7 +119,7 @@ export default function PublicProfilePage() {
                             {isVideoUrl(log.photo_url) ? (
                               <video src={mediaUrl(log.photo_url)} muted playsInline preload="metadata" className="h-full w-full object-cover" />
                             ) : (
-                              <img src={mediaUrl(log.photo_url)} alt="기록" className="h-full w-full object-cover" />
+                              <img src={mediaUrl(log.photo_url)} alt="공부 인증" className="h-full w-full object-cover" />
                             )}
                           </div>
                         )}

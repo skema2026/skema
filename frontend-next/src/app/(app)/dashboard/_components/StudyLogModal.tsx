@@ -141,10 +141,10 @@ export default function StudyLogModal({
       await Promise.all(
         targets.map((groupId) => createStudyLog.mutateAsync(makeForm(groupId))),
       );
-      toast.success('기록을 남겼어요');
+      toast.success('공부 인증을 남겼어요');
       closeModal();
     } catch {
-      toast.error('기록을 올리지 못했어요');
+      toast.error('공부 인증을 올리지 못했어요');
     }
   };
 
@@ -170,7 +170,7 @@ export default function StudyLogModal({
           <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-[0_12px_32px_rgba(15,30,58,0.12)] sm:rounded-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[17px] font-semibold text-[#0f1e3a]">기록 남기기</p>
+                <p className="text-[17px] font-semibold text-[#0f1e3a]">인증 남기기</p>
                 <p className="mt-0.5 truncate text-[13px] text-[#5f6f88]">{displayTitle(schedule.title)} 완료</p>
               </div>
               <button type="button" onClick={closeModal} aria-label="닫기" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#5f6f88] transition-colors hover:bg-[#edf3fc]">
@@ -203,7 +203,7 @@ export default function StudyLogModal({
                   })}
                 </div>
                 {groupIds.length === 0 && (
-                  <p className="mt-2 text-[12px] text-[#5f6f88]">그룹을 안 고르면 내 기록에만 남아요</p>
+                  <p className="mt-2 text-[12px] text-[#5f6f88]">그룹을 안 고르면 내 인증에만 남아요</p>
                 )}
               </div>
             )}
@@ -289,7 +289,7 @@ export default function StudyLogModal({
                 onClick={() => void submitLog()}
                 className="h-11 flex-1 rounded-[10px] bg-[#2a6fe3] text-[15px] font-medium text-white transition-colors hover:bg-[#1f63d6] disabled:opacity-40"
               >
-                {createStudyLog.isPending ? '등록하는 중' : '기록 남기기'}
+                {createStudyLog.isPending ? '등록하는 중' : '인증 남기기'}
               </button>
               <button
                 type="button"

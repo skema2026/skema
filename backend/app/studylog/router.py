@@ -145,8 +145,8 @@ def _notify_group_members(db: Session, group_id: int, poster_id: int, poster_nam
         if _is_notif_enabled(db, m.user_id, "group_member_post"):
             send_push_to_user(
                 db, m.user_id,
-                title="새 기록",
-                body=f"{poster_name}님이 기록을 올렸어요",
+                title="새 공부 인증",
+                body=f"{poster_name}님이 공부 인증을 올렸어요",
                 url="/log",
                 ntype="group_member_post",
             )

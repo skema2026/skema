@@ -459,7 +459,7 @@ def job_flush_like_queue():
                 continue
             unique_names = list(dict.fromkeys(names))   # 순서 유지 dedup
             if len(unique_names) == 1:
-                body = f"{unique_names[0]}님이 기록에 좋아요를 눌렀어요"
+                body = f"{unique_names[0]}님이 공부 인증에 좋아요를 눌렀어요"
             else:
                 body = f"{', '.join(unique_names[:3])}{'님 외 여러 명' if len(unique_names) > 3 else '님'}이 좋아요를 눌렀어요"
             # 커뮤니티 게시글(/feed)은 #4에서 제거됨 → 좋아요는 스터디 기록(log)만 남음
