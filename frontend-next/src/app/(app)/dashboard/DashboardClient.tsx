@@ -76,6 +76,7 @@ const getLocalDow = (date: Date) => {
 };
 
 const formatLongDate = (date: Date) => LONG_DATE_FORMATTER.format(date);
+const SHORT_DOW = ["월", "화", "수", "목", "금", "토", "일"];
 
 const DEFAULT_WAKE_TIME = "07:00";
 const DAY_END_MINUTES = 24 * 60;
@@ -538,6 +539,21 @@ export default function DashboardClient({
       : timetableView === "week"
         ? weekLabel
         : monthLabel;
+  // 모바일 기간 표시 (11/21): 화살표 사이에 지금 보고 있는 기간을 크게 보여 준다
+  const mobilePeriodLabel =
+    timetableView === "day"
+      ? `${dayDate.getMonth() + 1}월 ${dayDate.getDate()}일 (${SHORT_DOW[getLocalDow(dayDate)]})`
+      : timetableView === "week"
+        ? weekStart.getMonth() === weekEndDate.getMonth()
+          ? `${weekStart.getMonth() + 1}월 ${weekStart.getDate()}일 – ${weekEndDate.getDate()}일`
+          : `${weekStart.getMonth() + 1}월 ${weekStart.getDate()}일 – ${weekEndDate.getMonth() + 1}월 ${weekEndDate.getDate()}일`
+        : monthLabel;
+  const isViewingCurrentPeriod =
+    timetableView === "day"
+      ? dayOffset === 0
+      : timetableView === "week"
+        ? weekOffset === 0
+        : monthOffset === 0;
   // 에타 시간표 업로드는 대학생 전용 기능 → 비대학생에겐 "시간표 인식 필요" 안내를 띄우지 않는다
   const needsTimetableUpload =
     profile?.is_college_student === true &&
@@ -740,6 +756,30 @@ export default function DashboardClient({
     syncUrlState(date, "week");
   };
 
+  const changeView = (key: TimetableView) => {
+    setTimetableView(key);
+    const baseDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + dayOffset,
+    );
+    syncUrlState(baseDate, key);
+  };
+
+  const goToTodayInView = () => {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (timetableView === "day") {
+      setDayOffset(0);
+    } else if (timetableView === "week") {
+      setWeekOffset(0);
+      setWeekSelectedDate(todayStr);
+    } else {
+      setMonthOffset(0);
+      setMonthSelectedDate(todayStr);
+    }
+    syncUrlState(today, timetableView);
+  };
+
   const resetCalendar = () => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     setDayOffset(0);
@@ -832,20 +872,12 @@ export default function DashboardClient({
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="hidden flex-wrap items-center gap-2 sm:flex">
                     <div className="flex rounded-lg bg-[#e6effc] p-1">
                       {VIEW_LABELS.map(({ key, label }) => (
                         <button
                           key={key}
-                          onClick={() => {
-                            setTimetableView(key);
-                            const baseDate = new Date(
-                              now.getFullYear(),
-                              now.getMonth(),
-                              now.getDate() + dayOffset,
-                            );
-                            syncUrlState(baseDate, key);
-                          }}
+                          onClick={() => changeView(key)}
                           className={`h-7 rounded-md px-3 text-[13px] transition-colors ${
                             timetableView === key
                               ? "bg-[#2a6fe3] font-medium text-white shadow-[0_1px_2px_rgba(42,111,227,0.25)]"
@@ -883,6 +915,62 @@ export default function DashboardClient({
                         size={18}
                         color="#44536b"
                       />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 모바일 컨트롤 (11/21): 1줄 탭을 가로 꽉, 2줄 ‹ 기간 › + 다른 기간일 때만 '오늘' */}
+                <div className="mt-3 flex flex-col gap-2 sm:hidden">
+                  <div className="grid grid-cols-3 rounded-lg bg-[#e6effc] p-1" role="tablist" aria-label="보기">
+                    {VIEW_LABELS.map(({ key, label }) => (
+                      <button
+                        key={`m-${key}`}
+                        type="button"
+                        role="tab"
+                        aria-selected={timetableView === key}
+                        onClick={() => changeView(key)}
+                        className={`h-9 rounded-md text-[14px] transition-colors ${
+                          timetableView === key
+                            ? "bg-[#2a6fe3] font-medium text-white shadow-[0_1px_2px_rgba(42,111,227,0.25)]"
+                            : "text-[#44536b]"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-black/10 bg-white transition-colors active:bg-[#edf3fc]"
+                      onClick={() => moveCalendar(-1)}
+                      aria-label="이전"
+                    >
+                      <MaterialIcon icon="chevron_left" size={20} color="#44536b" />
+                    </button>
+                    <p
+                      className="min-w-0 flex-1 truncate text-center text-[16px] font-medium tabular-nums text-[#0f1e3a]"
+                      aria-live="polite"
+                    >
+                      {mobilePeriodLabel}
+                    </p>
+                    <button
+                      type="button"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-black/10 bg-white transition-colors active:bg-[#edf3fc]"
+                      onClick={() => moveCalendar(1)}
+                      aria-label="다음"
+                    >
+                      <MaterialIcon icon="chevron_right" size={20} color="#44536b" />
+                    </button>
+                    {/* 자리는 늘 잡아 둔다 — 버튼이 생겼다 사라지며 화살표가 밀리면 '다음'을 연달아 누르다 '오늘'을 누르게 된다 */}
+                    <button
+                      type="button"
+                      className={`skema-btn-secondary h-10 shrink-0 px-3 text-[13px] ${isViewingCurrentPeriod ? "invisible" : ""}`}
+                      onClick={goToTodayInView}
+                      aria-hidden={isViewingCurrentPeriod}
+                      tabIndex={isViewingCurrentPeriod ? -1 : 0}
+                    >
+                      오늘
                     </button>
                   </div>
                 </div>
