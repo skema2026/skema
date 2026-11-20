@@ -7,7 +7,7 @@ GET    /groups/me            — 내 그룹 목록
 GET    /groups/search        — 이름으로 그룹 검색
 GET    /groups/{id}          — 그룹 상세 + 멤버
 DELETE /groups/{id}/leave    — 그룹 탈퇴
-GET    /groups/{id}/feed     — BeReal 스타일 피드 (날짜별 멤버×기록)
+GET    /groups/{id}/feed     — 오늘 피드 (멤버×오늘 기록, 셋로그처럼 지난 날은 안 보임)
 """
 
 from collections import Counter
@@ -206,10 +206,10 @@ def get_group_feed(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """최근 N일치 BeReal 스타일 피드 반환.
+    """오늘(한국 시간) 피드만 반환 — 셋로그처럼 지난 날은 보이지 않는다 (11/20).
 
-    각 날짜별로 그룹 멤버 전원을 나열하고,
-    해당 날에 기록을 올렸으면 기록 정보를, 안 올렸으면 None을 담아 반환.
+    그룹 멤버 전원을 나열하고, 오늘 올린 기록이 있으면 기록 정보를,
+    없으면 빈 칸을 담아 반환. days 는 이전 클라이언트 호환용으로 받기만 하고 1로 고정한다.
     """
     _group_or_404(db, group_id)
     if not _is_member(db, group_id, current_user.id):
@@ -224,7 +224,7 @@ def get_group_feed(
     members = [(m.user_id, m.user.username or "") for m in memberships]
 
     today_kst = datetime.now(KST).date()
-    days = min(max(days, 1), 30)
+    days = 1  # 오늘만 (지난 날은 보이지 않게)
 
     result: list[GroupFeedDay] = []
     for delta in range(days):

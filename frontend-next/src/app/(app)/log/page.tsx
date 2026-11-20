@@ -20,6 +20,9 @@ import {
   useToggleGroupReaction,
 } from '@/hooks/useGroups';
 import {
+  STUDY_LOG_RULE_TEXT,
+  parseServerTime,
+  postToTargets,
   useCreateStudyLog,
   useDeleteStudyLog,
   useMyStudyLogs,
@@ -353,14 +356,15 @@ function UploadModal({
       return form;
     };
 
-    try {
-      // 그룹 미선택: 내 기록에만 1번 업로드
-      // 그룹 선택: 그룹마다 1번씩 업로드 (내 기록에도 자동으로 뜸)
-      const targets = groupIds.length > 0 ? groupIds : [undefined];
-      await Promise.all(targets.map(gid => create.mutateAsync(makeForm(gid))));
-      toast.success('공부 인증을 남겼어요');
-      onClose();
-    } catch { toast.error('공부 인증을 올리지 못했어요'); }
+    // 그룹 미선택: 내 기록에만 1번 업로드
+    // 그룹 선택: 그룹마다 1번씩 업로드 (내 기록에도 자동으로 뜸)
+    // 그룹마다 한 시간에 한 번이라, 일부 그룹만 막힐 수 있다
+    const targets = groupIds.length > 0 ? groupIds : [undefined];
+    const { ok, failed, detail } = await postToTargets(targets, gid => create.mutateAsync(makeForm(gid)));
+    if (ok === 0) { toast.error(detail ?? '공부 인증을 올리지 못했어요'); return; }
+    toast.success('공부 인증을 남겼어요');
+    if (failed > 0) toast.message(`${failed}개 그룹은 올리지 못했어요`, { description: detail });
+    onClose();
   };
 
   return (
@@ -503,6 +507,8 @@ function UploadModal({
           className="mb-3 w-full resize-none rounded-[10px] border border-[#0f1e3a]/10 bg-white px-3 py-2.5 text-[15px] text-[#0f1e3a] transition-colors placeholder:text-[#98a6ba] focus:border-[#2a6fe3] focus:outline-none focus:ring-3 focus:ring-[#2a6fe3]/15"
         />
 
+        <p className="mb-3 text-[12px] text-[#5f6f88]">{STUDY_LOG_RULE_TEXT}</p>
+
         <button
           type="button"
           onClick={handleSubmit}
@@ -531,14 +537,13 @@ function MemberCard({
   const liked    = slot.my_reactions.includes('👍');
   const likeCount = slot.reactions.find(r => r.emoji === '👍')?.count ?? 0;
 
+  // 셋로그처럼 몇 시 칸에 올렸는지 보여 준다 (예: "14시 · 12분 전")
   const relTime = slot.created_at ? (() => {
-    const diff = new Date().getTime() - new Date(slot.created_at).getTime();
+    const posted = parseServerTime(slot.created_at);
+    const diff = new Date().getTime() - posted.getTime();
     const m = Math.floor(diff / 60000);
-    if (m < 1) return '방금';
-    if (m < 60) return `${m}분 전`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}시간 전`;
-    return `${Math.floor(h / 24)}일 전`;
+    const ago = m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`;
+    return `${posted.getHours()}시 · ${ago}`;
   })() : null;
 
   const color = avatarColor(slot.user_id);
@@ -712,10 +717,9 @@ function GroupFeed({
         </div>
       </div>
 
-      {/* 날짜별 피드 */}
+      {/* 오늘 피드 (서버가 오늘 것만 보낸다) */}
       {feed?.map(day => {
-        const isToday = day.date === new Date().toISOString().slice(0, 10);
-        const dateLabel = isToday ? '오늘' : day.date.slice(5).replace('-', '/');
+        const dateLabel = `오늘 · ${Number(day.date.slice(5, 7))}월 ${Number(day.date.slice(8, 10))}일`;
         // 올린 사람 수 (중복 제거), 전체 멤버 수 (빈 슬롯 포함 유니크 user_id)
         const postedUsers = new Set(day.slots.filter(s => s.log_id).map(s => s.user_id)).size;
         const totalUsers  = new Set(day.slots.map(s => s.user_id)).size;
@@ -728,6 +732,7 @@ function GroupFeed({
                 {postedUsers}/{totalUsers}명
               </StatusPill>
             </div>
+            <p className="mb-3 text-[12px] text-[#5f6f88]">{STUDY_LOG_RULE_TEXT}</p>
             <div className="space-y-3">
               {day.slots.map((slot, idx) => (
                 <MemberCard
@@ -862,8 +867,9 @@ export default function LogPage() {
                   <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#eaf2ff]">
                     <MaterialIcon icon="edit_note" size={18} color="#2a6fe3" />
                   </div>
-                  <p className="text-[15px] font-medium text-[#0f1e3a]">아직 내 인증이 없어요</p>
+                  <p className="text-[15px] font-medium text-[#0f1e3a]">오늘 올린 인증이 없어요</p>
                   <p className="mt-1 text-[13px] text-[#5f6f88]">공부 블록을 끝내고 3초 영상이나 한마디를 남겨 보세요</p>
+                  <p className="mt-1 text-[12px] text-[#98a6ba]">{STUDY_LOG_RULE_TEXT}</p>
                   <button type="button" onClick={() => setShowUpload(true)}
                     className="mt-5 h-10 rounded-[10px] bg-[#2a6fe3] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#1f63d6]">
                     인증 남기기
@@ -871,16 +877,17 @@ export default function LogPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
+                  <p className="text-[12px] text-[#5f6f88]">{STUDY_LOG_RULE_TEXT}</p>
                   {myData.items.map(log => {
-                    const color = avatarColor(log.user_id);
+                    const postedHour = parseServerTime(log.created_at).getHours();
                     return (
                       <article key={log.id} className="overflow-hidden rounded-2xl border border-[#0f1e3a]/8 bg-white">
                         <div className="flex items-center justify-between px-4 py-3">
                           <div className="flex items-center gap-2">
-                            {log.schedule_title
-                              ? <span className="text-[13px] text-[#44536b]">{displayTitle(log.schedule_title)} 완료</span>
-                              : <span className="font-mono text-[12px] tabular-nums text-[#5f6f88]">{new Date(log.created_at).toLocaleDateString('ko-KR')}</span>
-                            }
+                            <span className="font-mono text-[12px] tabular-nums text-[#5f6f88]">{postedHour}시</span>
+                            {log.schedule_title && (
+                              <span className="text-[13px] text-[#44536b]">{displayTitle(log.schedule_title)} 완료</span>
+                            )}
                           </div>
                           <button type="button" onClick={() => handleDeleteMyLog(log.id)}
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-[#98a6ba] transition-colors hover:bg-[#fef2f2] hover:text-[#dc2626]">

@@ -1,9 +1,12 @@
 """
 공부 인증 피드 API
 
-POST   /study-logs                  — 기록 업로드 (그룹 지정 가능)
-GET    /study-logs/feed             — 그룹 없는 사람용 글로벌 피드
-GET    /study-logs/me               — 내 기록 목록
+POST   /study-logs                  — 기록 업로드 (그룹 지정 가능, 그룹마다 한 시간에 1번)
+GET    /study-logs/feed             — 그룹 없는 사람용 글로벌 피드 (오늘 것만)
+GET    /study-logs/me               — 내 기록 목록 (오늘 것만)
+
+셋로그처럼 운영한다 (11/20): 인증은 한 시간(한국 시간 정각~정각)에 한 번,
+화면에는 오늘(한국 시간 0시부터) 올린 것만 보인다. 지난 기록은 지우지 않고 DB에 남는다.
 GET    /study-logs/streak           — 내 스트릭
 GET    /study-logs/today-stats      — 오늘 현황
 DELETE /study-logs/{id}            — 내 기록 삭제
@@ -13,7 +16,9 @@ POST   /study-logs/{id}/reactions  — 이모지 반응 추가/토글
 import logging
 import os
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session, joinedload
@@ -33,6 +38,44 @@ router = APIRouter(prefix="/study-logs", tags=["study-logs"])
 logger = logging.getLogger(__name__)
 
 MAX_BYTES = 100 * 1024 * 1024  # 100 MB
+
+KST = ZoneInfo("Asia/Seoul")
+
+
+def _to_utc_naive(dt: datetime) -> datetime:
+    """DB의 created_at 은 UTC 기준 naive datetime 이라 비교용으로 맞춘다."""
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def kst_hour_window(now: datetime | None = None) -> tuple[datetime, datetime, int]:
+    """지금이 속한 한국 시간 1시간 칸 (시작, 끝, 몇 시) — UTC naive."""
+    now_kst = (now or datetime.now(timezone.utc)).astimezone(KST)
+    start = now_kst.replace(minute=0, second=0, microsecond=0)
+    return _to_utc_naive(start), _to_utc_naive(start + timedelta(hours=1)), start.hour
+
+
+def kst_today_window(now: datetime | None = None) -> tuple[datetime, datetime]:
+    """한국 시간 오늘 0시 ~ 내일 0시 — UTC naive."""
+    now_kst = (now or datetime.now(timezone.utc)).astimezone(KST)
+    start = now_kst.replace(hour=0, minute=0, second=0, microsecond=0)
+    return _to_utc_naive(start), _to_utc_naive(start + timedelta(days=1))
+
+
+def ensure_hourly_slot_free(db: Session, user_id: int, group_id: Optional[int], now: datetime | None = None) -> None:
+    """같은 그룹(그룹 없음도 하나의 칸)에 이번 시간에 이미 올렸으면 409."""
+    start, end, hour = kst_hour_window(now)
+    q = db.query(StudyLog.id).filter(
+        StudyLog.user_id == user_id,
+        StudyLog.created_at >= start,
+        StudyLog.created_at < end,
+    )
+    q = q.filter(StudyLog.group_id == group_id) if group_id else q.filter(StudyLog.group_id == None)  # noqa: E711
+    if q.first():
+        next_hour = (hour + 1) % 24
+        raise HTTPException(
+            status_code=409,
+            detail=f"{hour}시에는 이미 인증했어요. {next_hour}시부터 다시 올릴 수 있어요.",
+        )
 
 
 def _build_log_out(log: StudyLog, current_user_id: int, db: Session | None = None) -> StudyLogOut:
@@ -82,6 +125,9 @@ async def create_study_log(
         ).first()
         if not is_member:
             raise HTTPException(status_code=403, detail="해당 그룹의 멤버가 아닙니다.")
+
+    # 한 시간에 한 번 (영상 저장 전에 막아서 헛 업로드를 만들지 않는다)
+    ensure_hourly_slot_free(db, current_user.id, group_id)
 
     photo_path = None  # DB에는 주소가 아니라 저장소 키(studylogs/<uuid>.<ext>)를 넣는다
     if video and video.filename:
@@ -157,10 +203,7 @@ def get_today_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-    today_start = datetime.now(ZoneInfo("Asia/Seoul")).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_start_utc = today_start.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    today_start_utc, _ = kst_today_window()
     today_logs = db.query(StudyLog).filter(
         StudyLog.created_at >= today_start_utc,
         StudyLog.group_id == None,  # noqa: E711 — 그룹 없는 글로벌 로그만
@@ -184,11 +227,13 @@ def get_feed(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """그룹에 속하지 않은 글로벌 공개 피드 (is_public=True만)."""
+    """그룹에 속하지 않은 글로벌 공개 피드 (is_public=True만, 오늘 것만)."""
     limit = min(limit, 50)
+    day_start, day_end = kst_today_window()
     q = (
         db.query(StudyLog)
         .filter(StudyLog.group_id == None, StudyLog.is_public == True)  # noqa: E711,E712
+        .filter(StudyLog.created_at >= day_start, StudyLog.created_at < day_end)
         .options(joinedload(StudyLog.user), joinedload(StudyLog.reactions))
         .order_by(StudyLog.created_at.desc())
     )
@@ -208,10 +253,13 @@ def get_my_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """내 기록 — 오늘(한국 시간) 올린 것만."""
     limit = min(limit, 50)
+    day_start, day_end = kst_today_window()
     q = (
         db.query(StudyLog)
         .filter(StudyLog.user_id == current_user.id)
+        .filter(StudyLog.created_at >= day_start, StudyLog.created_at < day_end)
         .options(joinedload(StudyLog.user), joinedload(StudyLog.reactions))
         .order_by(StudyLog.created_at.desc())
     )

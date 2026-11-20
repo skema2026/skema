@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { displayTitle } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
-import { useCreateStudyLog } from '@/hooks/useStudyLogs';
+import { STUDY_LOG_RULE_TEXT, postToTargets, useCreateStudyLog } from '@/hooks/useStudyLogs';
 import type { GroupOut } from '@/hooks/useGroups';
 
 type StudyLogSchedule = { id: number; title: string };
@@ -136,16 +136,18 @@ export default function StudyLogModal({
       return form;
     };
 
-    try {
-      const targets = groupIds.length > 0 ? groupIds : [undefined];
-      await Promise.all(
-        targets.map((groupId) => createStudyLog.mutateAsync(makeForm(groupId))),
-      );
-      toast.success('공부 인증을 남겼어요');
-      closeModal();
-    } catch {
-      toast.error('공부 인증을 올리지 못했어요');
+    // 그룹마다 한 시간에 한 번이라, 일부 그룹만 막힐 수 있다
+    const targets = groupIds.length > 0 ? groupIds : [undefined];
+    const { ok, failed, detail } = await postToTargets(targets, (groupId) =>
+      createStudyLog.mutateAsync(makeForm(groupId)),
+    );
+    if (ok === 0) {
+      toast.error(detail ?? '공부 인증을 올리지 못했어요');
+      return;
     }
+    toast.success('공부 인증을 남겼어요');
+    if (failed > 0) toast.message(`${failed}개 그룹은 올리지 못했어요`, { description: detail });
+    closeModal();
   };
 
   return (
@@ -279,8 +281,9 @@ export default function StudyLogModal({
               value={caption}
               onChange={(event) => setCaption(event.target.value.slice(0, 200))}
               rows={2}
-              className="mb-4 w-full resize-none rounded-[10px] border border-[#0f1e3a]/10 bg-white px-3 py-2.5 text-[15px] text-[#0f1e3a] transition-colors placeholder:text-[#98a6ba] focus:border-[#2a6fe3] focus:outline-none focus:ring-3 focus:ring-[#2a6fe3]/15"
+              className="mb-2 w-full resize-none rounded-[10px] border border-[#0f1e3a]/10 bg-white px-3 py-2.5 text-[15px] text-[#0f1e3a] transition-colors placeholder:text-[#98a6ba] focus:border-[#2a6fe3] focus:outline-none focus:ring-3 focus:ring-[#2a6fe3]/15"
             />
+            <p className="mb-4 text-[12px] text-[#5f6f88]">{STUDY_LOG_RULE_TEXT}</p>
 
             <div className="flex gap-2">
               <button

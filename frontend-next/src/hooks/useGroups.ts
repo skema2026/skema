@@ -63,7 +63,7 @@ export function useGroupDetail(groupId: number | null) {
   });
 }
 
-export function useGroupFeed(groupId: number | null, days = 7) {
+export function useGroupFeed(groupId: number | null, days = 1) {
   return useQuery({
     queryKey: ['groups', groupId, 'feed', days],
     queryFn: async () => {

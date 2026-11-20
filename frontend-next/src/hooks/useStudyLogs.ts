@@ -6,6 +6,27 @@ import { mediaUrl } from '@/lib/media';
 
 export type ReactionOut = { emoji: string; count: number };
 
+/** 공부 인증 규칙 안내 (셋로그처럼, 11/20) */
+export const STUDY_LOG_RULE_TEXT = '인증은 한 시간에 한 번 올릴 수 있고, 오늘 올린 것만 보여요';
+
+/** 서버 시각(UTC, 시간대 표기 없음)을 Date로. 'Z'가 없으면 UTC로 보고 붙인다 */
+export function parseServerTime(value: string): Date {
+  return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(value) ? value : `${value}Z`);
+}
+
+/** 여러 그룹에 나눠 올리고 결과를 모은다 (한 시간 제한으로 일부 그룹만 막힐 수 있어서) */
+export async function postToTargets<T>(
+  targets: T[],
+  send: (target: T) => Promise<unknown>,
+): Promise<{ ok: number; failed: number; detail?: string }> {
+  const results = await Promise.allSettled(targets.map(send));
+  const ok = results.filter((r) => r.status === 'fulfilled').length;
+  const rejected = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  const detail = (rejected?.reason as { response?: { data?: { detail?: unknown } } } | undefined)
+    ?.response?.data?.detail;
+  return { ok, failed: results.length - ok, detail: typeof detail === 'string' ? detail : undefined };
+}
+
 export type StudyLogItem = {
   id: number;
   user_id: number;
