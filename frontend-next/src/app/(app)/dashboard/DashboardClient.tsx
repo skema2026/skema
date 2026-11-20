@@ -919,7 +919,7 @@ export default function DashboardClient({
                   </div>
                 </div>
 
-                {/* 모바일 컨트롤 (11/21): 1줄 탭을 가로 꽉, 2줄 ‹ 기간 › + 다른 기간일 때만 '오늘' */}
+                {/* 모바일 컨트롤 (11/21): 1줄 탭을 가로 꽉, 2줄 ‹ 기간 › — 다른 기간일 때만 기간 아래 '오늘로 돌아가기' */}
                 <div className="mt-3 flex flex-col gap-2 sm:hidden">
                   <div className="grid grid-cols-3 rounded-lg bg-[#e6effc] p-1" role="tablist" aria-label="보기">
                     {VIEW_LABELS.map(({ key, label }) => (
@@ -948,12 +948,25 @@ export default function DashboardClient({
                     >
                       <MaterialIcon icon="chevron_left" size={20} color="#44536b" />
                     </button>
-                    <p
-                      className="min-w-0 flex-1 truncate text-center text-[16px] font-medium tabular-nums text-[#0f1e3a]"
-                      aria-live="polite"
-                    >
-                      {mobilePeriodLabel}
-                    </p>
+                    {/* 가운데: 기간을 정가운데 크게. 다른 기간일 때만 아래에 작게 '오늘로 돌아가기' (줄 높이는 그대로) */}
+                    <div className="flex h-10 min-w-0 flex-1 flex-col items-center justify-center">
+                      <p
+                        className="max-w-full truncate text-[16px] font-medium leading-tight tabular-nums text-[#0f1e3a]"
+                        aria-live="polite"
+                      >
+                        {mobilePeriodLabel}
+                      </p>
+                      {!isViewingCurrentPeriod && (
+                        <button
+                          type="button"
+                          onClick={goToTodayInView}
+                          className="flex items-center gap-0.5 rounded px-1 text-[12px] font-medium leading-tight text-[#2a6fe3] active:text-[#1f63d6]"
+                        >
+                          <MaterialIcon icon="undo" size={12} color="currentColor" />
+                          오늘로 돌아가기
+                        </button>
+                      )}
+                    </div>
                     <button
                       type="button"
                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-black/10 bg-white transition-colors active:bg-[#edf3fc]"
@@ -961,16 +974,6 @@ export default function DashboardClient({
                       aria-label="다음"
                     >
                       <MaterialIcon icon="chevron_right" size={20} color="#44536b" />
-                    </button>
-                    {/* 자리는 늘 잡아 둔다 — 버튼이 생겼다 사라지며 화살표가 밀리면 '다음'을 연달아 누르다 '오늘'을 누르게 된다 */}
-                    <button
-                      type="button"
-                      className={`skema-btn-secondary h-10 shrink-0 px-3 text-[13px] ${isViewingCurrentPeriod ? "invisible" : ""}`}
-                      onClick={goToTodayInView}
-                      aria-hidden={isViewingCurrentPeriod}
-                      tabIndex={isViewingCurrentPeriod ? -1 : 0}
-                    >
-                      오늘
                     </button>
                   </div>
                 </div>

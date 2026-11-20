@@ -67,6 +67,7 @@ import {
   Mic,
   MicOff,
   SwitchCamera,
+  Undo2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -111,6 +112,7 @@ const ICONS: Record<string, LucideIcon> = {
   cameraswitch: SwitchCamera,
   mic: Mic,
   mic_off: MicOff,
+  undo: Undo2,
   light_mode: Sun,
   expand_less: ChevronUp,
   expand_more: ChevronDown,
