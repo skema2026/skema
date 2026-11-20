@@ -215,6 +215,14 @@ export default function DashboardClient({
   });
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
+  // 모바일 주간·월간: 날짜를 누르면 그 보기 안에서 그날 목록을 펼친다 (일간으로 넘어가지 않음, 11/21)
+  const [weekSelectedDate, setWeekSelectedDate] = useState<string | null>(null);
+  const [monthSelectedDate, setMonthSelectedDate] = useState<string | null>(null);
+  // 보기를 바꾸면 다시 처음 상태(선택 없음)에서 시작
+  useEffect(() => {
+    setWeekSelectedDate(null);
+    setMonthSelectedDate(null);
+  }, [timetableView]);
   const syncStateFromUrl = useCallback(() => {
     if (typeof window === "undefined") return;
 
@@ -278,6 +286,7 @@ export default function DashboardClient({
   }, [syncStateFromUrl]);
 
   const [weekScrollDate, setWeekScrollDate] = useState<string | null>(null);
+  const clearWeekScrollDate = useCallback(() => setWeekScrollDate(null), []);
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
   const [examForStudyBlocks, setExamForStudyBlocks] = useState<{
     id: number;
@@ -499,6 +508,18 @@ export default function DashboardClient({
   // 사이드바 "다가오는 중요 일정" 카드용 데이터 — 대학생·비대학생 모두 시험만 표시
   const sidebarExams = upcomingExams.slice(0, 5);
   const sidebarOneTimeEvents: typeof schedules = [];
+  const openExamStudyBlocks = (exam: ExamSchedule) =>
+    setExamForStudyBlocks({
+      id: exam.id,
+      title: exam.title,
+      exam_date: exam.exam_date,
+    });
+  // 일간 보기와 같은 완료 처리 — 같은 일정 캐시를 고쳐서 모든 보기에 같은 상태가 보인다
+  const toggleScheduleComplete = (schedule: Schedule) =>
+    toggleComplete.mutate({
+      id: schedule.id,
+      is_completed: !schedule.is_completed,
+    });
 
   const getDaysUntil = (date: string) =>
     Math.ceil(
@@ -581,6 +602,15 @@ export default function DashboardClient({
     queryClient.invalidateQueries({ queryKey: ["schedules"] });
     queryClient.invalidateQueries({ queryKey: ["exams"] });
   };
+  const upcomingExamsCard = (
+    <UpcomingExams
+      exams={sidebarExams}
+      events={sidebarOneTimeEvents}
+      schedules={schedules}
+      getDaysUntil={getDaysUntil}
+      onExamClick={openExamStudyBlocks}
+    />
+  );
 
   /** 다시 짜기 (#11): 미리보기를 받아 확인 창을 띄운다. 적용은 RescheduleDialog에서. */
   const handleReschedule = async () => {
@@ -867,16 +897,14 @@ export default function DashboardClient({
                       exams={exams}
                       timetableRef={timetableRef}
                       onScheduleClick={openClassForm}
-                      onExamClick={(exam) =>
-                        setExamForStudyBlocks({
-                          id: exam.id,
-                          title: exam.title,
-                          exam_date: exam.exam_date,
-                        })
-                      }
+                      onExamClick={openExamStudyBlocks}
                       onShowDayView={showDayViewForDate}
                       scrollToDateStr={weekScrollDate}
-                      onScrollConsumed={() => setWeekScrollDate(null)}
+                      onScrollConsumed={clearWeekScrollDate}
+                      selectedDateStr={weekSelectedDate}
+                      onSelectDate={setWeekSelectedDate}
+                      onToggleComplete={toggleScheduleComplete}
+                      examsCard={upcomingExamsCard}
                     />
                   )}
 
@@ -927,25 +955,21 @@ export default function DashboardClient({
                       todayStr={todayStr}
                       wakeStartMinutes={wakeStartMinutes}
                       onDayClick={showDayViewForDate}
+                      selectedDateStr={monthSelectedDate}
+                      onSelectDate={setMonthSelectedDate}
+                      onScheduleClick={openClassForm}
+                      onExamClick={openExamStudyBlocks}
+                      onToggleComplete={toggleScheduleComplete}
                     />
                   )}
                 </div>
               </div>
 
-              <aside className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto">
-                <UpcomingExams
-                  exams={sidebarExams}
-                  events={sidebarOneTimeEvents}
-                  schedules={schedules}
-                  getDaysUntil={getDaysUntil}
-                  onExamClick={(exam) =>
-                    setExamForStudyBlocks({
-                      id: exam.id,
-                      title: exam.title,
-                      exam_date: exam.exam_date,
-                    })
-                  }
-                />
+              {/* 모바일 주간 보기에서는 시험 카드를 주간 화면 안(날짜 줄·하루 목록 아래)에 넣으므로 여기선 숨긴다 */}
+              <aside
+                className={`${timetableView === "week" ? "hidden sm:flex" : "flex"} min-w-0 flex-col gap-3 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto`}
+              >
+                {upcomingExamsCard}
               </aside>
             </section>
           </div>

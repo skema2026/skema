@@ -3,7 +3,9 @@
 
 import { getDisplayColor } from '@/lib/scheduleColor';
 import { minutesToTime } from '@/lib/utils';
+import type { ExamSchedule, Schedule } from '@/types';
 import type { WeekAgendaDay } from './WeekView';
+import MobileDayList from './MobileDayList';
 
 type MonthViewProps = {
   days: WeekAgendaDay[];
@@ -11,20 +13,42 @@ type MonthViewProps = {
   monthLabel: string;
   todayStr: string;
   wakeStartMinutes: number;
+  /** 데스크톱 달력: 누르면 일간 보기로 (기존 동작) */
   onDayClick: (date: Date) => void;
+  /** 모바일 전용: 월간 탭을 유지한 채 달력 아래에 그날 할 일을 펼친다 (11/21) */
+  selectedDateStr: string | null;
+  onSelectDate: (dateStr: string) => void;
+  onScheduleClick: (schedule: Schedule) => void;
+  onExamClick: (exam: ExamSchedule) => void;
+  onToggleComplete: (schedule: Schedule) => void;
 };
 
 function MobileMonthAgenda({
   days,
   monthDate,
   todayStr,
-  onDayClick,
+  selectedDateStr,
+  onSelectDate,
+  onScheduleClick,
+  onExamClick,
+  onToggleComplete,
 }: Pick<
   MonthViewProps,
-  'days' | 'monthDate' | 'todayStr' | 'onDayClick'
+  | 'days'
+  | 'monthDate'
+  | 'todayStr'
+  | 'selectedDateStr'
+  | 'onSelectDate'
+  | 'onScheduleClick'
+  | 'onExamClick'
+  | 'onToggleComplete'
 >) {
+  const selectedDay = selectedDateStr
+    ? days.find((day) => day.dateStr === selectedDateStr) ?? null
+    : null;
+
   return (
-    <div className="p-3">
+    <div className="space-y-3 p-3">
       <div className="rounded-2xl border border-[#0f1e3a]/8 bg-white p-3">
         <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[12px] text-[#5f6f88]">
           {['월', '화', '수', '목', '금', '토', '일'].map((day) => (
@@ -40,16 +64,21 @@ function MobileMonthAgenda({
             const isCurrentMonth =
               day.date.getMonth() === monthDate.getMonth();
             const count = day.schedules.length + day.exams.length;
+            const isSelected = day.dateStr === selectedDay?.dateStr;
 
             return (
               <button
                 key={`mobile-month-${day.dateStr}`}
                 type="button"
-                onClick={() => onDayClick(day.date)}
+                onClick={() => onSelectDate(day.dateStr)}
+                aria-pressed={isSelected}
+                aria-label={`${day.date.getMonth() + 1}월 ${day.date.getDate()}일${count ? `, 일정 ${count}개` : ''}`}
                 className={`aspect-square min-w-0 rounded-[10px] border p-1.5 text-left transition-colors ${
                   isToday
-                    ? 'border-[#2a6fe3] bg-[#2a6fe3] text-white'
-                    : isCurrentMonth
+                    ? `border-[#2a6fe3] bg-[#2a6fe3] text-white ${isSelected ? 'ring-2 ring-[#2a6fe3] ring-offset-2' : ''}`
+                    : isSelected
+                      ? 'border-[#2a6fe3] bg-[#eaf2ff] text-[#1f63d6] ring-1 ring-[#2a6fe3]'
+                      : isCurrentMonth
                       ? count
                         ? 'border-[#0f1e3a]/8 bg-white text-[#0f1e3a]'
                         : 'border-[#0f1e3a]/8 bg-white text-[#5f6f88]'
@@ -90,6 +119,20 @@ function MobileMonthAgenda({
           })}
         </div>
       </div>
+
+      {selectedDay ? (
+        <MobileDayList
+          date={selectedDay.date}
+          isToday={selectedDay.dateStr === todayStr}
+          schedules={selectedDay.schedules}
+          exams={selectedDay.exams}
+          onScheduleClick={onScheduleClick}
+          onExamClick={onExamClick}
+          onToggleComplete={onToggleComplete}
+        />
+      ) : (
+        <p className="px-1 text-center text-[12px] text-[#98a6ba]">날짜를 누르면 그날 할 일을 보여 줘요</p>
+      )}
     </div>
   );
 }
@@ -101,6 +144,11 @@ export default function MonthView({
   todayStr,
   wakeStartMinutes,
   onDayClick,
+  selectedDateStr,
+  onSelectDate,
+  onScheduleClick,
+  onExamClick,
+  onToggleComplete,
 }: MonthViewProps) {
   return (
     <>
@@ -109,7 +157,11 @@ export default function MonthView({
           days={days}
           monthDate={monthDate}
           todayStr={todayStr}
-          onDayClick={onDayClick}
+          selectedDateStr={selectedDateStr}
+          onSelectDate={onSelectDate}
+          onScheduleClick={onScheduleClick}
+          onExamClick={onExamClick}
+          onToggleComplete={onToggleComplete}
         />
       </div>
 
