@@ -451,20 +451,20 @@ function UploadModal({
           {recordState === 'preview' && (
             <div className="relative h-full">
               <video ref={liveVideoCallbackRef} autoPlay muted playsInline className="h-full w-full object-cover" />
-              {/* 상단 버튼들 */}
-              <div className="absolute top-2 right-2 flex gap-2">
-                <button type="button" onClick={flipCamera}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white">
-                  <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
+              {/* 상단 버튼들 — 아이콘만으로는 뜻이 안 보여서 글자를 같이 붙인다 */}
+              <div className="absolute inset-x-2 top-2 flex justify-between gap-2">
+                <button type="button" onClick={flipCamera} aria-label="카메라 전환"
+                  className="flex h-9 items-center gap-1.5 rounded-full bg-black/50 px-3 text-[13px] font-medium text-white backdrop-blur-sm">
+                  <MaterialIcon icon="cameraswitch" size={16} color="currentColor" />
+                  카메라 전환
                 </button>
-                <button type="button" onClick={() => setAudioEnabled(v => !v)}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${audioEnabled ? 'bg-[#2a6fe3]' : 'bg-white/15'} text-white`}>
-                  <MaterialIcon icon={audioEnabled ? 'videocam' : 'videocam_off'} size={16} color="currentColor" />
+                <button type="button" onClick={() => setAudioEnabled(v => !v)} aria-pressed={audioEnabled}
+                  aria-label={audioEnabled ? '소리 끄기' : '소리 켜기'}
+                  className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-white backdrop-blur-sm ${audioEnabled ? 'bg-[#2a6fe3]' : 'bg-black/50'}`}>
+                  <MaterialIcon icon={audioEnabled ? 'mic' : 'mic_off'} size={16} color="currentColor" />
+                  {audioEnabled ? '소리 켜짐' : '소리 꺼짐'}
                 </button>
               </div>
-              <p className="absolute bottom-12 inset-x-0 text-center text-[12px] text-white/70">
-                {audioEnabled ? '소리 켜짐' : '소리 꺼짐'}
-              </p>
               {/* 녹화 시작 버튼 */}
               <div className="absolute bottom-3 inset-x-0 flex justify-center">
                 <button type="button" onClick={beginRecording}

@@ -219,9 +219,11 @@ export default function StudyLogModal({
                   <button
                     type="button"
                     onClick={flipCamera}
-                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white transition-colors hover:bg-white/25"
+                    aria-label="카메라 전환"
+                    className="absolute right-2 top-2 flex h-9 items-center gap-1.5 rounded-full bg-white/15 px-3 text-[13px] font-medium text-white transition-colors hover:bg-white/25"
                   >
-                    <MaterialIcon icon="flip_camera_ios" size={16} color="currentColor" />
+                    <MaterialIcon icon="cameraswitch" size={16} color="currentColor" />
+                    카메라 전환
                   </button>
                   <button
                     type="button"

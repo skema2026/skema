@@ -64,6 +64,9 @@ import {
   Video,
   VideoOff,
   X,
+  Mic,
+  MicOff,
+  SwitchCamera,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -105,6 +108,9 @@ const ICONS: Record<string, LucideIcon> = {
   event: CalendarClock,
   event_available: CalendarCheck,
   flip_camera_ios: FlipHorizontal,
+  cameraswitch: SwitchCamera,
+  mic: Mic,
+  mic_off: MicOff,
   light_mode: Sun,
   expand_less: ChevronUp,
   expand_more: ChevronDown,
