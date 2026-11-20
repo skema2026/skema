@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { displayTitle } from '@/lib/utils';
 import MaterialIcon from '@/components/common/MaterialIcon';
-import { STUDY_LOG_RULE_TEXT, postToTargets, useCreateStudyLog } from '@/hooks/useStudyLogs';
+import { STUDY_LOG_RULE_TEXT, currentSlotLabel, postToTargets, useCreateStudyLog } from '@/hooks/useStudyLogs';
 import type { GroupOut } from '@/hooks/useGroups';
 
 type StudyLogSchedule = { id: number; title: string };
@@ -172,7 +172,10 @@ export default function StudyLogModal({
           <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-[0_12px_32px_rgba(15,30,58,0.12)] sm:rounded-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[17px] font-semibold text-[#0f1e3a]">인증 남기기</p>
+                <p className="text-[17px] font-semibold text-[#0f1e3a]">
+                  인증 남기기
+                  <span className="ml-2 rounded-md bg-[#eaf2ff] px-2 py-0.5 align-middle text-[12px] font-medium text-[#1f63d6]">{currentSlotLabel()} 인증</span>
+                </p>
                 <p className="mt-0.5 truncate text-[13px] text-[#5f6f88]">{displayTitle(schedule.title)} 완료</p>
               </div>
               <button type="button" onClick={closeModal} aria-label="닫기" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#5f6f88] transition-colors hover:bg-[#edf3fc]">

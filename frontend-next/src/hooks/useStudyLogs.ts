@@ -14,6 +14,17 @@ export function parseServerTime(value: string): Date {
   return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(value) ? value : `${value}Z`);
 }
 
+/** 올린 시각을 "14:05"처럼 */
+export function formatPostedTime(value: string): string {
+  const d = parseServerTime(value);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** 지금 올리면 들어가는 시간 칸 ("14시") */
+export function currentSlotLabel(now: Date = new Date()): string {
+  return `${now.getHours()}시`;
+}
+
 /** 여러 그룹에 나눠 올리고 결과를 모은다 (한 시간 제한으로 일부 그룹만 막힐 수 있어서) */
 export async function postToTargets<T>(
   targets: T[],

@@ -21,6 +21,8 @@ import {
 } from '@/hooks/useGroups';
 import {
   STUDY_LOG_RULE_TEXT,
+  currentSlotLabel,
+  formatPostedTime,
   parseServerTime,
   postToTargets,
   useCreateStudyLog,
@@ -371,7 +373,10 @@ function UploadModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#0f1e3a]/30 sm:items-center">
       <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-[0_12px_32px_rgba(15,30,58,0.12)] sm:rounded-2xl">
         <div className="mb-4 flex items-center gap-3">
-          <p className="flex-1 text-[17px] font-semibold text-[#0f1e3a]">인증 남기기</p>
+          <p className="flex-1 text-[17px] font-semibold text-[#0f1e3a]">
+            인증 남기기
+            <span className="ml-2 rounded-md bg-[#eaf2ff] px-2 py-0.5 align-middle text-[12px] font-medium text-[#1f63d6]">{currentSlotLabel()} 인증</span>
+          </p>
           <button type="button" onClick={onClose} aria-label="닫기" className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5f6f88] transition-colors hover:bg-[#edf3fc]">
             <MaterialIcon icon="close" size={18} color="currentColor" />
           </button>
@@ -537,13 +542,12 @@ function MemberCard({
   const liked    = slot.my_reactions.includes('👍');
   const likeCount = slot.reactions.find(r => r.emoji === '👍')?.count ?? 0;
 
-  // 셋로그처럼 몇 시 칸에 올렸는지 보여 준다 (예: "14시 · 12분 전")
+  // 올린 시각을 보여 준다 (예: "14:05 · 12분 전")
   const relTime = slot.created_at ? (() => {
-    const posted = parseServerTime(slot.created_at);
-    const diff = new Date().getTime() - posted.getTime();
+    const diff = new Date().getTime() - parseServerTime(slot.created_at).getTime();
     const m = Math.floor(diff / 60000);
     const ago = m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`;
-    return `${posted.getHours()}시 · ${ago}`;
+    return `${formatPostedTime(slot.created_at)} · ${ago}`;
   })() : null;
 
   const color = avatarColor(slot.user_id);
@@ -570,7 +574,7 @@ function MemberCard({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          {relTime && <span className="text-[11px] text-[#5f6f88]">{relTime}</span>}
+          {relTime && <span className="text-[12px] tabular-nums text-[#5f6f88]">{relTime}</span>}
           {isMe && hasLog && onDelete && slot.log_id && (
             <button
               type="button"
@@ -879,12 +883,11 @@ export default function LogPage() {
                 <div className="space-y-3">
                   <p className="text-[12px] text-[#5f6f88]">{STUDY_LOG_RULE_TEXT}</p>
                   {myData.items.map(log => {
-                    const postedHour = parseServerTime(log.created_at).getHours();
                     return (
                       <article key={log.id} className="overflow-hidden rounded-2xl border border-[#0f1e3a]/8 bg-white">
                         <div className="flex items-center justify-between px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-[12px] tabular-nums text-[#5f6f88]">{postedHour}시</span>
+                            <span className="font-mono text-[12px] tabular-nums text-[#5f6f88]">{formatPostedTime(log.created_at)}</span>
                             {log.schedule_title && (
                               <span className="text-[13px] text-[#44536b]">{displayTitle(log.schedule_title)} 완료</span>
                             )}
