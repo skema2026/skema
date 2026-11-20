@@ -12,6 +12,9 @@ type DayTimelineProps = {
   onScheduleClick: (schedule: Schedule) => void;
   onToggleComplete: (schedule: Schedule) => void;
   getDisplayColor: (schedule: Schedule) => string;
+  /** 그릴 시간 범위 (기본 0~24시). 모바일은 그날 일정 앞뒤만 그려 길이를 줄인다 */
+  startHour?: number;
+  endHour?: number;
 };
 
 const getScheduleStyle = (type?: string | null) => {
@@ -29,8 +32,6 @@ const getScheduleStyle = (type?: string | null) => {
   }
 };
 
-const START_HOUR = 0;
-const END_HOUR = 24;
 const HOUR_HEIGHT = 64;
 const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
 
@@ -46,7 +47,13 @@ export default function DayTimeline({
   onScheduleClick,
   onToggleComplete,
   getDisplayColor,
+  startHour = 0,
+  endHour = 24,
 }: DayTimelineProps) {
+  const START_HOUR = startHour;
+  const END_HOUR = endHour;
+  const rangeStart = START_HOUR * 60;
+  const rangeEnd = END_HOUR * 60;
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -62,7 +69,9 @@ export default function DayTimeline({
   const totalHeight = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
   const nowMinutes = now ? now.getHours() * 60 + now.getMinutes() : null;
   const currentTop =
-    nowMinutes !== null ? (nowMinutes - START_HOUR * 60) * MINUTE_HEIGHT : null;
+    nowMinutes !== null && nowMinutes >= rangeStart && nowMinutes <= rangeEnd
+      ? (nowMinutes - rangeStart) * MINUTE_HEIGHT
+      : null;
 
   const sortedSchedules = useMemo(
     () => [...schedules].sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time)),
@@ -72,8 +81,8 @@ export default function DayTimeline({
   return (
     <div className="overflow-hidden rounded-lg border border-black/[0.08] bg-white">
       <div className="relative ml-14 mr-2" style={{ height: totalHeight }}>
-        {Array.from({ length: 49 }, (_, index) => {
-          const minutes = index * 30;
+        {Array.from({ length: (END_HOUR - START_HOUR) * 2 + 1 }, (_, index) => {
+          const minutes = rangeStart + index * 30;
           const hour = Math.floor(minutes / 60);
           const minute = minutes % 60;
           const isHour = minute === 0;
@@ -84,7 +93,7 @@ export default function DayTimeline({
               className={`absolute left-0 right-0 border-t ${
                 isHour ? "border-black/[0.08]" : "border-black/[0.04]"
               }`}
-              style={{ top: minutes * MINUTE_HEIGHT }}
+              style={{ top: (minutes - rangeStart) * MINUTE_HEIGHT }}
             >
               <span className="absolute -left-13 -top-2 w-10 text-right font-mono text-[11px] tabular-nums text-[#98a6ba]">
                 {isHour ? `${String(hour).padStart(2, "0")}:00` : ""}
@@ -94,8 +103,11 @@ export default function DayTimeline({
         })}
 
         {freeWindows.map((window) => {
-          const top = window.start * MINUTE_HEIGHT;
-          const height = Math.max((window.end - window.start) * MINUTE_HEIGHT, 18);
+          const wStart = Math.max(window.start, rangeStart);
+          const wEnd = Math.min(window.end, rangeEnd);
+          if (wEnd <= wStart) return null;
+          const top = (wStart - rangeStart) * MINUTE_HEIGHT;
+          const height = Math.max((wEnd - wStart) * MINUTE_HEIGHT, 18);
 
           return (
             <div
@@ -108,14 +120,18 @@ export default function DayTimeline({
         })}
 
         {sortedSchedules.map((schedule) => {
-          const start = toMinutes(schedule.start_time);
-          const end = toMinutes(schedule.end_time);
+          const rawStart = toMinutes(schedule.start_time);
+          const rawEnd = toMinutes(schedule.end_time);
 
-          if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+          if (!Number.isFinite(rawStart) || !Number.isFinite(rawEnd) || rawEnd <= rawStart) {
             return null;
           }
+          // 범위 밖은 잘라서 그린다
+          const start = Math.max(rawStart, rangeStart);
+          const end = Math.min(rawEnd, rangeEnd);
+          if (end <= start) return null;
 
-          const top = start * MINUTE_HEIGHT;
+          const top = (start - rangeStart) * MINUTE_HEIGHT;
           const height = (end - start) * MINUTE_HEIGHT;
           const color = getDisplayColor(schedule);
           const scheduleStyle = getScheduleStyle(schedule.schedule_type);

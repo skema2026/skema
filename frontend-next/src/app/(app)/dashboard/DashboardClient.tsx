@@ -1036,6 +1036,7 @@ export default function DashboardClient({
                       setCertSchedule={setCertSchedule}
                       onReschedule={handleReschedule}
                       isRegenerating={isRegenerating}
+                      examsCard={upcomingExamsCard}
                     />
                   )}
                   {timetableView === "month" && (
@@ -1056,9 +1057,9 @@ export default function DashboardClient({
                 </div>
               </div>
 
-              {/* 모바일 주간 보기에서는 시험 카드를 주간 화면 안(날짜 줄·하루 목록 아래)에 넣으므로 여기선 숨긴다 */}
+              {/* 모바일 주간·하루 보기에서는 시험 카드를 화면 안(주간: 날짜 줄·하루 목록 아래, 하루: 오늘 일정 아래)에 넣으므로 여기선 숨긴다 */}
               <aside
-                className={`${timetableView === "week" ? "hidden sm:flex" : "flex"} min-w-0 flex-col gap-3 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto`}
+                className={`${timetableView === "week" || timetableView === "day" ? "hidden sm:flex" : "flex"} min-w-0 flex-col gap-3 xl:sticky xl:top-20 xl:max-h-[calc(100vh-100px)] xl:overflow-y-auto`}
               >
                 {upcomingExamsCard}
               </aside>

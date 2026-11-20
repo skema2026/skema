@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import DayTimeline from "./DayTimeline";
+import MobileDayList from "./MobileDayList";
 import MaterialIcon from "@/components/common/MaterialIcon";
 import { displayTitle } from "@/lib/utils";
 import type { ExamSchedule, Schedule, UserProfile } from "@/types";
@@ -51,6 +53,8 @@ type DayViewProps = {
   setCertSchedule: (schedule: { id: number; title: string }) => void;
   onReschedule: () => void;
   isRegenerating: boolean;
+  /** 모바일: '오늘 일정' 카드 바로 아래에 넣을 '시험 일정 · 준비도' 카드 */
+  examsCard?: ReactNode;
 };
 
 type ScheduleListProps = {
@@ -313,8 +317,11 @@ export default function DayView({
   toggleComplete,
   onReschedule,
   isRegenerating,
+  examsCard,
 }: DayViewProps) {
   const [showReport, setShowReport] = useState(true);
+  // 모바일 '오늘 일정' 카드: 기본은 목록, 필요할 때만 시간표 (11/21)
+  const [mobileMode, setMobileMode] = useState<"list" | "grid">("list");
   const focusKeyRef = useRef<string | null>(null);
 
   const completed = daySchedules.filter((schedule) => schedule.is_completed).length;
@@ -366,6 +373,44 @@ export default function DayView({
 
   const todaySummaryText = `${total}개 일정 · 완료 ${completed}개`;
 
+  // 맨 위 '지금/다음 할 일' — 오늘이면 아직 안 끝난 첫 일정, 다른 날이면 안 한 첫 일정
+  const nextUp = useMemo(() => {
+    const sorted = [...daySchedules].sort(
+      (a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time),
+    );
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const pick = sorted.find(
+      (s) => !s.is_completed && (!isSelectedDayToday || timeToMinutes(s.end_time) > nowMin),
+    );
+    if (!pick) return null;
+    const ongoing =
+      isSelectedDayToday &&
+      timeToMinutes(pick.start_time) <= nowMin &&
+      nowMin < timeToMinutes(pick.end_time);
+    return { schedule: pick, label: ongoing ? "지금 할 일" : isSelectedDayToday ? "다음 할 일" : "첫 할 일" };
+  }, [daySchedules, isSelectedDayToday, now, timeToMinutes]);
+
+  // 모바일 시간표는 그날 첫 일정 1시간 전 ~ 마지막 일정 1시간 뒤만 그린다 (최소 6시간)
+  const gridRange = useMemo(() => {
+    const starts = daySchedules.map((s) => timeToMinutes(s.start_time)).filter(Number.isFinite);
+    const ends = daySchedules.map((s) => timeToMinutes(s.end_time)).filter(Number.isFinite);
+    if (starts.length === 0) return { start: 8, end: 22 };
+    let lo = Math.min(...starts) - 60;
+    let hi = Math.max(...ends) + 60;
+    if (isSelectedDayToday) {
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      lo = Math.min(lo, nowMin - 30);
+      hi = Math.max(hi, nowMin + 30);
+    }
+    let start = Math.max(0, Math.floor(lo / 60));
+    let end = Math.min(24, Math.ceil(hi / 60));
+    if (end - start < 6) {
+      end = Math.min(24, start + 6);
+      start = Math.max(0, end - 6);
+    }
+    return { start, end };
+  }, [daySchedules, isSelectedDayToday, now, timeToMinutes]);
+
   return (
     <div
       data-day-scroll-container="true"
@@ -400,9 +445,102 @@ export default function DayView({
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#edf3fc]">
             <div className="h-full rounded-full bg-[#2a6fe3] transition-[width] duration-300" style={{ width: `${completionRate}%` }} />
           </div>
+
+          {/* 모바일: 지금/다음 할 일 한 줄 */}
+          {total > 0 && (
+            <div className="mt-3 sm:hidden">
+              {nextUp ? (
+                <div className="flex items-center gap-3 rounded-lg bg-[#eaf2ff] px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-medium text-[#1f63d6]">{nextUp.label}</p>
+                    <p className="mt-0.5 truncate text-[15px] font-medium text-[#0f1e3a]">
+                      <span className="mr-1.5 font-mono tabular-nums">{nextUp.schedule.start_time}</span>
+                      {displayTitle(nextUp.schedule.title)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      toggleComplete.mutate({ id: nextUp.schedule.id, is_completed: true })
+                    }
+                    className="h-8 shrink-0 rounded-lg bg-[#2a6fe3] px-3 text-[13px] font-medium text-white"
+                  >
+                    완료
+                  </button>
+                </div>
+              ) : (
+                <p className="rounded-lg bg-[#f5f8fd] px-3 py-2.5 text-[13px] text-[#44536b]">
+                  {isSelectedDayToday ? "오늘 할 일을 모두 끝냈어요" : "이날 할 일을 모두 끝냈어요"}
+                </p>
+              )}
+            </div>
+          )}
         </header>
 
-        <section className="rounded-xl border border-black/10 bg-white p-4">
+        {/* 모바일: 목록/시간표를 한 카드로 → 시험 준비도 → 리포트 순서 (데스크톱은 아래 기존 구성 그대로) */}
+        <section className="rounded-xl border border-black/10 bg-white p-4 sm:hidden">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-[15px] font-medium text-[#0f1e3a]">
+              {isSelectedDayToday ? "오늘 일정" : "이날 일정"}
+              <span className="ml-1.5 font-mono text-[13px] font-normal tabular-nums text-[#5f6f88]">{total}개</span>
+            </h3>
+            <div className="flex rounded-lg bg-[#e6effc] p-0.5" role="tablist" aria-label="일정 보기 방식">
+              {(
+                [
+                  ["list", "목록"],
+                  ["grid", "시간표"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={mobileMode === key}
+                  onClick={() => setMobileMode(key)}
+                  className={`h-7 rounded-md px-3 text-[13px] transition-colors ${
+                    mobileMode === key ? "bg-white font-medium text-[#1f63d6] shadow-sm" : "text-[#44536b]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {mobileMode === "list" ? (
+            <MobileDayList
+              bare
+              date={dayDate}
+              isToday={isSelectedDayToday}
+              schedules={daySchedules}
+              exams={dayExams}
+              onScheduleClick={(schedule) => openClassForm(schedule)}
+              onExamClick={(exam) =>
+                setExamForStudyBlocks({ id: exam.id, title: exam.title, exam_date: exam.exam_date })
+              }
+              onToggleComplete={(schedule) =>
+                toggleComplete.mutate({ id: schedule.id, is_completed: !schedule.is_completed })
+              }
+            />
+          ) : (
+            <DayTimeline
+              schedules={daySchedules}
+              freeWindows={dayFreeWindows}
+              isToday={isSelectedDayToday}
+              onScheduleClick={(schedule) => openClassForm(schedule)}
+              onToggleComplete={(schedule) =>
+                toggleComplete.mutate({ id: schedule.id, is_completed: !schedule.is_completed })
+              }
+              getDisplayColor={getDisplayColor}
+              startHour={gridRange.start}
+              endHour={gridRange.end}
+            />
+          )}
+        </section>
+
+        {examsCard && <div className="sm:hidden">{examsCard}</div>}
+
+        <section className="hidden rounded-xl border border-black/10 bg-white p-4 sm:block">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
               <h3 className="text-[15px] font-medium text-[#0f1e3a]">오늘 타임라인</h3>
@@ -424,7 +562,7 @@ export default function DayView({
           />
         </section>
 
-        <section className="rounded-xl border border-black/10 bg-white p-4">
+        <section className="hidden rounded-xl border border-black/10 bg-white p-4 sm:block">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
               <h3 className="text-[15px] font-medium text-[#0f1e3a]">오늘 일정 체크리스트</h3>
